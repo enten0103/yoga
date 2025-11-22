@@ -74,6 +74,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final double? flexGrow;
   final double? flexShrink;
   final double? flexBasis;
+  final YogaDisplay? display;
   final double? width;
   final double? height;
   final EdgeInsets? margin;
@@ -85,6 +86,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.flexGrow,
     this.flexShrink,
     this.flexBasis,
+    this.display,
     this.width,
     this.height,
     this.margin,
@@ -127,12 +129,30 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       needsLayout = true;
     }
 
-    if (parentData.width != width) {
+    // Handle Display and Width together
+    if (parentData.display != display || parentData.width != width) {
+      parentData.display = display;
       parentData.width = width;
+
+      // 1. Set Yoga Display
+      if (display == YogaDisplay.none) {
+        node.display = YGDisplay.none;
+      } else {
+        node.display = YGDisplay.flex;
+      }
+
+      // 2. Set Yoga Width
       if (width != null) {
         node.width = width!;
       } else {
-        node.setWidthAuto();
+        // Width is Auto (null)
+        if (display == YogaDisplay.block) {
+          // Block behaves like width: 100%
+          node.setWidthPercent(100);
+        } else {
+          // Inline, InlineBlock, Flex (default) behave like width: auto
+          node.setWidthAuto();
+        }
       }
       needsLayout = true;
     }

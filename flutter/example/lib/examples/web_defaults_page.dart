@@ -317,6 +317,71 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('5. Display 属性 (Display Properties)'),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试 display: block, inline-block, none 的行为。\n'
+              '\n'
+              '1. Block: 默认占满父容器宽度 (width: 100%)。\n'
+              '2. Inline-Block: 根据内容自适应宽度 (width: auto)。\n'
+              '3. None: 不显示，不占用空间。',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: 300,
+            // height: 200, // Let it grow
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              flexDirection: YGFlexDirection.row, // Row to show width differences
+              flexWrap: YGWrap.wrap,
+              alignItems: YGAlign.flexStart,
+              children: [
+                YogaItem(
+                  display: YogaDisplay.block,
+                  height: 50,
+                  child: Container(
+                    color: Colors.red,
+                    alignment: Alignment.center,
+                    child: const Text('Block (Full Width)'),
+                  ),
+                ),
+                YogaItem(
+                  display: YogaDisplay.inlineBlock,
+                  height: 50,
+                  child: Container(
+                    color: Colors.green,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    child: const Text('Inline-Block (Auto)'),
+                  ),
+                ),
+                YogaItem(
+                  display: YogaDisplay.none,
+                  width: 100,
+                  height: 50,
+                  child: Container(
+                    color: Colors.blue,
+                    alignment: Alignment.center,
+                    child: const Text('None (Hidden)'),
+                  ),
+                ),
+                YogaItem(
+                  display: YogaDisplay.inlineBlock,
+                  height: 50,
+                  child: Container(
+                    color: Colors.orange,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    alignment: Alignment.center,
+                    child: const Text('Inline-Block 2'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

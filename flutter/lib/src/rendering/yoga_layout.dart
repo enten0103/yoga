@@ -10,6 +10,7 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   double? flexGrow;
   double? flexShrink;
   double? flexBasis;
+  YogaDisplay? display;
   double? width;
   double? height;
   EdgeInsets? margin;
