@@ -392,47 +392,66 @@ class _MarginPageState extends State<MarginPage> {
             child: Text(
               '说明:\n'
               '测试负百分比 Margin 的折叠行为。\n'
-              '注意：目前 Flutter Yoga 实现中，如果使用了百分比 Margin，会跳过 Dart 层的 Margin 折叠逻辑，直接交给 Yoga 处理。\n'
-              'Yoga 本身在 Web Defaults 模式下可能支持折叠，但在标准模式下不支持。\n'
+              '注意：\n'
+              '1. 在 Flexbox/Yoga 中，**垂直方向的百分比 Margin 也是相对于父容器宽度的**，而不是高度。\n'
+              '2. 目前 Flutter Yoga 实现中，百分比 Margin 会跳过 Dart 层的折叠逻辑，直接交给 Yoga 处理。\n'
               '\n'
-              'Case: 上方块 marginBottom: 10%, 下方块 marginTop: -5%\n'
-              '父容器高度: 200\n'
-              '预期: 间距 = 10% - 5% = 5% (如果 Yoga 支持折叠/累加)',
+              'Case: 上方块 marginBottom: 10% (of Width), 下方块 marginTop: -5% (of Width)\n'
+              '父容器高度: 200 (固定)\n'
+              '预期: 间距 = 5% of Width',
             ),
           ),
-          Container(
-            color: Colors.grey[300],
-            width: double.infinity,
-            height: 200,
-            child: YogaLayout(
-              useWebDefaults: _useWebDefaults,
-              enableMarginCollapsing: _enableMarginCollapsing,
-              flexDirection: YGFlexDirection.column,
-              alignItems: YGAlign.center,
-              justifyContent: YGJustify.center,
-              children: [
-                YogaItem(
-                  width: 100,
-                  height: 50,
-                  marginPercent: const EdgeInsets.only(bottom: 10),
-                  child: Container(
-                    color: Colors.red,
-                    alignment: Alignment.center,
-                    child: const Text('Bottom 10%'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final margin1 = width * 0.10;
+              final margin2 = width * -0.05;
+              final gap = margin1 + margin2;
+              
+              return Column(
+                children: [
+                  Text('当前父容器宽度: ${width.toStringAsFixed(1)}'),
+                  Text('Bottom Margin (10%): ${margin1.toStringAsFixed(1)}'),
+                  Text('Top Margin (-5%): ${margin2.toStringAsFixed(1)}'),
+                  Text('预期理论间距 (Sum): ${gap.toStringAsFixed(1)}'),
+                  const SizedBox(height: 10),
+                  Container(
+                    color: Colors.grey[300],
+                    width: double.infinity,
+                    height: 200,
+                    child: YogaLayout(
+                      useWebDefaults: _useWebDefaults,
+                      enableMarginCollapsing: _enableMarginCollapsing,
+                      flexDirection: YGFlexDirection.column,
+                      alignItems: YGAlign.center,
+                      justifyContent: YGJustify.center,
+                      children: [
+                        YogaItem(
+                          width: 100,
+                          height: 50,
+                          marginPercent: const EdgeInsets.only(bottom: 10),
+                          child: Container(
+                            color: Colors.red,
+                            alignment: Alignment.center,
+                            child: const Text('Bottom 10%'),
+                          ),
+                        ),
+                        YogaItem(
+                          width: 100,
+                          height: 50,
+                          marginPercent: const EdgeInsets.only(top: -5),
+                          child: Container(
+                            color: Colors.green,
+                            alignment: Alignment.center,
+                            child: const Text('Top -5%'),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                YogaItem(
-                  width: 100,
-                  height: 50,
-                  marginPercent: const EdgeInsets.only(top: -5),
-                  child: Container(
-                    color: Colors.green,
-                    alignment: Alignment.center,
-                    child: const Text('Top -5%'),
-                  ),
-                ),
-              ],
-            ),
+                ],
+              );
+            },
           ),
         ],
       ),
