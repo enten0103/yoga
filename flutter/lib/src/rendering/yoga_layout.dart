@@ -250,7 +250,7 @@ class RenderYogaLayout extends RenderBox
     RenderBox? child = renderLayout.firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
-      
+
       // Reset margins for this child
       childParentData.effectiveMargin = null;
       if (childParentData.yogaNode != null) {
@@ -274,8 +274,7 @@ class RenderYogaLayout extends RenderBox
     return pd.effectiveMargin ?? pd.margin ?? EdgeInsets.zero;
   }
 
-  void _updateEffectiveMargin(
-      YogaLayoutParentData pd, int edge, double value) {
+  void _updateEffectiveMargin(YogaLayoutParentData pd, int edge, double value) {
     EdgeInsets current = _getEffectiveMargin(pd);
     if (edge == YGEdge.top) {
       pd.effectiveMargin = current.copyWith(top: value);
@@ -307,7 +306,7 @@ class RenderYogaLayout extends RenderBox
         final marginTop = _getEffectiveMargin(nextParentData).top;
 
         // Calculate collapsed margin
-        final collapsedMargin = math.max(marginBottom, marginTop);
+        final collapsedMargin = _collapse(marginBottom, marginTop);
 
         // Apply to nodes and update effective margins
         childNode.setMargin(YGEdge.bottom, collapsedMargin);
@@ -337,16 +336,22 @@ class RenderYogaLayout extends RenderBox
         // My top margin
         double myMarginTop = 0.0;
         if (parentData is YogaLayoutParentData) {
-          myMarginTop = _getEffectiveMargin(parentData as YogaLayoutParentData).top;
+          myMarginTop = _getEffectiveMargin(
+            parentData as YogaLayoutParentData,
+          ).top;
         }
 
         final childMarginTop = _getEffectiveMargin(childParentData).top;
 
-        final collapsed = math.max(myMarginTop, childMarginTop);
+        final collapsed = _collapse(myMarginTop, childMarginTop);
 
         _rootNode.setMargin(YGEdge.top, collapsed);
         if (parentData is YogaLayoutParentData) {
-          _updateEffectiveMargin(parentData as YogaLayoutParentData, YGEdge.top, collapsed);
+          _updateEffectiveMargin(
+            parentData as YogaLayoutParentData,
+            YGEdge.top,
+            collapsed,
+          );
         }
 
         childNode.setMargin(YGEdge.top, 0);
@@ -365,21 +370,40 @@ class RenderYogaLayout extends RenderBox
 
         double myMarginBottom = 0.0;
         if (parentData is YogaLayoutParentData) {
-          myMarginBottom = _getEffectiveMargin(parentData as YogaLayoutParentData).bottom;
+          myMarginBottom = _getEffectiveMargin(
+            parentData as YogaLayoutParentData,
+          ).bottom;
         }
 
         final childMarginBottom = _getEffectiveMargin(childParentData).bottom;
 
-        final collapsed = math.max(myMarginBottom, childMarginBottom);
+        final collapsed = _collapse(myMarginBottom, childMarginBottom);
 
         _rootNode.setMargin(YGEdge.bottom, collapsed);
         if (parentData is YogaLayoutParentData) {
-          _updateEffectiveMargin(parentData as YogaLayoutParentData, YGEdge.bottom, collapsed);
+          _updateEffectiveMargin(
+            parentData as YogaLayoutParentData,
+            YGEdge.bottom,
+            collapsed,
+          );
         }
 
         childNode.setMargin(YGEdge.bottom, 0);
         _updateEffectiveMargin(childParentData, YGEdge.bottom, 0);
       }
+    }
+  }
+
+  double _collapse(double m1, double m2) {
+    if (m1 >= 0 && m2 >= 0) {
+      // Both positive: max
+      return math.max(m1, m2);
+    } else if (m1 < 0 && m2 < 0) {
+      // Both negative: min (most negative)
+      return math.min(m1, m2);
+    } else {
+      // One positive, one negative: sum
+      return m1 + m2;
     }
   }
 }

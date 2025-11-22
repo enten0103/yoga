@@ -221,6 +221,102 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('4. 负 Margin 折叠 (Negative Margin Collapsing)'),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试负 Margin 的折叠规则。\n'
+              '\n'
+              'Case A: 正 + 负\n'
+              '上方块 marginBottom: 20\n'
+              '下方块 marginTop: -10\n'
+              '结果: 20 + (-10) = 10\n'
+              '\n'
+              'Case B: 负 + 负\n'
+              '上方块 marginBottom: -10\n'
+              '下方块 marginTop: -20\n'
+              '结果: min(-10, -20) = -20',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: 300,
+            child: Column(
+              children: [
+                const Text('Case A: 20 + (-10) = 10'),
+                Container(
+                  color: Colors.white,
+                  height: 150,
+                  child: YogaLayout(
+                    useWebDefaults: _useWebDefaults,
+                    enableMarginCollapsing: _enableMarginCollapsing,
+                    flexDirection: YGFlexDirection.column,
+                    alignItems: YGAlign.center,
+                    justifyContent: YGJustify.center,
+                    children: [
+                      YogaItem(
+                        width: 100,
+                        height: 50,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        child: Container(
+                          color: Colors.red,
+                          alignment: Alignment.center,
+                          child: const Text('Bottom 20'),
+                        ),
+                      ),
+                      YogaItem(
+                        width: 100,
+                        height: 50,
+                        margin: const EdgeInsets.only(top: -10),
+                        child: Container(
+                          color: Colors.green,
+                          alignment: Alignment.center,
+                          child: const Text('Top -10'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text('Case B: -10 + (-20) = -20'),
+                Container(
+                  color: Colors.white,
+                  height: 150,
+                  child: YogaLayout(
+                    useWebDefaults: _useWebDefaults,
+                    enableMarginCollapsing: _enableMarginCollapsing,
+                    flexDirection: YGFlexDirection.column,
+                    alignItems: YGAlign.center,
+                    justifyContent: YGJustify.center,
+                    children: [
+                      YogaItem(
+                        width: 100,
+                        height: 50,
+                        margin: const EdgeInsets.only(bottom: -10),
+                        child: Container(
+                          color: Colors.red,
+                          alignment: Alignment.center,
+                          child: const Text('Bottom -10'),
+                        ),
+                      ),
+                      YogaItem(
+                        width: 100,
+                        height: 50,
+                        margin: const EdgeInsets.only(top: -20),
+                        child: Container(
+                          color: Colors.green,
+                          alignment: Alignment.center,
+                          child: const Text('Top -20'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
