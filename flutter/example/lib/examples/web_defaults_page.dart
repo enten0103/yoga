@@ -336,7 +336,8 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
             // height: 200, // Let it grow
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
-              flexDirection: YGFlexDirection.row, // Row to show width differences
+              flexDirection:
+                  YGFlexDirection.row, // Row to show width differences
               flexWrap: YGWrap.wrap,
               alignItems: YGAlign.flexStart,
               children: [
@@ -382,6 +383,17 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('6. Display 动态切换 (Dynamic Display Toggle)'),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '点击按钮切换中间元素的 Display 属性，观察布局变化。\n'
+              'None -> Block -> Inline-Block -> None',
+            ),
+          ),
+          _DynamicDisplayDemo(),
         ],
       ),
     );
@@ -407,6 +419,90 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
         alignment: Alignment.center,
         child: Text(text, style: const TextStyle(color: Colors.white)),
       ),
+    );
+  }
+}
+
+class _DynamicDisplayDemo extends StatefulWidget {
+  @override
+  State<_DynamicDisplayDemo> createState() => _DynamicDisplayDemoState();
+}
+
+class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
+  YogaDisplay _display = YogaDisplay.block;
+
+  void _toggleDisplay() {
+    setState(() {
+      if (_display == YogaDisplay.block) {
+        _display = YogaDisplay.inlineBlock;
+      } else if (_display == YogaDisplay.inlineBlock) {
+        _display = YogaDisplay.none;
+      } else {
+        _display = YogaDisplay.block;
+      }
+    });
+  }
+
+  String get _displayString {
+    switch (_display) {
+      case YogaDisplay.block:
+        return 'Block';
+      case YogaDisplay.inlineBlock:
+        return 'Inline-Block';
+      case YogaDisplay.none:
+        return 'None';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        ElevatedButton(
+          onPressed: _toggleDisplay,
+          child: Text('Toggle Display: $_displayString'),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          color: Colors.grey[300],
+          width: 300,
+          child: YogaLayout(
+            flexDirection: YGFlexDirection.row,
+            flexWrap: YGWrap.wrap,
+            children: [
+              YogaItem(
+                display: YogaDisplay.inlineBlock,
+                height: 50,
+                child: Container(
+                  color: Colors.blue[200],
+                  padding: const EdgeInsets.all(8),
+                  child: const Text('Item 1 (Inline-Block)'),
+                ),
+              ),
+              YogaItem(
+                display: _display,
+                height: 50,
+                child: Container(
+                  color: Colors.orange,
+                  padding: const EdgeInsets.all(8),
+                  child: Text('Item 2 ($_displayString)'),
+                ),
+              ),
+              YogaItem(
+                display: YogaDisplay.inlineBlock,
+                height: 50,
+                child: Container(
+                  color: Colors.blue[200],
+                  padding: const EdgeInsets.all(8),
+                  child: const Text('Item 3 (Inline-Block)'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

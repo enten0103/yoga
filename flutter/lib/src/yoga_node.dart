@@ -1,13 +1,7 @@
 import 'dart:ffi';
 import 'yoga_ffi.dart';
 
-enum YogaDisplay {
-  flex,
-  none,
-  block,
-  inline,
-  inlineBlock,
-}
+enum YogaDisplay { flex, none, block, inline, inlineBlock }
 
 /// A high-level wrapper around a Yoga node.
 ///
