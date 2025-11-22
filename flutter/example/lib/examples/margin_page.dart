@@ -350,6 +350,90 @@ class _MarginPageState extends State<MarginPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('6. 负百分比 Margin (Negative Percentage Margin)'),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试负百分比 Margin。\n'
+              '父容器宽度自适应。\n'
+              '紫色方块: width=50%, marginLeft=-10% (向左偏移)',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: double.infinity,
+            height: 100,
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              flexDirection: YGFlexDirection.row,
+              // Add padding to container so we can see the negative margin pull it out
+              padding: const EdgeInsets.only(left: 50),
+              children: [
+                YogaItem(
+                  widthPercent: 50,
+                  marginPercent: const EdgeInsets.only(left: -10),
+                  child: Container(
+                    color: Colors.purple,
+                    alignment: Alignment.center,
+                    child: const Text('Left Margin -10%'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(),
+          _buildSectionTitle(
+            '7. 负百分比 Margin 折叠 (Negative Percentage Margin Collapsing)',
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试负百分比 Margin 的折叠行为。\n'
+              '注意：目前 Flutter Yoga 实现中，如果使用了百分比 Margin，会跳过 Dart 层的 Margin 折叠逻辑，直接交给 Yoga 处理。\n'
+              'Yoga 本身在 Web Defaults 模式下可能支持折叠，但在标准模式下不支持。\n'
+              '\n'
+              'Case: 上方块 marginBottom: 10%, 下方块 marginTop: -5%\n'
+              '父容器高度: 200\n'
+              '预期: 间距 = 10% - 5% = 5% (如果 Yoga 支持折叠/累加)',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: double.infinity,
+            height: 200,
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              enableMarginCollapsing: _enableMarginCollapsing,
+              flexDirection: YGFlexDirection.column,
+              alignItems: YGAlign.center,
+              justifyContent: YGJustify.center,
+              children: [
+                YogaItem(
+                  width: 100,
+                  height: 50,
+                  marginPercent: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    color: Colors.red,
+                    alignment: Alignment.center,
+                    child: const Text('Bottom 10%'),
+                  ),
+                ),
+                YogaItem(
+                  width: 100,
+                  height: 50,
+                  marginPercent: const EdgeInsets.only(top: -5),
+                  child: Container(
+                    color: Colors.green,
+                    alignment: Alignment.center,
+                    child: const Text('Top -5%'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
