@@ -145,12 +145,14 @@ class RenderYogaLayout extends RenderBox
 
       // If the user didn't specify an explicit size, we try to measure the child's content size
       // and set it on the Yoga node. This is a simplified "Auto" sizing.
-      if (childParentData.width == null) {
+      // Note: We must NOT overwrite width/height if widthPercent/heightPercent is set.
+      if (childParentData.width == null && childParentData.widthPercent == null) {
         final Size childSize = child.getDryLayout(const BoxConstraints());
         childNode.width = childSize.width.ceilToDouble();
       }
 
-      if (childParentData.height == null) {
+      if (childParentData.height == null &&
+          childParentData.heightPercent == null) {
         final Size childSize = child.getDryLayout(const BoxConstraints());
         childNode.height = childSize.height.ceilToDouble();
       }
