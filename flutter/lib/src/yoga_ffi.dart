@@ -1,5 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
+import 'dart:developer' as developer;
 
 // Enums
 class YGAlign {
@@ -432,14 +433,17 @@ class Yoga {
       try {
         _lib = DynamicLibrary.open('libyoga.so');
       } catch (e) {
-        print("Failed to load libyoga.so: $e");
+        developer.log("Failed to load libyoga.so: $e", name: 'flutter_yoga');
         rethrow;
       }
     } else if (Platform.isWindows) {
       try {
         _lib = DynamicLibrary.open('flutter_yoga_plugin.dll');
       } catch (e) {
-        print("Failed to load flutter_yoga_plugin.dll: $e");
+        developer.log(
+          "Failed to load flutter_yoga_plugin.dll: $e",
+          name: 'flutter_yoga',
+        );
         rethrow;
       }
     } else {
@@ -779,7 +783,7 @@ class Yoga {
           )
           .asFunction();
     } catch (e) {
-      print("Failed to lookup symbols: $e");
+      developer.log("Failed to lookup symbols: $e", name: 'flutter_yoga');
       rethrow;
     }
   }
