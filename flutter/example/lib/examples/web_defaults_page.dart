@@ -435,6 +435,37 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('8. 百分比 Margin (Percentage Margin)'),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试 marginPercent。\n'
+              '父容器宽度自适应。\n'
+              '蓝色方块: width=50%, marginLeft=25% (居中效果)',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: double.infinity,
+            height: 100,
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              flexDirection: YGFlexDirection.row,
+              children: [
+                YogaItem(
+                  widthPercent: 50,
+                  marginPercent: const EdgeInsets.only(left: 25),
+                  child: Container(
+                    color: Colors.blue,
+                    alignment: Alignment.center,
+                    child: const Text('Left Margin 25%'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

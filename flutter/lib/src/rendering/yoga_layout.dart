@@ -16,6 +16,7 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   double? height;
   double? heightPercent;
   EdgeInsets? margin;
+  EdgeInsets? marginPercent;
   EdgeInsets? borderWidth;
   int? alignSelf;
 
@@ -146,7 +147,8 @@ class RenderYogaLayout extends RenderBox
       // If the user didn't specify an explicit size, we try to measure the child's content size
       // and set it on the Yoga node. This is a simplified "Auto" sizing.
       // Note: We must NOT overwrite width/height if widthPercent/heightPercent is set.
-      if (childParentData.width == null && childParentData.widthPercent == null) {
+      if (childParentData.width == null &&
+          childParentData.widthPercent == null) {
         final Size childSize = child.getDryLayout(const BoxConstraints());
         childNode.width = childSize.width.ceilToDouble();
       }
@@ -229,7 +231,11 @@ class RenderYogaLayout extends RenderBox
       childParentData.effectiveMargin = null;
 
       if (childParentData.yogaNode != null) {
-        _resetMargins(childParentData.yogaNode!, childParentData.margin);
+        _resetMargins(
+          childParentData.yogaNode!,
+          childParentData.margin,
+          childParentData.marginPercent,
+        );
       }
 
       if (child is RenderYogaLayout) {
@@ -239,14 +245,24 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  void _resetMargins(YogaNode node, EdgeInsets? margin) {
-    if (margin != null) {
-      node.setMargin(YGEdge.left, margin.left);
-      node.setMargin(YGEdge.top, margin.top);
-      node.setMargin(YGEdge.right, margin.right);
-      node.setMargin(YGEdge.bottom, margin.bottom);
+  void _resetMargins(
+    YogaNode node,
+    EdgeInsets? margin,
+    EdgeInsets? marginPercent,
+  ) {
+    _setMarginEdge(node, YGEdge.left, margin?.left, marginPercent?.left);
+    _setMarginEdge(node, YGEdge.top, margin?.top, marginPercent?.top);
+    _setMarginEdge(node, YGEdge.right, margin?.right, marginPercent?.right);
+    _setMarginEdge(node, YGEdge.bottom, margin?.bottom, marginPercent?.bottom);
+  }
+
+  void _setMarginEdge(YogaNode node, int edge, double? px, double? pct) {
+    if (pct != null && pct != 0) {
+      node.setMarginPercent(edge, pct);
+    } else if (px != null) {
+      node.setMargin(edge, px);
     } else {
-      node.setMargin(YGEdge.all, 0);
+      node.setMargin(edge, 0);
     }
   }
 
@@ -259,7 +275,11 @@ class RenderYogaLayout extends RenderBox
       // Reset margins for this child
       childParentData.effectiveMargin = null;
       if (childParentData.yogaNode != null) {
-        _resetMargins(childParentData.yogaNode!, childParentData.margin);
+        _resetMargins(
+          childParentData.yogaNode!,
+          childParentData.margin,
+          childParentData.marginPercent,
+        );
       }
 
       if (child is RenderYogaLayout) {
@@ -306,6 +326,13 @@ class RenderYogaLayout extends RenderBox
         final childNode = childParentData.yogaNode!;
         final nextNode = nextParentData.yogaNode!;
 
+        // Skip collapsing if either margin is percentage-based
+        if ((childParentData.marginPercent?.bottom ?? 0) != 0 ||
+            (nextParentData.marginPercent?.top ?? 0) != 0) {
+          child = nextChild;
+          continue;
+        }
+
         // Get effective margins
         final marginBottom = _getEffectiveMargin(childParentData).bottom;
         final marginTop = _getEffectiveMargin(nextParentData).top;
@@ -338,29 +365,39 @@ class RenderYogaLayout extends RenderBox
         final childParentData = firstChild.parentData as YogaLayoutParentData;
         final childNode = childParentData.yogaNode!;
 
-        // My top margin
-        double myMarginTop = 0.0;
-        if (parentData is YogaLayoutParentData) {
-          myMarginTop = _getEffectiveMargin(
-            parentData as YogaLayoutParentData,
-          ).top;
+        // Skip if child has percentage top margin
+        if ((childParentData.marginPercent?.top ?? 0) != 0) {
+          // Do nothing
+        } else {
+          // My top margin
+          double myMarginTop = 0.0;
+          bool myMarginIsPercent = false;
+          if (parentData is YogaLayoutParentData) {
+            final pd = parentData as YogaLayoutParentData;
+            myMarginTop = _getEffectiveMargin(pd).top;
+            if ((pd.marginPercent?.top ?? 0) != 0) {
+              myMarginIsPercent = true;
+            }
+          }
+
+          if (!myMarginIsPercent) {
+            final childMarginTop = _getEffectiveMargin(childParentData).top;
+
+            final collapsed = _collapse(myMarginTop, childMarginTop);
+
+            _rootNode.setMargin(YGEdge.top, collapsed);
+            if (parentData is YogaLayoutParentData) {
+              _updateEffectiveMargin(
+                parentData as YogaLayoutParentData,
+                YGEdge.top,
+                collapsed,
+              );
+            }
+
+            childNode.setMargin(YGEdge.top, 0);
+            _updateEffectiveMargin(childParentData, YGEdge.top, 0);
+          }
         }
-
-        final childMarginTop = _getEffectiveMargin(childParentData).top;
-
-        final collapsed = _collapse(myMarginTop, childMarginTop);
-
-        _rootNode.setMargin(YGEdge.top, collapsed);
-        if (parentData is YogaLayoutParentData) {
-          _updateEffectiveMargin(
-            parentData as YogaLayoutParentData,
-            YGEdge.top,
-            collapsed,
-          );
-        }
-
-        childNode.setMargin(YGEdge.top, 0);
-        _updateEffectiveMargin(childParentData, YGEdge.top, 0);
       }
     }
 
@@ -373,28 +410,39 @@ class RenderYogaLayout extends RenderBox
         final childParentData = lastChild.parentData as YogaLayoutParentData;
         final childNode = childParentData.yogaNode!;
 
-        double myMarginBottom = 0.0;
-        if (parentData is YogaLayoutParentData) {
-          myMarginBottom = _getEffectiveMargin(
-            parentData as YogaLayoutParentData,
-          ).bottom;
+        // Skip if child has percentage bottom margin
+        if ((childParentData.marginPercent?.bottom ?? 0) != 0) {
+          // Do nothing
+        } else {
+          double myMarginBottom = 0.0;
+          bool myMarginIsPercent = false;
+          if (parentData is YogaLayoutParentData) {
+            final pd = parentData as YogaLayoutParentData;
+            myMarginBottom = _getEffectiveMargin(pd).bottom;
+            if ((pd.marginPercent?.bottom ?? 0) != 0) {
+              myMarginIsPercent = true;
+            }
+          }
+
+          if (!myMarginIsPercent) {
+            final childMarginBottom =
+                _getEffectiveMargin(childParentData).bottom;
+
+            final collapsed = _collapse(myMarginBottom, childMarginBottom);
+
+            _rootNode.setMargin(YGEdge.bottom, collapsed);
+            if (parentData is YogaLayoutParentData) {
+              _updateEffectiveMargin(
+                parentData as YogaLayoutParentData,
+                YGEdge.bottom,
+                collapsed,
+              );
+            }
+
+            childNode.setMargin(YGEdge.bottom, 0);
+            _updateEffectiveMargin(childParentData, YGEdge.bottom, 0);
+          }
         }
-
-        final childMarginBottom = _getEffectiveMargin(childParentData).bottom;
-
-        final collapsed = _collapse(myMarginBottom, childMarginBottom);
-
-        _rootNode.setMargin(YGEdge.bottom, collapsed);
-        if (parentData is YogaLayoutParentData) {
-          _updateEffectiveMargin(
-            parentData as YogaLayoutParentData,
-            YGEdge.bottom,
-            collapsed,
-          );
-        }
-
-        childNode.setMargin(YGEdge.bottom, 0);
-        _updateEffectiveMargin(childParentData, YGEdge.bottom, 0);
       }
     }
   }

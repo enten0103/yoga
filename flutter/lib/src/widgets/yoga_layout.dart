@@ -80,6 +80,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final double? height;
   final double? heightPercent;
   final EdgeInsets? margin;
+  final EdgeInsets? marginPercent;
   final EdgeInsets? borderWidth;
   final int? alignSelf;
 
@@ -94,6 +95,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.height,
     this.heightPercent,
     this.margin,
+    this.marginPercent,
     this.borderWidth,
     this.alignSelf,
     required super.child,
@@ -180,14 +182,11 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       }
       needsLayout = true;
     }
-    if (parentData.margin != margin) {
+    if (parentData.margin != margin || parentData.marginPercent != marginPercent) {
       parentData.margin = margin;
-      if (margin != null) {
-        node.setMargin(YGEdge.left, margin!.left);
-        node.setMargin(YGEdge.top, margin!.top);
-        node.setMargin(YGEdge.right, margin!.right);
-        node.setMargin(YGEdge.bottom, margin!.bottom);
-      }
+      parentData.marginPercent = marginPercent;
+      
+      _applyMargin(node, margin, marginPercent);
       needsLayout = true;
     }
 
@@ -215,6 +214,27 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       if (targetParent is RenderObject) {
         targetParent.markNeedsLayout();
       }
+    }
+  }
+
+  void _applyMargin(
+    YogaNode node,
+    EdgeInsets? margin,
+    EdgeInsets? marginPercent,
+  ) {
+    _setMarginEdge(node, YGEdge.left, margin?.left, marginPercent?.left);
+    _setMarginEdge(node, YGEdge.top, margin?.top, marginPercent?.top);
+    _setMarginEdge(node, YGEdge.right, margin?.right, marginPercent?.right);
+    _setMarginEdge(node, YGEdge.bottom, margin?.bottom, marginPercent?.bottom);
+  }
+
+  void _setMarginEdge(YogaNode node, int edge, double? px, double? pct) {
+    if (pct != null && pct != 0) {
+      node.setMarginPercent(edge, pct);
+    } else if (px != null) {
+      node.setMargin(edge, px);
+    } else {
+      node.setMargin(edge, 0);
     }
   }
 
