@@ -76,7 +76,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final double? flexBasis;
   final YogaDisplay? display;
   final double? width;
+  final double? widthPercent;
   final double? height;
+  final double? heightPercent;
   final EdgeInsets? margin;
   final EdgeInsets? borderWidth;
   final int? alignSelf;
@@ -88,7 +90,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.flexBasis,
     this.display,
     this.width,
+    this.widthPercent,
     this.height,
+    this.heightPercent,
     this.margin,
     this.borderWidth,
     this.alignSelf,
@@ -130,9 +134,12 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     }
 
     // Handle Display and Width together
-    if (parentData.display != display || parentData.width != width) {
+    if (parentData.display != display ||
+        parentData.width != width ||
+        parentData.widthPercent != widthPercent) {
       parentData.display = display;
       parentData.width = width;
+      parentData.widthPercent = widthPercent;
 
       // 1. Set Yoga Display
       if (display == YogaDisplay.none) {
@@ -142,7 +149,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       }
 
       // 2. Set Yoga Width
-      if (width != null) {
+      if (widthPercent != null) {
+        node.setWidthPercent(widthPercent!);
+      } else if (width != null) {
         node.width = width!;
       } else {
         // Width is Auto (null)
@@ -157,9 +166,14 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       needsLayout = true;
     }
 
-    if (parentData.height != height) {
+    if (parentData.height != height ||
+        parentData.heightPercent != heightPercent) {
       parentData.height = height;
-      if (height != null) {
+      parentData.heightPercent = heightPercent;
+
+      if (heightPercent != null) {
+        node.setHeightPercent(heightPercent!);
+      } else if (height != null) {
         node.height = height!;
       } else {
         node.setHeightAuto();

@@ -394,6 +394,47 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
             ),
           ),
           _DynamicDisplayDemo(),
+          const Divider(),
+          _buildSectionTitle('7. 百分比尺寸 (Percentage Sizing)'),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试 widthPercent 和 heightPercent。\n'
+              '父容器: 300x200\n'
+              '红色: width=50% (150), height=50% (100)\n'
+              '绿色: width=25% (75), height=100% (200)',
+            ),
+          ),
+          Container(
+            color: Colors.grey[300],
+            width: 300,
+            height: 200,
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              flexDirection: YGFlexDirection.row,
+              children: [
+                YogaItem(
+                  widthPercent: 50,
+                  heightPercent: 50,
+                  child: Container(
+                    color: Colors.red,
+                    alignment: Alignment.center,
+                    child: const Text('50% x 50%'),
+                  ),
+                ),
+                YogaItem(
+                  widthPercent: 25,
+                  heightPercent: 100,
+                  child: Container(
+                    color: Colors.green,
+                    alignment: Alignment.center,
+                    child: const Text('25% x 100%'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -474,7 +515,6 @@ class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
             children: [
               YogaItem(
                 display: YogaDisplay.inlineBlock,
-                height: 50,
                 child: Container(
                   color: Colors.blue[200],
                   padding: const EdgeInsets.all(8),
@@ -487,12 +527,12 @@ class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
                 child: Container(
                   color: Colors.orange,
                   padding: const EdgeInsets.all(8),
-                  child: Text('Item 2 ($_displayString)'),
+                  child: Text('Item 2 ($_displayString)',
+                  ),
                 ),
               ),
               YogaItem(
                 display: YogaDisplay.inlineBlock,
-                height: 50,
                 child: Container(
                   color: Colors.blue[200],
                   padding: const EdgeInsets.all(8),
