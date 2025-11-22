@@ -16,6 +16,9 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   EdgeInsets? borderWidth;
   int? alignSelf;
 
+  // Effective margin after collapsing (runtime only, not set by user)
+  EdgeInsets? effectiveMargin;
+
   @override
   String toString() => '${super.toString()}; yogaNode=$yogaNode';
 }
@@ -27,6 +30,8 @@ class RenderYogaLayout extends RenderBox
   late final YogaNode _rootNode;
   late final YogaConfig _config;
   bool _enableMarginCollapsing = false;
+  EdgeInsets _padding = EdgeInsets.zero;
+  EdgeInsets _borderWidth = EdgeInsets.zero;
 
   RenderYogaLayout() {
     _config = YogaConfig();
@@ -48,11 +53,63 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
+  set padding(EdgeInsets? value) {
+    _padding = value ?? EdgeInsets.zero;
+    if (value != null) {
+      _rootNode.setPadding(YGEdge.left, value.left);
+      _rootNode.setPadding(YGEdge.top, value.top);
+      _rootNode.setPadding(YGEdge.right, value.right);
+      _rootNode.setPadding(YGEdge.bottom, value.bottom);
+    } else {
+      _rootNode.setPadding(YGEdge.all, 0);
+    }
+    markNeedsLayout();
+  }
+
+  set borderWidth(EdgeInsets? value) {
+    _borderWidth = value ?? EdgeInsets.zero;
+    if (value != null) {
+      _rootNode.setBorder(YGEdge.left, value.left);
+      _rootNode.setBorder(YGEdge.top, value.top);
+      _rootNode.setBorder(YGEdge.right, value.right);
+      _rootNode.setBorder(YGEdge.bottom, value.bottom);
+    } else {
+      _rootNode.setBorder(YGEdge.all, 0);
+    }
+    markNeedsLayout();
+  }
+
   @override
   void setupParentData(RenderBox child) {
     if (child.parentData is! YogaLayoutParentData) {
       child.parentData = YogaLayoutParentData();
     }
+  }
+
+  @override
+  void insert(RenderBox child, {RenderBox? after}) {
+    super.insert(child, after: after);
+    final childParentData = child.parentData as YogaLayoutParentData;
+    childParentData.yogaNode ??= YogaNode();
+    final childNode = childParentData.yogaNode!;
+    childNode.setConfig(_config);
+
+    int index = 0;
+    RenderBox? current = firstChild;
+    while (current != null && current != child) {
+      index++;
+      current = (current.parentData as YogaLayoutParentData).nextSibling;
+    }
+    _rootNode.insertChild(childNode, index);
+  }
+
+  @override
+  void remove(RenderBox child) {
+    final childParentData = child.parentData as YogaLayoutParentData;
+    if (childParentData.yogaNode != null) {
+      _rootNode.removeChild(childParentData.yogaNode!);
+    }
+    super.remove(child);
   }
 
   @override
@@ -77,55 +134,14 @@ class RenderYogaLayout extends RenderBox
       _rootNode.setHeightAuto();
     }
 
-    // 2. Sync Children
-    // We assume the children list in RenderYogaLayout matches the children in YogaNode.
-    // However, since we are using a MultiChildRenderObjectWidget, the children are
-    // inserted/removed via insert/remove/move methods.
-    // We need to ensure the YogaNode tree is in sync.
-    // The easiest way is to rebuild the children list of the root node here,
-    // or maintain it incrementally.
-    // Let's rebuild it for simplicity in this version, or check if we can trust the order.
-
-    _rootNode.removeAllChildren();
-
+    // 2. Sync Children Size
     RenderBox? child = firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
-
-      // Ensure child has a YogaNode
-      childParentData.yogaNode ??= YogaNode();
-
       final childNode = childParentData.yogaNode!;
-      childNode.setConfig(_config);
-
-      // Reset margins to what the user specified in YogaItem
-      // This is crucial because we might have modified them in the previous layout pass
-      _resetMargins(childNode, childParentData.margin);
-
-      // If the child is a RenderYogaLayout (nested), we might want to let it handle its own layout?
-      // But generally, we treat children as black boxes unless they are also Yoga nodes we want to merge?
-      // For now, treat all children as leaf nodes or nested roots.
-
-      // We need to measure the child.
-      // Since we don't have a complex measure callback setup yet,
-      // we will use a simplified approach:
-      // If the child has intrinsic size (like Text), we need to measure it.
-      // If the child is flexible, Yoga handles it.
-
-      // CRITICAL: How to measure Flutter children from Yoga?
-      // We will set a measure function on the childNode.
-      // But passing the callback is hard.
-
-      // ALTERNATIVE:
-      // We can't easily pass a callback that calls `child.getDryLayout`.
-      // So we will try to infer size.
-      // If we don't set a measure function, Yoga assumes the node has no content size
-      // unless we set width/height.
 
       // If the user didn't specify an explicit size, we try to measure the child's content size
       // and set it on the Yoga node. This is a simplified "Auto" sizing.
-      // We use ceilToDouble() to avoid sub-pixel clipping issues when converting between
-      // Flutter's double precision and Yoga's float precision.
       if (childParentData.width == null) {
         final Size childSize = child.getDryLayout(const BoxConstraints());
         childNode.width = childSize.width.ceilToDouble();
@@ -136,13 +152,14 @@ class RenderYogaLayout extends RenderBox
         childNode.height = childSize.height.ceilToDouble();
       }
 
-      _rootNode.addChild(childNode);
-
       child = childParentData.nextSibling;
     }
 
     if (_enableMarginCollapsing) {
-      _applyMarginCollapsing();
+      _collapseMarginsRecursive(this);
+    } else {
+      // Ensure margins are reset if collapsing is disabled
+      _resetMarginsRecursive(this);
     }
 
     // 3. Calculate Layout
@@ -199,6 +216,24 @@ class RenderYogaLayout extends RenderBox
     return defaultHitTestChildren(result, position: position);
   }
 
+  void _resetMarginsRecursive(RenderYogaLayout renderLayout) {
+    RenderBox? child = renderLayout.firstChild;
+    while (child != null) {
+      final childParentData = child.parentData as YogaLayoutParentData;
+      // Reset effective margin
+      childParentData.effectiveMargin = null;
+
+      if (childParentData.yogaNode != null) {
+        _resetMargins(childParentData.yogaNode!, childParentData.margin);
+      }
+
+      if (child is RenderYogaLayout) {
+        _resetMarginsRecursive(child);
+      }
+      child = childParentData.nextSibling;
+    }
+  }
+
   void _resetMargins(YogaNode node, EdgeInsets? margin) {
     if (margin != null) {
       node.setMargin(YGEdge.left, margin.left);
@@ -210,10 +245,47 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  void _applyMarginCollapsing() {
+  void _collapseMarginsRecursive(RenderYogaLayout renderLayout) {
+    // 1. Recurse first (Post-order traversal)
+    RenderBox? child = renderLayout.firstChild;
+    while (child != null) {
+      final childParentData = child.parentData as YogaLayoutParentData;
+      
+      // Reset margins for this child
+      childParentData.effectiveMargin = null;
+      if (childParentData.yogaNode != null) {
+        _resetMargins(childParentData.yogaNode!, childParentData.margin);
+      }
+
+      if (child is RenderYogaLayout) {
+        _collapseMarginsRecursive(child);
+      }
+      child = childParentData.nextSibling;
+    }
+
+    // 2. Apply Sibling Collapsing (My children)
+    renderLayout._applySiblingCollapsing();
+
+    // 3. Apply Parent-Child Collapsing (Me and my children)
+    renderLayout._applyParentChildCollapsing();
+  }
+
+  EdgeInsets _getEffectiveMargin(YogaLayoutParentData pd) {
+    return pd.effectiveMargin ?? pd.margin ?? EdgeInsets.zero;
+  }
+
+  void _updateEffectiveMargin(
+      YogaLayoutParentData pd, int edge, double value) {
+    EdgeInsets current = _getEffectiveMargin(pd);
+    if (edge == YGEdge.top) {
+      pd.effectiveMargin = current.copyWith(top: value);
+    } else if (edge == YGEdge.bottom) {
+      pd.effectiveMargin = current.copyWith(bottom: value);
+    }
+  }
+
+  void _applySiblingCollapsing() {
     // Margin collapsing only applies to vertical flow (column/column-reverse)
-    // and when flexWrap is noWrap (usually).
-    // For simplicity, we only support column direction for now.
     final flexDirection = _rootNode.flexDirection;
     if (flexDirection != YGFlexDirection.column) {
       return;
@@ -230,21 +302,84 @@ class RenderYogaLayout extends RenderBox
         final childNode = childParentData.yogaNode!;
         final nextNode = nextParentData.yogaNode!;
 
-        // Get margins from ParentData (source of truth)
-        final marginBottom = childParentData.margin?.bottom ?? 0.0;
-        final marginTop = nextParentData.margin?.top ?? 0.0;
+        // Get effective margins
+        final marginBottom = _getEffectiveMargin(childParentData).bottom;
+        final marginTop = _getEffectiveMargin(nextParentData).top;
 
         // Calculate collapsed margin
         final collapsedMargin = math.max(marginBottom, marginTop);
 
-        // Apply to nodes:
-        // We set the bottom margin of the current node to the collapsed value
-        // and the top margin of the next node to 0.
+        // Apply to nodes and update effective margins
         childNode.setMargin(YGEdge.bottom, collapsedMargin);
+        _updateEffectiveMargin(childParentData, YGEdge.bottom, collapsedMargin);
+
         nextNode.setMargin(YGEdge.top, 0);
+        _updateEffectiveMargin(nextParentData, YGEdge.top, 0);
       }
 
       child = nextChild;
+    }
+  }
+
+  void _applyParentChildCollapsing() {
+    final flexDirection = _rootNode.flexDirection;
+    if (flexDirection != YGFlexDirection.column) {
+      return;
+    }
+
+    // Top Collapsing
+    if (_padding.top == 0 && _borderWidth.top == 0) {
+      final firstChild = this.firstChild;
+      if (firstChild != null) {
+        final childParentData = firstChild.parentData as YogaLayoutParentData;
+        final childNode = childParentData.yogaNode!;
+
+        // My top margin
+        double myMarginTop = 0.0;
+        if (parentData is YogaLayoutParentData) {
+          myMarginTop = _getEffectiveMargin(parentData as YogaLayoutParentData).top;
+        }
+
+        final childMarginTop = _getEffectiveMargin(childParentData).top;
+
+        final collapsed = math.max(myMarginTop, childMarginTop);
+
+        _rootNode.setMargin(YGEdge.top, collapsed);
+        if (parentData is YogaLayoutParentData) {
+          _updateEffectiveMargin(parentData as YogaLayoutParentData, YGEdge.top, collapsed);
+        }
+
+        childNode.setMargin(YGEdge.top, 0);
+        _updateEffectiveMargin(childParentData, YGEdge.top, 0);
+      }
+    }
+
+    // Bottom Collapsing
+    if (!constraints.hasBoundedHeight &&
+        _padding.bottom == 0 &&
+        _borderWidth.bottom == 0) {
+      final lastChild = this.lastChild;
+      if (lastChild != null) {
+        final childParentData = lastChild.parentData as YogaLayoutParentData;
+        final childNode = childParentData.yogaNode!;
+
+        double myMarginBottom = 0.0;
+        if (parentData is YogaLayoutParentData) {
+          myMarginBottom = _getEffectiveMargin(parentData as YogaLayoutParentData).bottom;
+        }
+
+        final childMarginBottom = _getEffectiveMargin(childParentData).bottom;
+
+        final collapsed = math.max(myMarginBottom, childMarginBottom);
+
+        _rootNode.setMargin(YGEdge.bottom, collapsed);
+        if (parentData is YogaLayoutParentData) {
+          _updateEffectiveMargin(parentData as YogaLayoutParentData, YGEdge.bottom, collapsed);
+        }
+
+        childNode.setMargin(YGEdge.bottom, 0);
+        _updateEffectiveMargin(childParentData, YGEdge.bottom, 0);
+      }
     }
   }
 }

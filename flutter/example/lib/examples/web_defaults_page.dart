@@ -158,6 +158,69 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               ],
             ),
           ),
+          const Divider(),
+          _buildSectionTitle('3. 父子折叠 (Parent-Child Collapsing)'),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '当父容器没有 Padding 或 Border 时，其第一个子项的 Top Margin 会与父容器的 Top Margin 折叠。\n'
+              '\n'
+              '当前状态: ${_enableMarginCollapsing ? "开启" : "关闭"}\n'
+              '\n'
+              '示例结构:\n'
+              '灰色背景 (Outer)\n'
+              '  蓝色背景 (Inner, 无 Padding/Border)\n'
+              '    红色方块 (Child, Margin Top: 30)\n'
+              '\n'
+              '预期效果:\n'
+              '关闭时: 蓝色容器紧贴顶部，红色方块在蓝色容器内部向下偏移 30px (露出蓝色背景)。\n'
+              '开启时: 蓝色容器整体向下偏移 30px (露出灰色背景)，红色方块紧贴蓝色容器顶部。',
+            ),
+          ),
+          Container(
+            color: Colors.grey[400], // Outer background
+            width: 300,
+            height: 150,
+            alignment: Alignment.topLeft,
+            child: YogaLayout(
+              useWebDefaults: _useWebDefaults,
+              enableMarginCollapsing: _enableMarginCollapsing,
+              flexDirection: YGFlexDirection.column,
+              children: [
+                // Inner Container
+                YogaItem(
+                  width: 200,
+                  height: 100,
+                  child: Container(
+                    color: Colors.blue[200], // Inner background
+                    child: YogaLayout(
+                      // Inner layout must also enable collapsing if we want it to participate?
+                      // Actually, the Outer layout runs the recursive logic.
+                      // But we should set it for consistency or if it runs independently.
+                      enableMarginCollapsing: _enableMarginCollapsing,
+                      flexDirection: YGFlexDirection.column,
+                      children: [
+                        YogaItem(
+                          width: 100,
+                          height: 50,
+                          margin: const EdgeInsets.only(top: 30),
+                          child: Container(
+                            color: Colors.red,
+                            alignment: Alignment.center,
+                            child: const Text(
+                              'Margin Top 30',
+                              style: TextStyle(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

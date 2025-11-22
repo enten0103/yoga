@@ -44,8 +44,8 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..rootNode.height = height ?? double.nan
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
-      .._updatePadding(padding)
-      .._updateBorderWidth(borderWidth);
+      ..padding = padding
+      ..borderWidth = borderWidth;
   }
 
   @override
@@ -63,36 +63,13 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..rootNode.height = height ?? double.nan
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
-      .._updatePadding(padding)
-      .._updateBorderWidth(borderWidth);
+      ..padding = padding
+      ..borderWidth = borderWidth;
 
     renderObject.markNeedsLayout();
   }
 }
 
-extension _RenderYogaLayoutPadding on RenderYogaLayout {
-  void _updatePadding(EdgeInsets? padding) {
-    if (padding != null) {
-      rootNode.setPadding(YGEdge.left, padding.left);
-      rootNode.setPadding(YGEdge.top, padding.top);
-      rootNode.setPadding(YGEdge.right, padding.right);
-      rootNode.setPadding(YGEdge.bottom, padding.bottom);
-    } else {
-      rootNode.setPadding(YGEdge.all, 0);
-    }
-  }
-
-  void _updateBorderWidth(EdgeInsets? borderWidth) {
-    if (borderWidth != null) {
-      rootNode.setBorder(YGEdge.left, borderWidth.left);
-      rootNode.setBorder(YGEdge.top, borderWidth.top);
-      rootNode.setBorder(YGEdge.right, borderWidth.right);
-      rootNode.setBorder(YGEdge.bottom, borderWidth.bottom);
-    } else {
-      rootNode.setBorder(YGEdge.all, 0);
-    }
-  }
-}
 
 class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final double? flexGrow;
