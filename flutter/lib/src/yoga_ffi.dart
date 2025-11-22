@@ -38,6 +38,13 @@ class Yoga {
         print("Failed to load libyoga.so: $e");
         rethrow;
       }
+    } else if (Platform.isWindows) {
+      try {
+        _lib = DynamicLibrary.open('flutter_yoga_plugin.dll');
+      } catch (e) {
+        print("Failed to load flutter_yoga_plugin.dll: $e");
+        rethrow;
+      }
     } else {
       throw UnimplementedError('Platform not supported');
     }
