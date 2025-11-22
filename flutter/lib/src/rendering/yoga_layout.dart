@@ -425,8 +425,9 @@ class RenderYogaLayout extends RenderBox
           }
 
           if (!myMarginIsPercent) {
-            final childMarginBottom =
-                _getEffectiveMargin(childParentData).bottom;
+            final childMarginBottom = _getEffectiveMargin(
+              childParentData,
+            ).bottom;
 
             final collapsed = _collapse(myMarginBottom, childMarginBottom);
 

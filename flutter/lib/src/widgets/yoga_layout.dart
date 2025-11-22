@@ -182,10 +182,11 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       }
       needsLayout = true;
     }
-    if (parentData.margin != margin || parentData.marginPercent != marginPercent) {
+    if (parentData.margin != margin ||
+        parentData.marginPercent != marginPercent) {
       parentData.margin = margin;
       parentData.marginPercent = marginPercent;
-      
+
       _applyMargin(node, margin, marginPercent);
       needsLayout = true;
     }

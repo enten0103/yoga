@@ -9,6 +9,7 @@ import 'examples/flex_properties_page.dart';
 import 'examples/spacing_page.dart';
 import 'examples/display_page.dart';
 import 'examples/web_defaults_page.dart';
+import 'examples/margin_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -49,6 +50,7 @@ class _MyAppState extends State<MyApp> {
         '/spacing': (context) => const SpacingPage(),
         '/display': (context) => const DisplayPage(),
         '/web_defaults': (context) => const WebDefaultsPage(),
+        '/margin': (context) => const MarginPage(),
       },
     );
   }

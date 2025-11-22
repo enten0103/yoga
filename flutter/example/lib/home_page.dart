@@ -24,6 +24,7 @@ class HomePage extends StatelessWidget {
           ),
           _buildListTile(context, 'Display (None/Flex)', '/display'),
           _buildListTile(context, 'Web Defaults', '/web_defaults'),
+          _buildListTile(context, 'Margin Examples', '/margin'),
         ],
       ),
     );
