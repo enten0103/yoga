@@ -94,6 +94,14 @@ class YGWrap {
   static const int wrapReverse = 2;
 }
 
+final class YGSize extends Struct {
+  @Float()
+  external double width;
+
+  @Float()
+  external double height;
+}
+
 // Typedefs
 typedef YGNodeNewFunc = Pointer<Void> Function();
 typedef YGNodeNew = Pointer<Void> Function();
@@ -115,6 +123,26 @@ typedef YGNodeSetNodeType = void Function(Pointer<Void>, int);
 
 typedef YGNodeGetNodeTypeFunc = Int32 Function(Pointer<Void>);
 typedef YGNodeGetNodeType = int Function(Pointer<Void>);
+
+typedef YGNodeSetContextFunc = Void Function(Pointer<Void>, Pointer<Void>);
+typedef YGNodeSetContext = void Function(Pointer<Void>, Pointer<Void>);
+
+typedef YGNodeGetContextFunc = Pointer<Void> Function(Pointer<Void>);
+typedef YGNodeGetContext = Pointer<Void> Function(Pointer<Void>);
+
+typedef YGMeasureFunc =
+    YGSize Function(
+      Pointer<Void> node,
+      Float width,
+      Int32 widthMode,
+      Float height,
+      Int32 heightMode,
+    );
+
+typedef YGNodeSetMeasureFuncFunc =
+    Void Function(Pointer<Void>, Pointer<NativeFunction<YGMeasureFunc>>);
+typedef YGNodeSetMeasureFunc =
+    void Function(Pointer<Void>, Pointer<NativeFunction<YGMeasureFunc>>);
 
 typedef YGNodeCopyStyleFunc = Void Function(Pointer<Void>, Pointer<Void>);
 typedef YGNodeCopyStyle = void Function(Pointer<Void>, Pointer<Void>);
@@ -292,6 +320,22 @@ typedef YGNodeLayoutGetDirection = int Function(Pointer<Void>);
 typedef YGNodeLayoutGetHadOverflowFunc = Bool Function(Pointer<Void>);
 typedef YGNodeLayoutGetHadOverflow = bool Function(Pointer<Void>);
 
+// Config Typedefs
+typedef YGConfigNewFunc = Pointer<Void> Function();
+typedef YGConfigNew = Pointer<Void> Function();
+
+typedef YGConfigFreeFunc = Void Function(Pointer<Void>);
+typedef YGConfigFree = void Function(Pointer<Void>);
+
+typedef YGConfigSetUseWebDefaultsFunc = Void Function(Pointer<Void>, Bool);
+typedef YGConfigSetUseWebDefaults = void Function(Pointer<Void>, bool);
+
+typedef YGNodeSetConfigFunc = Void Function(Pointer<Void>, Pointer<Void>);
+typedef YGNodeSetConfig = void Function(Pointer<Void>, Pointer<Void>);
+
+typedef YGNodeStyleGetFlexDirectionFunc = Int32 Function(Pointer<Void>);
+typedef YGNodeStyleGetFlexDirection = int Function(Pointer<Void>);
+
 class Yoga {
   late DynamicLibrary _lib;
 
@@ -302,7 +346,15 @@ class Yoga {
   late YGNodeMarkDirty _ygNodeMarkDirty;
   late YGNodeSetNodeType _ygNodeSetNodeType;
   late YGNodeGetNodeType _ygNodeGetNodeType;
+  late YGNodeSetContext _ygNodeSetContext;
+  late YGNodeGetContext _ygNodeGetContext;
+  late YGNodeSetMeasureFunc _ygNodeSetMeasureFunc;
   late YGNodeCopyStyle _ygNodeCopyStyle;
+  late YGNodeSetConfig _ygNodeSetConfig;
+
+  late YGConfigNew _ygConfigNew;
+  late YGConfigFree _ygConfigFree;
+  late YGConfigSetUseWebDefaults _ygConfigSetUseWebDefaults;
 
   late YGNodeInsertChild _ygNodeInsertChild;
   late YGNodeRemoveChild _ygNodeRemoveChild;
@@ -313,6 +365,7 @@ class Yoga {
 
   late YGNodeStyleSetDirection _ygNodeStyleSetDirection;
   late YGNodeStyleSetFlexDirection _ygNodeStyleSetFlexDirection;
+  late YGNodeStyleGetFlexDirection _ygNodeStyleGetFlexDirection;
   late YGNodeStyleSetJustifyContent _ygNodeStyleSetJustifyContent;
   late YGNodeStyleSetAlignContent _ygNodeStyleSetAlignContent;
   late YGNodeStyleSetAlignItems _ygNodeStyleSetAlignItems;
@@ -417,8 +470,34 @@ class Yoga {
       _ygNodeGetNodeType = _lib
           .lookup<NativeFunction<YGNodeGetNodeTypeFunc>>('YGNodeGetNodeType')
           .asFunction();
+      _ygNodeSetContext = _lib
+          .lookup<NativeFunction<YGNodeSetContextFunc>>('YGNodeSetContext')
+          .asFunction();
+      _ygNodeGetContext = _lib
+          .lookup<NativeFunction<YGNodeGetContextFunc>>('YGNodeGetContext')
+          .asFunction();
+      _ygNodeSetMeasureFunc = _lib
+          .lookup<NativeFunction<YGNodeSetMeasureFuncFunc>>(
+            'YGNodeSetMeasureFunc',
+          )
+          .asFunction();
       _ygNodeCopyStyle = _lib
           .lookup<NativeFunction<YGNodeCopyStyleFunc>>('YGNodeCopyStyle')
+          .asFunction();
+      _ygNodeSetConfig = _lib
+          .lookup<NativeFunction<YGNodeSetConfigFunc>>('YGNodeSetConfig')
+          .asFunction();
+
+      _ygConfigNew = _lib
+          .lookup<NativeFunction<YGConfigNewFunc>>('YGConfigNew')
+          .asFunction();
+      _ygConfigFree = _lib
+          .lookup<NativeFunction<YGConfigFreeFunc>>('YGConfigFree')
+          .asFunction();
+      _ygConfigSetUseWebDefaults = _lib
+          .lookup<NativeFunction<YGConfigSetUseWebDefaultsFunc>>(
+            'YGConfigSetUseWebDefaults',
+          )
           .asFunction();
 
       _ygNodeInsertChild = _lib
@@ -452,6 +531,11 @@ class Yoga {
       _ygNodeStyleSetFlexDirection = _lib
           .lookup<NativeFunction<YGNodeStyleSetFlexDirectionFunc>>(
             'YGNodeStyleSetFlexDirection',
+          )
+          .asFunction();
+      _ygNodeStyleGetFlexDirection = _lib
+          .lookup<NativeFunction<YGNodeStyleGetFlexDirectionFunc>>(
+            'YGNodeStyleGetFlexDirection',
           )
           .asFunction();
       _ygNodeStyleSetJustifyContent = _lib
@@ -708,6 +792,13 @@ class Yoga {
   void setNodeType(Pointer<Void> node, int nodeType) =>
       _ygNodeSetNodeType(node, nodeType);
   int getNodeType(Pointer<Void> node) => _ygNodeGetNodeType(node);
+  void setContext(Pointer<Void> node, Pointer<Void> context) =>
+      _ygNodeSetContext(node, context);
+  Pointer<Void> getContext(Pointer<Void> node) => _ygNodeGetContext(node);
+  void setMeasureFunc(
+    Pointer<Void> node,
+    Pointer<NativeFunction<YGMeasureFunc>> measureFunc,
+  ) => _ygNodeSetMeasureFunc(node, measureFunc);
   void copyStyle(Pointer<Void> dstNode, Pointer<Void> srcNode) =>
       _ygNodeCopyStyle(dstNode, srcNode);
 
@@ -725,6 +816,8 @@ class Yoga {
       _ygNodeStyleSetDirection(node, direction);
   void setFlexDirection(Pointer<Void> node, int flexDirection) =>
       _ygNodeStyleSetFlexDirection(node, flexDirection);
+  int getFlexDirection(Pointer<Void> node) =>
+      _ygNodeStyleGetFlexDirection(node);
   void setJustifyContent(Pointer<Void> node, int justifyContent) =>
       _ygNodeStyleSetJustifyContent(node, justifyContent);
   void setAlignContent(Pointer<Void> node, int alignContent) =>
@@ -830,4 +923,12 @@ class Yoga {
   double getLayoutHeight(Pointer<Void> node) => _ygNodeLayoutGetHeight(node);
   int getLayoutDirection(Pointer<Void> node) => _ygNodeLayoutGetDirection(node);
   bool getHadOverflow(Pointer<Void> node) => _ygNodeLayoutGetHadOverflow(node);
+
+  // Config
+  Pointer<Void> newConfig() => _ygConfigNew();
+  void freeConfig(Pointer<Void> config) => _ygConfigFree(config);
+  void setConfigUseWebDefaults(Pointer<Void> config, bool useWebDefaults) =>
+      _ygConfigSetUseWebDefaults(config, useWebDefaults);
+  void setNodeConfig(Pointer<Void> node, Pointer<Void> config) =>
+      _ygNodeSetConfig(node, config);
 }
