@@ -83,7 +83,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           Container(
             color: Colors.grey[300],
             // Fixed width container to force overflow/shrinking
-            width: 300,
+            width: double.infinity,
             height: 100,
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
@@ -99,7 +99,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           ),
           const Padding(
             padding: EdgeInsets.all(8.0),
-            child: Text('容器宽度: 300. 子项总宽度: 400.'),
+            child: Text('容器宽度: 自适应 (拉伸窗口测试). 子项总宽度: 400.'),
           ),
           const Divider(),
           _buildSectionTitle('2. Margin 折叠 (Margin Collapsing)'),
@@ -120,7 +120,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           ),
           Container(
             color: Colors.grey[300],
-            width: 300,
+            width: double.infinity,
             height: 200,
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
@@ -180,7 +180,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           ),
           Container(
             color: Colors.grey[400], // Outer background
-            width: 300,
+            width: double.infinity,
             height: 150,
             alignment: Alignment.topLeft,
             child: YogaLayout(
@@ -242,7 +242,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           ),
           Container(
             color: Colors.grey[300],
-            width: 300,
+            width: double.infinity,
             child: Column(
               children: [
                 const Text('Case A: 20 + (-10) = 10'),
@@ -332,7 +332,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
           ),
           Container(
             color: Colors.grey[300],
-            width: 300,
+            width: double.infinity,
             // height: 200, // Let it grow
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
@@ -401,14 +401,14 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
             child: Text(
               '说明:\n'
               '测试 widthPercent 和 heightPercent。\n'
-              '父容器: 300x200\n'
-              '红色: width=50% (150), height=50% (100)\n'
-              '绿色: width=25% (75), height=100% (200)',
+              '父容器: 宽度自适应 x 200\n'
+              '红色: width=50%, height=50%\n'
+              '绿色: width=25%, height=100%',
             ),
           ),
           Container(
             color: Colors.grey[300],
-            width: 300,
+            width: double.infinity,
             height: 200,
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
@@ -508,7 +508,7 @@ class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
         const SizedBox(height: 10),
         Container(
           color: Colors.grey[300],
-          width: 300,
+          width: double.infinity,
           child: YogaLayout(
             flexDirection: YGFlexDirection.row,
             flexWrap: YGWrap.wrap,
@@ -527,8 +527,7 @@ class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
                 child: Container(
                   color: Colors.orange,
                   padding: const EdgeInsets.all(8),
-                  child: Text('Item 2 ($_displayString)',
-                  ),
+                  child: Text('Item 2 ($_displayString)'),
                 ),
               ),
               YogaItem(
