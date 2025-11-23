@@ -13,6 +13,7 @@ class NestedLayoutPage extends StatelessWidget {
         child: YogaLayout(
           // Root Layout
           useWebDefaults: true,
+          enableMarginCollapsing: true,
           flexDirection: YGFlexDirection.column,
           width: YogaValue.percent(100),
           height: YogaValue.percent(100),

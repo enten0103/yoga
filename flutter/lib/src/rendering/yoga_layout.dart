@@ -1775,7 +1775,17 @@ class RenderYogaLayout extends RenderBox
     }
 
     // Bottom Collapsing
-    if (!constraints.hasBoundedHeight &&
+    bool isHeightBounded;
+    if (parent is RenderYogaLayout) {
+      isHeightBounded =
+          _height != null &&
+          _height!.unit != YogaUnit.auto &&
+          _height!.unit != YogaUnit.undefined;
+    } else {
+      isHeightBounded = constraints.hasBoundedHeight;
+    }
+
+    if (!isHeightBounded &&
         _isZero(_padding?.bottom) &&
         _borderWidth.bottom == 0) {
       final lastChild = this.lastChild;

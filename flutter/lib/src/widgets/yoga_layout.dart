@@ -46,8 +46,6 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.height,
     this.padding,
     this.borderWidth,
-    this.useWebDefaults = false,
-    this.enableMarginCollapsing = false,
     this.flexGrow,
     this.flexShrink,
     this.flexBasis,
@@ -60,6 +58,8 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.overflow,
     this.transform,
     this.transformOrigin,
+    this.useWebDefaults = true,
+    this.enableMarginCollapsing = true,
     super.children,
   });
 
