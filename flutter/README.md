@@ -18,12 +18,35 @@ A powerful Flutter plugin that brings the [Yoga Layout](https://yogalayout.com/)
 
 ## Installation
 
-Add `flutter_yoga` to your `pubspec.yaml`:
+### Option 1: From GitHub (Recommended)
+
+Add `flutter_yoga` to your `pubspec.yaml` using the GitHub repository:
 
 ```yaml
 dependencies:
   flutter_yoga:
-    path: ./ # Or git url
+    git:
+      url: https://github.com/enten0103/yoga.git
+      path: flutter
+      ref: main  # Or specific commit/tag
+```
+
+### Option 2: Local Path
+
+If you have cloned the repository locally:
+
+```yaml
+dependencies:
+  flutter_yoga:
+    path: path/to/yoga/flutter
+```
+
+### After Installation
+
+Run `flutter pub get` to fetch the package, then import it in your Dart files:
+
+```dart
+import 'package:flutter_yoga/flutter_yoga.dart';
 ```
 
 ## Basic Usage

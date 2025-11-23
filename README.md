@@ -2,6 +2,29 @@
 
 Yoga is an embeddable and performant flexbox layout engine with bindings for multiple languages.
 
+## 🎯 Flutter Support
+
+This repository now includes a complete **Flutter plugin** that brings Yoga Layout to Flutter with enhanced features:
+
+- ✅ Full Flexbox support via Yoga engine
+- ✅ CSS-like styling (borders, shadows, backgrounds)
+- ✅ Intrinsic sizing (`fit-content`, `max-content`, `min-content`)
+- ✅ Border images and advanced border styles
+- ✅ Web defaults and margin collapsing
+- ✅ High performance FFI bindings
+
+**Quick Start:**
+
+```yaml
+dependencies:
+  flutter_yoga:
+    git:
+      url: https://github.com/enten0103/yoga.git
+      path: flutter
+```
+
+📖 **[Flutter Usage Guide](USAGE.md)** | 📚 **[Full Documentation](flutter/README.md)** | 🎨 **[Example App](flutter/example)**
+
 ## Building
 
 Yoga's main implementation targets C++ 20 with accompanying build logic in CMake. A wrapper is provided to build the main library and run unit tests.
