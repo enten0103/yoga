@@ -29,7 +29,10 @@ class MinMaxPage extends StatelessWidget {
                     child: Container(
                       color: Colors.blue,
                       child: const Center(
-                        child: Text('Small', style: TextStyle(color: Colors.white)),
+                        child: Text(
+                          'Small',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
@@ -80,7 +83,10 @@ class MinMaxPage extends StatelessWidget {
                     child: Container(
                       color: Colors.green,
                       child: const Center(
-                        child: Text('Short', style: TextStyle(color: Colors.white)),
+                        child: Text(
+                          'Short',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
@@ -106,34 +112,40 @@ class MinMaxPage extends StatelessWidget {
                     child: Container(
                       color: Colors.purple,
                       child: const Center(
-                        child: Text('Tall', style: TextStyle(color: Colors.white)),
+                        child: Text(
+                          'Tall',
+                          style: TextStyle(color: Colors.white),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             _buildSectionTitle('5. Min/Max on YogaLayout (Parent)'),
-            Container(
-              color: Colors.grey[300],
-              alignment: Alignment.centerLeft,
-              child: YogaLayout(
-                useWebDefaults: true,
-                // Parent constraints
-                minWidth: YogaValue.point(200),
-                maxWidth: YogaValue.point(300),
-                height: YogaValue.point(100),
-                padding: const YogaEdgeInsets.all(YogaValue.point(10)),
-                border: YogaBorder.all(color: Colors.black, width: 2),
-                justifyContent: YGJustify.center,
-                alignItems: YGAlign.center,
-                children: [
-                   YogaItem(
-                     child: const Text("I am inside a container with minWidth 200 and maxWidth 300"),
-                   )
-                ],
-              ),
+            YogaLayout(
+              children: [
+                YogaLayout(
+                  useWebDefaults: true,
+                  // Parent constraints
+                  minWidth: YogaValue.point(400),
+                  maxWidth: YogaValue.point(500),
+                  height: YogaValue.point(100),
+                  margin: YogaEdgeInsets.only(left: YogaValue.point(40)),
+                  padding: const YogaEdgeInsets.all(YogaValue.point(20)),
+                  border: YogaBorder.all(color: Colors.black, width: 2),
+                  justifyContent: YGJustify.center,
+                  alignItems: YGAlign.center,
+                  children: [
+                    YogaItem(
+                      child: const Text(
+                        "I am inside a container with minWidth 200 and maxWidth 300",
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),

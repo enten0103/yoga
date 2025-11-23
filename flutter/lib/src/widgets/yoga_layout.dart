@@ -10,10 +10,11 @@ export '../yoga_border.dart';
 
 class YogaLayout extends MultiChildRenderObjectWidget {
   final int flexDirection;
-  final int justifyContent;
-  final int alignItems;
+  final int? justifyContent;
+  final int? alignItems;
   final int alignContent;
   final int flexWrap;
+  final TextAlign? textAlign;
   final YogaValue? width;
   final YogaValue? height;
   final YogaValue? minWidth;
@@ -42,10 +43,11 @@ class YogaLayout extends MultiChildRenderObjectWidget {
   const YogaLayout({
     super.key,
     this.flexDirection = YGFlexDirection.column,
-    this.justifyContent = YGJustify.flexStart,
-    this.alignItems = YGAlign.stretch,
+    this.justifyContent,
+    this.alignItems,
     this.alignContent = YGAlign.flexStart,
     this.flexWrap = YGWrap.noWrap,
+    this.textAlign,
     this.width,
     this.height,
     this.minWidth,
@@ -74,9 +76,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
   @override
   RenderYogaLayout createRenderObject(BuildContext context) {
     return RenderYogaLayout()
-      ..rootNode.flexDirection = flexDirection
-      ..rootNode.justifyContent = justifyContent
+      ..flexDirection = flexDirection
+      ..justifyContent = justifyContent
       ..alignItems = alignItems
+      ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
       ..rootNode.flexWrap = flexWrap
       ..width = width
@@ -110,9 +113,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     covariant RenderYogaLayout renderObject,
   ) {
     renderObject
-      ..rootNode.flexDirection = flexDirection
-      ..rootNode.justifyContent = justifyContent
+      ..flexDirection = flexDirection
+      ..justifyContent = justifyContent
       ..alignItems = alignItems
+      ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
       ..rootNode.flexWrap = flexWrap
       ..width = width

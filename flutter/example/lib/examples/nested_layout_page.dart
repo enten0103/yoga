@@ -88,7 +88,7 @@ class NestedLayoutPage extends StatelessWidget {
 
                 // 2.2 Content Area (Nested YogaLayout with flexGrow: 1)
                 YogaLayout(
-                  useWebDefaults: true,
+                  margin: const YogaEdgeInsets.only(left: YogaValue.point(20)),
                   flexGrow: 1, // Fills remaining horizontal space
                   border: YogaBorder.all(
                     color: Colors.green,

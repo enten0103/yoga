@@ -59,7 +59,9 @@ class RenderYogaLayout extends RenderBox
   bool _useWebDefaults = false;
   bool _enableMarginCollapsing = false;
   YogaEdgeInsets? _padding;
-  int _alignItems = YGAlign.stretch; // Default for YogaLayout widget is stretch
+  int? _justifyContent;
+  int? _alignItems;
+  TextAlign? _textAlign;
   EdgeInsets _borderWidth = EdgeInsets.zero;
   YogaValue? _width;
   YogaValue? _height;
@@ -168,10 +170,34 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  set alignItems(int value) {
+  set flexDirection(int value) {
+    if (_rootNode.flexDirection != value) {
+      _rootNode.flexDirection = value;
+      _applyLayoutProperties();
+      markNeedsLayout();
+    }
+  }
+
+  set justifyContent(int? value) {
+    if (_justifyContent != value) {
+      _justifyContent = value;
+      _applyLayoutProperties();
+      markNeedsLayout();
+    }
+  }
+
+  set alignItems(int? value) {
     if (_alignItems != value) {
       _alignItems = value;
-      _rootNode.alignItems = value;
+      _applyLayoutProperties();
+      markNeedsLayout();
+    }
+  }
+
+  set textAlign(TextAlign? value) {
+    if (_textAlign != value) {
+      _textAlign = value;
+      _applyLayoutProperties();
       markNeedsLayout();
     }
   }
@@ -695,7 +721,7 @@ class RenderYogaLayout extends RenderBox
         bool skipHeight = false;
 
         final int parentFlexDirection = _rootNode.flexDirection;
-        final int parentAlignItems = _alignItems;
+        final int parentAlignItems = _alignItems ?? YGAlign.stretch;
 
         // Determine effective alignment for the child
         int effectiveAlign = alignSelf ?? YGAlign.auto;
@@ -2039,5 +2065,61 @@ class RenderYogaLayout extends RenderBox
       // One positive, one negative: sum
       return m1 + m2;
     }
+  }
+
+  void _applyLayoutProperties() {
+    int effectiveJustifyContent = _justifyContent ?? YGJustify.flexStart;
+    int effectiveAlignItems = _alignItems ?? YGAlign.stretch;
+
+    if (_textAlign != null) {
+      final isRow =
+          _rootNode.flexDirection == YGFlexDirection.row ||
+          _rootNode.flexDirection == YGFlexDirection.rowReverse;
+
+      if (isRow) {
+        // In Row, textAlign maps to justifyContent
+        if (_justifyContent == null) {
+          switch (_textAlign!) {
+            case TextAlign.left:
+            case TextAlign.start:
+              effectiveJustifyContent = YGJustify.flexStart;
+              break;
+            case TextAlign.right:
+            case TextAlign.end:
+              effectiveJustifyContent = YGJustify.flexEnd;
+              break;
+            case TextAlign.center:
+              effectiveJustifyContent = YGJustify.center;
+              break;
+            case TextAlign.justify:
+              effectiveJustifyContent = YGJustify.spaceBetween;
+              break;
+          }
+        }
+      } else {
+        // In Column, textAlign maps to alignItems
+        if (_alignItems == null) {
+          switch (_textAlign!) {
+            case TextAlign.left:
+            case TextAlign.start:
+              effectiveAlignItems = YGAlign.flexStart;
+              break;
+            case TextAlign.right:
+            case TextAlign.end:
+              effectiveAlignItems = YGAlign.flexEnd;
+              break;
+            case TextAlign.center:
+              effectiveAlignItems = YGAlign.center;
+              break;
+            case TextAlign.justify:
+              effectiveAlignItems = YGAlign.stretch;
+              break;
+          }
+        }
+      }
+    }
+
+    _rootNode.justifyContent = effectiveJustifyContent;
+    _rootNode.alignItems = effectiveAlignItems;
   }
 }

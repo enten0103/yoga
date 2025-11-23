@@ -33,6 +33,7 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Box Sizing Examples', '/box_sizing'),
           _buildListTile(context, 'Transform Examples', '/transform'),
           _buildListTile(context, 'Min/Max Dimensions', '/min_max'),
+          _buildListTile(context, 'Text Align', '/text_align'),
         ],
       ),
     );
