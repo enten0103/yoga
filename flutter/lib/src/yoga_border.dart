@@ -1,33 +1,75 @@
 import 'package:flutter/painting.dart';
 import 'yoga_value.dart';
 
+/// The style of a border.
 enum YogaBorderStyle {
+  /// No border.
   none,
+
+  /// Same as none, but has different behavior in border conflict resolution (not fully applicable here).
   hidden,
+
+  /// A series of round dots.
   dotted,
+
+  /// A series of short square-ended dashes.
   dashed,
+
+  /// A single solid line.
   solid,
+
+  /// Two parallel solid lines with some space between them.
   double,
+
+  /// Looks as if it were carved in the canvas.
   groove,
+
+  /// Looks as if it were coming out of the canvas.
   ridge,
+
+  /// Looks as if the content inside the border is sunken.
   inset,
+
+  /// Looks as if the content inside the border is coming out of the canvas.
   outset,
 }
 
-enum YogaBorderImageRepeat { stretch, repeat, round, space }
+/// How the image should be repeated to fill the area.
+enum YogaBorderImageRepeat {
+  /// The image is stretched to fill the area.
+  stretch,
 
+  /// The image is tiled (repeated) to fill the area.
+  repeat,
+
+  /// The image is tiled (repeated) to fill the area. If it doesn't fit a whole number of times, it is rescaled so that it does.
+  round,
+
+  /// The image is tiled (repeated) to fill the area. If it doesn't fit a whole number of times, the extra space is distributed around the tiles.
+  space,
+}
+
+/// A side of a border of a box.
 class YogaBorderSide {
+  /// The color of this side of the border.
   final Color? color;
+
+  /// The width of this side of the border.
   final double? width;
+
+  /// The style of this side of the border.
   final YogaBorderStyle? style;
 
+  /// Creates the side of a border.
   const YogaBorderSide({this.color, this.width, this.style});
 
+  /// A border side that is invisible.
   static const YogaBorderSide none = YogaBorderSide(
     width: 0.0,
     style: YogaBorderStyle.none,
   );
 
+  /// Creates a copy of this border side with the given fields replaced with the new values.
   YogaBorderSide copyWith({
     Color? color,
     double? width,
@@ -52,6 +94,7 @@ class YogaBorderSide {
   @override
   int get hashCode => Object.hash(color, width, style);
 
+  /// Converts this [YogaBorderSide] to a Flutter [BorderSide].
   BorderSide toFlutterBorderSide() {
     if (style == YogaBorderStyle.none || style == YogaBorderStyle.hidden) {
       return BorderSide.none;
@@ -69,16 +112,35 @@ class YogaBorderSide {
   }
 }
 
+/// A set of immutable radii for each corner of a rectangle.
+///
+/// Similar to Flutter's [BorderRadius], but uses [YogaValue] to support percentages.
 class YogaBorderRadius {
+  /// The top-left radius.
   final YogaValue? topLeft;
+
+  /// The top-right radius.
   final YogaValue? topRight;
+
+  /// The bottom-left radius.
   final YogaValue? bottomLeft;
+
+  /// The bottom-right radius.
   final YogaValue? bottomRight;
+
+  /// The start-start radius (logical).
   final YogaValue? startStart;
+
+  /// The start-end radius (logical).
   final YogaValue? startEnd;
+
+  /// The end-start radius (logical).
   final YogaValue? endStart;
+
+  /// The end-end radius (logical).
   final YogaValue? endEnd;
 
+  /// Creates a border radius with the given radii.
   const YogaBorderRadius({
     this.topLeft,
     this.topRight,
@@ -90,6 +152,7 @@ class YogaBorderRadius {
     this.endEnd,
   });
 
+  /// A border radius with all zero radii.
   static const YogaBorderRadius zero = YogaBorderRadius(
     topLeft: YogaValue.zero,
     topRight: YogaValue.zero,
@@ -97,6 +160,7 @@ class YogaBorderRadius {
     bottomRight: YogaValue.zero,
   );
 
+  /// Creates a border radius where all radii are [radius].
   const YogaBorderRadius.all(YogaValue radius)
     : topLeft = radius,
       topRight = radius,
@@ -107,10 +171,11 @@ class YogaBorderRadius {
       endStart = null,
       endEnd = null;
 
-  // Convenience for point values
+  /// Creates a border radius where all radii are [radius] (in points).
   factory YogaBorderRadius.circular(double radius) =>
       YogaBorderRadius.all(YogaValue.point(radius));
 
+  /// Resolves logical radii to physical radii based on the text direction.
   YogaBorderRadius resolve(TextDirection direction) {
     // Resolve logical to physical
     YogaValue? tl = topLeft;
@@ -138,6 +203,7 @@ class YogaBorderRadius {
     );
   }
 
+  /// Converts this [YogaBorderRadius] to a Flutter [BorderRadius].
   BorderRadius toFlutterBorderRadius(Size size) {
     Radius resolveRadius(YogaValue? v) {
       if (v == null) return Radius.zero;
@@ -164,26 +230,45 @@ class YogaBorderRadius {
   }
 }
 
+/// A border of a box, comprised of four sides and a border radius.
 class YogaBorder {
   // Physical
+  /// The top side of this border.
   final YogaBorderSide? top;
+
+  /// The right side of this border.
   final YogaBorderSide? right;
+
+  /// The bottom side of this border.
   final YogaBorderSide? bottom;
+
+  /// The left side of this border.
   final YogaBorderSide? left;
 
   // Logical
+  /// The start side of this border (logical).
   final YogaBorderSide? start; // inline-start
+
+  /// The end side of this border (logical).
   final YogaBorderSide? end; // inline-end
+
+  /// The block-start side of this border (logical).
   final YogaBorderSide? blockStart;
+
+  /// The block-end side of this border (logical).
   final YogaBorderSide? blockEnd;
 
   // Global
+  /// A side representing all sides of this border.
   final YogaBorderSide? all;
 
+  /// The radii for each corner of the border.
   final YogaBorderRadius? borderRadius;
 
+  /// An image to be used for the border.
   final YogaBorderImage? image;
 
+  /// Creates a border.
   const YogaBorder({
     this.top,
     this.right,
@@ -198,7 +283,7 @@ class YogaBorder {
     this.image,
   });
 
-  // Helper to resolve to physical sides
+  /// Resolves logical sides to physical sides based on the text direction.
   ResolvedYogaBorder resolve(TextDirection direction) {
     YogaBorderSide resolveSide(
       YogaBorderSide? specific,
@@ -236,13 +321,24 @@ class YogaBorder {
   }
 }
 
+/// A border where all logical sides have been resolved to physical sides.
 class ResolvedYogaBorder {
+  /// The top side.
   final YogaBorderSide top;
+
+  /// The right side.
   final YogaBorderSide right;
+
+  /// The bottom side.
   final YogaBorderSide bottom;
+
+  /// The left side.
   final YogaBorderSide left;
+
+  /// The border radius.
   final YogaBorderRadius borderRadius;
 
+  /// Creates a resolved border.
   ResolvedYogaBorder({
     required this.top,
     required this.right,
@@ -251,10 +347,12 @@ class ResolvedYogaBorder {
     required this.borderRadius,
   });
 
+  /// Whether all four sides are identical.
   bool get isUniform {
     return top == right && right == bottom && bottom == left;
   }
 
+  /// Converts this [ResolvedYogaBorder] to a Flutter [Border].
   Border toFlutterBorder() {
     return Border(
       top: top.toFlutterBorderSide(),
@@ -265,14 +363,27 @@ class ResolvedYogaBorder {
   }
 }
 
+/// An image to be used as a border.
 class YogaBorderImage {
+  /// The image to use.
   final ImageProvider source;
+
+  /// The offsets that define the slicing lines for the image.
   final YogaEdgeInsets slice;
+
+  /// Whether to fill the center of the border image.
   final bool fill;
+
+  /// The width of the border image.
   final YogaEdgeInsets? width;
+
+  /// The amount by which the border image area extends beyond the border box.
   final YogaEdgeInsets outset;
+
+  /// How the image should be repeated to fill the area.
   final YogaBorderImageRepeat repeat;
 
+  /// Creates a border image.
   const YogaBorderImage({
     required this.source,
     this.slice = YogaEdgeInsets.zero,
