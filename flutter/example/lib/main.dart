@@ -14,6 +14,8 @@ import 'examples/padding_page.dart';
 import 'examples/box_shadow_page.dart';
 import 'examples/border_image_page.dart';
 import 'examples/box_sizing_page.dart';
+import 'examples/border_style_page.dart';
+import 'examples/border_radius_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -59,6 +61,8 @@ class _MyAppState extends State<MyApp> {
         '/box_shadow': (context) => const BoxShadowPage(),
         '/border_image': (context) => const BorderImagePage(),
         '/box_sizing': (context) => const BoxSizingPage(),
+        '/border_style': (context) => const BorderStylePage(),
+        '/border_radius': (context) => const BorderRadiusPage(),
       },
     );
   }

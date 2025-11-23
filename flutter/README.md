@@ -133,6 +133,33 @@ YogaLayout(
 )
 ```
 
+### 4. Box Sizing & Borders
+
+You can control how the width and height of an element are calculated using `boxSizing`.
+
+*   **`YogaBoxSizing.borderBox`** (Default): `width` and `height` include the content, padding, and border.
+*   **`YogaBoxSizing.contentBox`**: `width` and `height` apply only to the content area. Padding and border are added outside.
+
+You can also define complex borders, including **Border Images** (CSS `border-image` support).
+
+```dart
+YogaItem(
+  width: YogaValue.point(100),
+  height: YogaValue.point(100),
+  boxSizing: YogaBoxSizing.contentBox, // Total size will be 100 + border
+  border: YogaBorder(
+    all: YogaBorderSide(width: 10, color: Colors.black),
+    // Optional: Border Image
+    image: YogaBorderImage(
+      source: NetworkImage('https://example.com/border.png'),
+      slice: YogaEdgeInsets.all(YogaValue.point(30)),
+      repeat: YogaBorderImageRepeat.round,
+    ),
+  ),
+  child: Container(color: Colors.red),
+)
+```
+
 ## API Reference
 
 ### YogaLayout
@@ -154,9 +181,11 @@ YogaLayout(
 | `flexShrink` | `double` | How much the item should shrink relative to others. |
 | `flexBasis` | `double` | Initial main size of the item. |
 | `display` | `YogaDisplay` | `flex`, `none`, `block`, `inline`, `inlineBlock`. |
-| `width` / `height` | `double` | Explicit size. |
-| `margin` | `EdgeInsets` | Outer spacing. |
-| `borderWidth` | `EdgeInsets` | Border width (affects layout). |
+| `width` / `height` | `YogaValue` | Explicit size (`point`, `percent`, `auto`). |
+| `margin` | `YogaEdgeInsets` | Outer spacing. |
+| `border` | `YogaBorder` | Border styling and width. |
+| `boxSizing` | `YogaBoxSizing` | `borderBox` (default) or `contentBox`. |
+| `boxShadow` | `List<YogaBoxShadow>` | Box shadows. |
 | `alignSelf` | `int` | Overrides `alignItems` for this specific item. |
 
 ## License

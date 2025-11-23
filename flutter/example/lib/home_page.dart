@@ -28,6 +28,8 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Padding Examples', '/padding'),
           _buildListTile(context, 'Box Shadow Examples', '/box_shadow'),
           _buildListTile(context, 'Border Image Examples', '/border_image'),
+          _buildListTile(context, 'Border Style Examples', '/border_style'),
+          _buildListTile(context, 'Border Radius Examples', '/border_radius'),
           _buildListTile(context, 'Box Sizing Examples', '/box_sizing'),
         ],
       ),

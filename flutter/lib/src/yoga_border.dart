@@ -40,6 +40,18 @@ class YogaBorderSide {
     );
   }
 
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is YogaBorderSide &&
+        other.color == color &&
+        other.width == width &&
+        other.style == style;
+  }
+
+  @override
+  int get hashCode => Object.hash(color, width, style);
+
   BorderSide toFlutterBorderSide() {
     if (style == YogaBorderStyle.none || style == YogaBorderStyle.hidden) {
       return BorderSide.none;
@@ -58,14 +70,14 @@ class YogaBorderSide {
 }
 
 class YogaBorderRadius {
-  final double? topLeft;
-  final double? topRight;
-  final double? bottomLeft;
-  final double? bottomRight;
-  final double? startStart;
-  final double? startEnd;
-  final double? endStart;
-  final double? endEnd;
+  final YogaValue? topLeft;
+  final YogaValue? topRight;
+  final YogaValue? bottomLeft;
+  final YogaValue? bottomRight;
+  final YogaValue? startStart;
+  final YogaValue? startEnd;
+  final YogaValue? endStart;
+  final YogaValue? endEnd;
 
   const YogaBorderRadius({
     this.topLeft,
@@ -79,13 +91,13 @@ class YogaBorderRadius {
   });
 
   static const YogaBorderRadius zero = YogaBorderRadius(
-    topLeft: 0,
-    topRight: 0,
-    bottomLeft: 0,
-    bottomRight: 0,
+    topLeft: YogaValue.zero,
+    topRight: YogaValue.zero,
+    bottomLeft: YogaValue.zero,
+    bottomRight: YogaValue.zero,
   );
 
-  const YogaBorderRadius.all(double radius)
+  const YogaBorderRadius.all(YogaValue radius)
     : topLeft = radius,
       topRight = radius,
       bottomLeft = radius,
@@ -95,12 +107,16 @@ class YogaBorderRadius {
       endStart = null,
       endEnd = null;
 
-  BorderRadius toFlutterBorderRadius(TextDirection direction) {
+  // Convenience for point values
+  factory YogaBorderRadius.circular(double radius) =>
+      YogaBorderRadius.all(YogaValue.point(radius));
+
+  YogaBorderRadius resolve(TextDirection direction) {
     // Resolve logical to physical
-    double? tl = topLeft;
-    double? tr = topRight;
-    double? bl = bottomLeft;
-    double? br = bottomRight;
+    YogaValue? tl = topLeft;
+    YogaValue? tr = topRight;
+    YogaValue? bl = bottomLeft;
+    YogaValue? br = bottomRight;
 
     if (direction == TextDirection.ltr) {
       tl ??= startStart;
@@ -114,11 +130,36 @@ class YogaBorderRadius {
       br ??= endStart;
     }
 
+    return YogaBorderRadius(
+      topLeft: tl ?? YogaValue.zero,
+      topRight: tr ?? YogaValue.zero,
+      bottomLeft: bl ?? YogaValue.zero,
+      bottomRight: br ?? YogaValue.zero,
+    );
+  }
+
+  BorderRadius toFlutterBorderRadius(Size size) {
+    Radius resolveRadius(YogaValue? v) {
+      if (v == null) return Radius.zero;
+      switch (v.unit) {
+        case YogaUnit.point:
+          return Radius.circular(v.value);
+        case YogaUnit.percent:
+          return Radius.elliptical(
+            v.value * size.width / 100,
+            v.value * size.height / 100,
+          );
+        case YogaUnit.auto:
+        case YogaUnit.undefined:
+          return Radius.zero;
+      }
+    }
+
     return BorderRadius.only(
-      topLeft: Radius.circular(tl ?? 0),
-      topRight: Radius.circular(tr ?? 0),
-      bottomLeft: Radius.circular(bl ?? 0),
-      bottomRight: Radius.circular(br ?? 0),
+      topLeft: resolveRadius(topLeft),
+      topRight: resolveRadius(topRight),
+      bottomLeft: resolveRadius(bottomLeft),
+      bottomRight: resolveRadius(bottomRight),
     );
   }
 }
@@ -190,8 +231,7 @@ class YogaBorder {
       right: resolveSide(right, effectiveEnd, all),
       bottom: resolveSide(bottom, effectiveBlockEnd, all),
       left: resolveSide(left, effectiveStart, all),
-      borderRadius:
-          borderRadius?.toFlutterBorderRadius(direction) ?? BorderRadius.zero,
+      borderRadius: borderRadius?.resolve(direction) ?? YogaBorderRadius.zero,
     );
   }
 }
@@ -201,7 +241,7 @@ class ResolvedYogaBorder {
   final YogaBorderSide right;
   final YogaBorderSide bottom;
   final YogaBorderSide left;
-  final BorderRadius borderRadius;
+  final YogaBorderRadius borderRadius;
 
   ResolvedYogaBorder({
     required this.top,
@@ -210,6 +250,10 @@ class ResolvedYogaBorder {
     required this.left,
     required this.borderRadius,
   });
+
+  bool get isUniform {
+    return top == right && right == bottom && bottom == left;
+  }
 
   Border toFlutterBorder() {
     return Border(

@@ -4,6 +4,8 @@ enum YogaUnit { point, percent, auto, undefined }
 
 enum YogaBoxSizing { borderBox, contentBox }
 
+enum YogaOverflow { visible, hidden, scroll }
+
 class YogaValue {
   final double value;
   final YogaUnit unit;

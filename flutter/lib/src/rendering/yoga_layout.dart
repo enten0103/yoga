@@ -21,6 +21,7 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaBoxSizing? boxSizing;
   int? alignSelf;
   List<YogaBoxShadow>? boxShadow;
+  YogaOverflow? overflow;
 
   // Effective margin after collapsing (runtime only, not set by user)
   EdgeInsets? effectiveMargin;
@@ -376,7 +377,38 @@ class RenderYogaLayout extends RenderBox
       }
 
       // Paint child
-      context.paintChild(child, childParentData.offset + offset);
+      ResolvedYogaBorder? resolvedBorder;
+      if (childParentData.border != null) {
+        resolvedBorder = childParentData.border!.resolve(TextDirection.ltr);
+      }
+
+      final Offset childOffset = childParentData.offset + offset;
+      final Rect childRect = childOffset & child.size;
+      final RenderBox childRenderBox = child;
+
+      if (childParentData.overflow == YogaOverflow.hidden) {
+        if (resolvedBorder != null &&
+            resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+          final RRect rrect = resolvedBorder.borderRadius
+              .toFlutterBorderRadius(child.size)
+              .toRRect(childRect);
+          context.pushClipRRect(needsCompositing, offset, childRect, rrect, (
+            context,
+            offset,
+          ) {
+            context.paintChild(childRenderBox, childOffset);
+          });
+        } else {
+          context.pushClipRect(needsCompositing, offset, childRect, (
+            context,
+            offset,
+          ) {
+            context.paintChild(childRenderBox, childOffset);
+          });
+        }
+      } else {
+        context.paintChild(child, childOffset);
+      }
 
       // Paint border
       if (childParentData.border != null) {
@@ -387,7 +419,7 @@ class RenderYogaLayout extends RenderBox
 
         _paintBorder(
           context,
-          offset + childParentData.offset,
+          childOffset,
           child.size,
           childParentData.border!,
           childParentData._borderImageInfo,
@@ -407,8 +439,6 @@ class RenderYogaLayout extends RenderBox
   ) {
     // Resolve border (assuming LTR for now, ideally pass TextDirection)
     final resolvedBorder = border.resolve(TextDirection.ltr);
-    final flutterBorder = resolvedBorder.toFlutterBorder();
-    final borderRadius = resolvedBorder.borderRadius;
 
     // Paint border image if available
     if (border.image != null && borderImageInfo != null) {
@@ -416,20 +446,255 @@ class RenderYogaLayout extends RenderBox
       return; // If border image is painted, do we paint standard border? CSS says border-image replaces border-style.
     }
 
-    // Paint border on top of child
-    // Note: paintBorder paints inside the rect.
-    // Since Yoga includes border in size, the child size includes the border area.
-    // So painting inside (offset & size) is correct for border-box.
+    // Check if we need custom painting (dotted/dashed)
+    bool hasCustomStyle =
+        resolvedBorder.top.style == YogaBorderStyle.dotted ||
+        resolvedBorder.top.style == YogaBorderStyle.dashed ||
+        resolvedBorder.right.style == YogaBorderStyle.dotted ||
+        resolvedBorder.right.style == YogaBorderStyle.dashed ||
+        resolvedBorder.bottom.style == YogaBorderStyle.dotted ||
+        resolvedBorder.bottom.style == YogaBorderStyle.dashed ||
+        resolvedBorder.left.style == YogaBorderStyle.dotted ||
+        resolvedBorder.left.style == YogaBorderStyle.dashed;
 
-    if (borderRadius != BorderRadius.zero) {
-      // If we have radius, we use paintBorder with radius
-      flutterBorder.paint(
-        context.canvas,
-        offset & size,
-        borderRadius: borderRadius,
-      );
+    if (hasCustomStyle) {
+      if (resolvedBorder.isUniform &&
+          resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+        _paintUniformRoundedBorder(context, offset, size, resolvedBorder);
+      } else {
+        _paintCustomBorder(context, offset, size, resolvedBorder);
+      }
     } else {
-      flutterBorder.paint(context.canvas, offset & size);
+      // Use Flutter's optimized border painting for solid/none
+      final flutterBorder = resolvedBorder.toFlutterBorder();
+      final borderRadius = resolvedBorder.borderRadius.toFlutterBorderRadius(
+        size,
+      );
+
+      if (borderRadius != BorderRadius.zero) {
+        flutterBorder.paint(
+          context.canvas,
+          offset & size,
+          borderRadius: borderRadius,
+        );
+      } else {
+        flutterBorder.paint(context.canvas, offset & size);
+      }
+    }
+  }
+
+  void _paintCustomBorder(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    ResolvedYogaBorder border,
+  ) {
+    final Canvas canvas = context.canvas;
+    final Rect rect = offset & size;
+
+    // Helper to paint a single side
+    void paintSide(
+      YogaBorderSide side,
+      Offset p1,
+      Offset p2,
+      bool isHorizontal,
+    ) {
+      if (side.style == YogaBorderStyle.none ||
+          side.style == YogaBorderStyle.hidden ||
+          (side.width ?? 0) <= 0) {
+        return;
+      }
+
+      final double width = side.width ?? 1.0;
+      final Paint paint = Paint()
+        ..color = side.color ?? const Color(0xFF000000)
+        ..strokeWidth = width
+        ..style = PaintingStyle.stroke;
+
+      if (side.style == YogaBorderStyle.solid) {
+        canvas.drawLine(p1, p2, paint);
+      } else if (side.style == YogaBorderStyle.dashed) {
+        _drawDashedLine(canvas, p1, p2, width, paint);
+      } else if (side.style == YogaBorderStyle.dotted) {
+        _drawDottedLine(canvas, p1, p2, width, paint);
+      }
+    }
+
+    // We paint sides as lines.
+    // To avoid overlap issues at corners for translucent colors, we might need more complex logic.
+    // But for dashed/dotted, simple lines are usually acceptable approximation for "CSS-like" behavior in Flutter
+    // without implementing full trapezoid path clipping for every dash.
+
+    // Top
+    if (border.top.width != null && border.top.width! > 0) {
+      paintSide(
+        border.top,
+        rect.topLeft.translate(0, border.top.width! / 2),
+        rect.topRight.translate(0, border.top.width! / 2),
+        true,
+      );
+    }
+
+    // Right
+    if (border.right.width != null && border.right.width! > 0) {
+      paintSide(
+        border.right,
+        rect.topRight.translate(-border.right.width! / 2, 0),
+        rect.bottomRight.translate(-border.right.width! / 2, 0),
+        false,
+      );
+    }
+
+    // Bottom
+    if (border.bottom.width != null && border.bottom.width! > 0) {
+      paintSide(
+        border.bottom,
+        rect.bottomLeft.translate(0, -border.bottom.width! / 2),
+        rect.bottomRight.translate(0, -border.bottom.width! / 2),
+        true,
+      );
+    }
+
+    // Left
+    if (border.left.width != null && border.left.width! > 0) {
+      paintSide(
+        border.left,
+        rect.topLeft.translate(border.left.width! / 2, 0),
+        rect.bottomLeft.translate(border.left.width! / 2, 0),
+        false,
+      );
+    }
+  }
+
+  void _paintUniformRoundedBorder(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    ResolvedYogaBorder border,
+  ) {
+    final Canvas canvas = context.canvas;
+    final Rect rect = offset & size;
+    final RRect rrect = border.borderRadius
+        .toFlutterBorderRadius(size)
+        .toRRect(rect);
+
+    // Since it's uniform, we take top side properties
+    final double width = border.top.width ?? 1.0;
+    final Color color = border.top.color ?? const Color(0xFF000000);
+    final YogaBorderStyle style = border.top.style ?? YogaBorderStyle.solid;
+
+    final Paint paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..style = PaintingStyle.stroke;
+
+    // Deflate by half width to stroke inside the border area (centered on the inset line)
+    final RRect innerRRect = rrect.deflate(width / 2);
+    final Path path = Path()..addRRect(innerRRect);
+
+    if (style == YogaBorderStyle.dashed) {
+      _drawDashedPath(canvas, path, width, paint);
+    } else if (style == YogaBorderStyle.dotted) {
+      _drawDottedPath(canvas, path, width, paint);
+    } else {
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  void _drawDashedPath(Canvas canvas, Path path, double width, Paint paint) {
+    final double dashWidth = 3 * width;
+    final double dashSpace = 3 * width;
+
+    for (final ui.PathMetric metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final double len = (distance + dashWidth > metric.length)
+            ? metric.length - distance
+            : dashWidth;
+        final Path extract = metric.extractPath(distance, distance + len);
+        canvas.drawPath(extract, paint);
+        distance += dashWidth + dashSpace;
+      }
+    }
+  }
+
+  void _drawDottedPath(Canvas canvas, Path path, double width, Paint paint) {
+    final Paint dotPaint = Paint()
+      ..color = paint.color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final double step = 2 * width;
+
+    for (final ui.PathMetric metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final ui.Tangent? tangent = metric.getTangentForOffset(distance);
+        if (tangent != null) {
+          canvas.drawPoints(ui.PointMode.points, [tangent.position], dotPaint);
+        }
+        distance += step;
+      }
+    }
+  }
+
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    double width,
+    Paint paint,
+  ) {
+    // CSS dashed: usually 3*width dash, 3*width gap (or similar)
+    final double dashWidth = 3 * width;
+    final double dashSpace = 3 * width;
+    final double distance = (p2 - p1).distance;
+    final double dx = (p2.dx - p1.dx) / distance;
+    final double dy = (p2.dy - p1.dy) / distance;
+
+    double currentDistance = 0;
+    while (currentDistance < distance) {
+      final double len = (currentDistance + dashWidth > distance)
+          ? distance - currentDistance
+          : dashWidth;
+      canvas.drawLine(
+        p1 + Offset(dx * currentDistance, dy * currentDistance),
+        p1 + Offset(dx * (currentDistance + len), dy * (currentDistance + len)),
+        paint,
+      );
+      currentDistance += dashWidth + dashSpace;
+    }
+  }
+
+  void _drawDottedLine(
+    Canvas canvas,
+    Offset p1,
+    Offset p2,
+    double width,
+    Paint paint,
+  ) {
+    // CSS dotted: circles with diameter = width, spaced by width (or less)
+    // We use round cap for dots
+    final Paint dotPaint = Paint()
+      ..color = paint.color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final double distance = (p2 - p1).distance;
+    final double dx = (p2.dx - p1.dx) / distance;
+    final double dy = (p2.dy - p1.dy) / distance;
+
+    // Spacing: diameter (width) + gap (width) = 2*width
+    final double step = 2 * width;
+    double currentDistance = 0;
+
+    while (currentDistance <= distance) {
+      canvas.drawPoints(ui.PointMode.points, [
+        p1 + Offset(dx * currentDistance, dy * currentDistance),
+      ], dotPaint);
+      currentDistance += step;
     }
   }
 

@@ -87,6 +87,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final int? alignSelf;
   final List<YogaBoxShadow>? boxShadow;
   final YogaBoxSizing? boxSizing;
+  final YogaOverflow? overflow;
 
   const YogaItem({
     super.key,
@@ -101,6 +102,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.alignSelf,
     this.boxShadow,
     this.boxSizing,
+    this.overflow,
     required super.child,
   });
 
@@ -118,13 +120,15 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
 
     if (parentData.boxSizing != boxSizing) {
       parentData.boxSizing = boxSizing;
-      // boxSizing affects how width/height are applied, so we need to re-apply them
-      // But width/height application logic is currently in _applyWidth/_applyHeight which are simple setters.
-      // The actual box-sizing logic needs to happen in RenderYogaLayout.performLayout or here if we have enough info.
-      // Since we don't have padding/border info fully resolved here (border depends on direction),
-      // we should defer the calculation to RenderYogaLayout.performLayout.
-      // So we just mark needsLayout.
       needsLayout = true;
+    }
+
+    if (parentData.overflow != overflow) {
+      parentData.overflow = overflow;
+      // Overflow affects painting, so we need to repaint.
+      // But if it changes layout (scroll), it might need layout.
+      // For now, we only support visible/hidden which is paint/clip.
+      renderObject.markNeedsPaint();
     }
 
     if (parentData.flexGrow != flexGrow) {
