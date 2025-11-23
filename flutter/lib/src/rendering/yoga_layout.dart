@@ -1,8 +1,10 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import '../yoga_ffi.dart';
 import '../yoga_node.dart';
 import '../yoga_value.dart';
+import '../yoga_border.dart';
 
 class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaNode? yogaNode;
@@ -15,15 +17,30 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaValue? width;
   YogaValue? height;
   YogaEdgeInsets? margin;
-  EdgeInsets? borderWidth;
+  YogaBorder? border;
+  YogaBoxSizing? boxSizing;
   int? alignSelf;
   List<YogaBoxShadow>? boxShadow;
 
   // Effective margin after collapsing (runtime only, not set by user)
   EdgeInsets? effectiveMargin;
 
+  // Border Image Runtime Data
+  ImageStream? _borderImageStream;
+  ImageInfo? _borderImageInfo;
+  ImageStreamListener? _borderImageListener;
+
   @override
   String toString() => '${super.toString()}; yogaNode=$yogaNode';
+
+  @override
+  void detach() {
+    _borderImageStream?.removeListener(_borderImageListener!);
+    _borderImageStream = null;
+    _borderImageListener = null;
+    _borderImageInfo = null;
+    super.detach();
+  }
 }
 
 class RenderYogaLayout extends RenderBox
@@ -79,6 +96,12 @@ class RenderYogaLayout extends RenderBox
   }
 
   set borderWidth(EdgeInsets? value) {
+    // Deprecated or mapped to internal border logic if needed.
+    // For now, we keep it for backward compatibility or remove it if we fully switch.
+    // But RenderYogaLayout uses _borderWidth for collapsing logic on the root node.
+    // The root node is configured by YogaLayout widget properties.
+    // YogaLayout widget still has borderWidth property?
+    // Let's check YogaLayout widget.
     _borderWidth = value ?? EdgeInsets.zero;
     if (value != null) {
       _rootNode.setBorder(YGEdge.left, value.left);
@@ -155,6 +178,75 @@ class RenderYogaLayout extends RenderBox
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
       final childNode = childParentData.yogaNode!;
+
+      // Apply Border Widths to YogaNode
+      double borderTop = 0;
+      double borderRight = 0;
+      double borderBottom = 0;
+      double borderLeft = 0;
+
+      if (childParentData.border != null) {
+        // We assume LTR for now for layout purposes if direction is not available in context easily here?
+        // Actually RenderBox has no directionality unless we look up.
+        // But YogaNode needs physical edges.
+        // Let's assume LTR for layout calculation or try to get direction.
+        // In a real implementation we should pass direction to performLayout or store it.
+        // For now, default to LTR.
+        final resolvedBorder = childParentData.border!.resolve(
+          TextDirection.ltr,
+        );
+        final flutterBorder = resolvedBorder.toFlutterBorder();
+
+        borderTop = flutterBorder.top.width;
+        borderRight = flutterBorder.right.width;
+        borderBottom = flutterBorder.bottom.width;
+        borderLeft = flutterBorder.left.width;
+
+        childNode.setBorder(YGEdge.top, borderTop);
+        childNode.setBorder(YGEdge.right, borderRight);
+        childNode.setBorder(YGEdge.bottom, borderBottom);
+        childNode.setBorder(YGEdge.left, borderLeft);
+      } else {
+        childNode.setBorder(YGEdge.all, 0);
+      }
+
+      // Apply Box Sizing (Content-Box adjustment)
+      // Yoga defaults to Border-Box behavior (width specifies the node's total width).
+      // If box-sizing is content-box, we need to add border width to the specified width.
+      if (childParentData.boxSizing == YogaBoxSizing.contentBox) {
+        if (childParentData.width != null &&
+            childParentData.width!.unit == YogaUnit.point) {
+          childNode.width =
+              childParentData.width!.value + borderLeft + borderRight;
+        }
+        if (childParentData.height != null &&
+            childParentData.height!.unit == YogaUnit.point) {
+          childNode.height =
+              childParentData.height!.value + borderTop + borderBottom;
+        }
+      } else {
+        // Ensure we reset to original value if we switched back to border-box
+        // or if we are just ensuring consistency.
+        // However, YogaItem.applyParentData sets the value.
+        // If we don't touch it here, it stays as set by YogaItem.
+        // But if we previously set it to (width + border), and now we want (width),
+        // we rely on YogaItem.applyParentData to have reset it?
+        // No, applyParentData is only called when widget config changes.
+        // If only layout happens (e.g. parent size change), applyParentData is NOT called.
+        // So we MUST reset/re-apply the width from childParentData here to be safe,
+        // OR ensure that we always set it.
+
+        // To be safe and stateless, we should re-apply the width/height from parentData
+        // if it is a fixed point value.
+        if (childParentData.width != null &&
+            childParentData.width!.unit == YogaUnit.point) {
+          childNode.width = childParentData.width!.value;
+        }
+        if (childParentData.height != null &&
+            childParentData.height!.unit == YogaUnit.point) {
+          childNode.height = childParentData.height!.value;
+        }
+      }
 
       // If the user didn't specify an explicit size, we try to measure the child's content size
       // and set it on the Yoga node. This is a simplified "Auto" sizing.
@@ -286,7 +378,444 @@ class RenderYogaLayout extends RenderBox
       // Paint child
       context.paintChild(child, childParentData.offset + offset);
 
+      // Paint border
+      if (childParentData.border != null) {
+        // Resolve border image if present (now that child has been laid out)
+        if (childParentData.border!.image != null) {
+          _resolveBorderImage(child, childParentData);
+        }
+
+        _paintBorder(
+          context,
+          offset + childParentData.offset,
+          child.size,
+          childParentData.border!,
+          childParentData._borderImageInfo,
+        );
+      }
+
       child = childParentData.nextSibling;
+    }
+  }
+
+  void _paintBorder(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    YogaBorder border,
+    ImageInfo? borderImageInfo,
+  ) {
+    // Resolve border (assuming LTR for now, ideally pass TextDirection)
+    final resolvedBorder = border.resolve(TextDirection.ltr);
+    final flutterBorder = resolvedBorder.toFlutterBorder();
+    final borderRadius = resolvedBorder.borderRadius;
+
+    // Paint border image if available
+    if (border.image != null && borderImageInfo != null) {
+      _paintBorderImage(context, offset, size, border.image!, borderImageInfo);
+      return; // If border image is painted, do we paint standard border? CSS says border-image replaces border-style.
+    }
+
+    // Paint border on top of child
+    // Note: paintBorder paints inside the rect.
+    // Since Yoga includes border in size, the child size includes the border area.
+    // So painting inside (offset & size) is correct for border-box.
+
+    if (borderRadius != BorderRadius.zero) {
+      // If we have radius, we use paintBorder with radius
+      flutterBorder.paint(
+        context.canvas,
+        offset & size,
+        borderRadius: borderRadius,
+      );
+    } else {
+      flutterBorder.paint(context.canvas, offset & size);
+    }
+  }
+
+  void _paintBorderImage(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    YogaBorderImage borderImage,
+    ImageInfo imageInfo,
+  ) {
+    final Rect rect = offset & size;
+    final double imgW = imageInfo.image.width.toDouble();
+    final double imgH = imageInfo.image.height.toDouble();
+
+    // 1. Resolve Slices (Source)
+    final double sliceL = _resolveValue(borderImage.slice.left, imgW);
+    final double sliceT = _resolveValue(borderImage.slice.top, imgH);
+    final double sliceR = _resolveValue(borderImage.slice.right, imgW);
+    final double sliceB = _resolveValue(borderImage.slice.bottom, imgH);
+
+    // 2. Resolve Outsets
+    final double outsetL = _resolveValue(borderImage.outset.left, size.width);
+    final double outsetT = _resolveValue(borderImage.outset.top, size.height);
+    final double outsetR = _resolveValue(borderImage.outset.right, size.width);
+    final double outsetB = _resolveValue(
+      borderImage.outset.bottom,
+      size.height,
+    );
+
+    final Rect destRect = Rect.fromLTRB(
+      rect.left - outsetL,
+      rect.top - outsetT,
+      rect.right + outsetR,
+      rect.bottom + outsetB,
+    );
+
+    // 3. Resolve Border Widths (Destination)
+    // Use borderImage.width if available, otherwise fallback to slice size (common behavior if width not set)
+    // or 0 if we want to be strict. For this implementation, we use the provided width or slice.
+    double borderL = _resolveValue(
+      borderImage.width?.left ?? YogaValue.point(sliceL),
+      destRect.width,
+    );
+    double borderT = _resolveValue(
+      borderImage.width?.top ?? YogaValue.point(sliceT),
+      destRect.height,
+    );
+    double borderR = _resolveValue(
+      borderImage.width?.right ?? YogaValue.point(sliceR),
+      destRect.width,
+    );
+    double borderB = _resolveValue(
+      borderImage.width?.bottom ?? YogaValue.point(sliceB),
+      destRect.height,
+    );
+
+    // Source Rects
+    final Rect srcTL = Rect.fromLTWH(0, 0, sliceL, sliceT);
+    final Rect srcTR = Rect.fromLTWH(imgW - sliceR, 0, sliceR, sliceT);
+    final Rect srcBL = Rect.fromLTWH(0, imgH - sliceB, sliceL, sliceB);
+    final Rect srcBR = Rect.fromLTWH(
+      imgW - sliceR,
+      imgH - sliceB,
+      sliceR,
+      sliceB,
+    );
+
+    final Rect srcTop = Rect.fromLTWH(
+      sliceL,
+      0,
+      imgW - sliceL - sliceR,
+      sliceT,
+    );
+    final Rect srcBottom = Rect.fromLTWH(
+      sliceL,
+      imgH - sliceB,
+      imgW - sliceL - sliceR,
+      sliceB,
+    );
+    final Rect srcLeft = Rect.fromLTWH(
+      0,
+      sliceT,
+      sliceL,
+      imgH - sliceT - sliceB,
+    );
+    final Rect srcRight = Rect.fromLTWH(
+      imgW - sliceR,
+      sliceT,
+      sliceR,
+      imgH - sliceT - sliceB,
+    );
+
+    final Rect srcCenter = Rect.fromLTWH(
+      sliceL,
+      sliceT,
+      imgW - sliceL - sliceR,
+      imgH - sliceT - sliceB,
+    );
+
+    // Destination Rects
+    final Rect dstTL = Rect.fromLTWH(
+      destRect.left,
+      destRect.top,
+      borderL,
+      borderT,
+    );
+    final Rect dstTR = Rect.fromLTWH(
+      destRect.right - borderR,
+      destRect.top,
+      borderR,
+      borderT,
+    );
+    final Rect dstBL = Rect.fromLTWH(
+      destRect.left,
+      destRect.bottom - borderB,
+      borderL,
+      borderB,
+    );
+    final Rect dstBR = Rect.fromLTWH(
+      destRect.right - borderR,
+      destRect.bottom - borderB,
+      borderR,
+      borderB,
+    );
+
+    final Rect dstTop = Rect.fromLTWH(
+      destRect.left + borderL,
+      destRect.top,
+      math.max(0, destRect.width - borderL - borderR),
+      borderT,
+    );
+    final Rect dstBottom = Rect.fromLTWH(
+      destRect.left + borderL,
+      destRect.bottom - borderB,
+      math.max(0, destRect.width - borderL - borderR),
+      borderB,
+    );
+    final Rect dstLeft = Rect.fromLTWH(
+      destRect.left,
+      destRect.top + borderT,
+      borderL,
+      math.max(0, destRect.height - borderT - borderB),
+    );
+    final Rect dstRight = Rect.fromLTWH(
+      destRect.right - borderR,
+      destRect.top + borderT,
+      borderR,
+      math.max(0, destRect.height - borderT - borderB),
+    );
+
+    final Rect dstCenter = Rect.fromLTWH(
+      destRect.left + borderL,
+      destRect.top + borderT,
+      math.max(0, destRect.width - borderL - borderR),
+      math.max(0, destRect.height - borderT - borderB),
+    );
+
+    final Paint paint = Paint();
+    final Canvas canvas = context.canvas;
+
+    // Draw Corners (Always stretch/scale to fit corner box)
+    if (!dstTL.isEmpty && !srcTL.isEmpty) {
+      canvas.drawImageRect(imageInfo.image, srcTL, dstTL, paint);
+    }
+    if (!dstTR.isEmpty && !srcTR.isEmpty) {
+      canvas.drawImageRect(imageInfo.image, srcTR, dstTR, paint);
+    }
+    if (!dstBL.isEmpty && !srcBL.isEmpty) {
+      canvas.drawImageRect(imageInfo.image, srcBL, dstBL, paint);
+    }
+    if (!dstBR.isEmpty && !srcBR.isEmpty) {
+      canvas.drawImageRect(imageInfo.image, srcBR, dstBR, paint);
+    }
+
+    // Draw Edges
+    _drawTile(
+      canvas,
+      imageInfo.image,
+      srcTop,
+      dstTop,
+      borderImage.repeat,
+      isHorizontal: true,
+    );
+    _drawTile(
+      canvas,
+      imageInfo.image,
+      srcBottom,
+      dstBottom,
+      borderImage.repeat,
+      isHorizontal: true,
+    );
+    _drawTile(
+      canvas,
+      imageInfo.image,
+      srcLeft,
+      dstLeft,
+      borderImage.repeat,
+      isHorizontal: false,
+    );
+    _drawTile(
+      canvas,
+      imageInfo.image,
+      srcRight,
+      dstRight,
+      borderImage.repeat,
+      isHorizontal: false,
+    );
+
+    // Draw Center
+    if (borderImage.fill) {
+      // For center, we should ideally tile in both directions.
+      // For now, let's just stretch or simple tile.
+      // Implementing full 2D tiling for center is complex and rarely used with complex repeats.
+      // Let's use stretch for center if fill is true, or simple stretch.
+      // Or reuse _drawTile logic but it's 1D.
+      // Let's just stretch center for now as a simplification, or use paintImage.
+      if (!dstCenter.isEmpty && !srcCenter.isEmpty) {
+        canvas.drawImageRect(imageInfo.image, srcCenter, dstCenter, paint);
+      }
+    }
+  }
+
+  void _drawTile(
+    Canvas canvas,
+    ui.Image image,
+    Rect src,
+    Rect dst,
+    YogaBorderImageRepeat repeat, {
+    required bool isHorizontal,
+  }) {
+    if (dst.isEmpty || src.isEmpty) return;
+
+    if (repeat == YogaBorderImageRepeat.stretch) {
+      canvas.drawImageRect(image, src, dst, Paint());
+      return;
+    }
+
+    canvas.save();
+    canvas.clipRect(dst);
+
+    final double srcW = src.width;
+    final double srcH = src.height;
+    final double dstW = dst.width;
+    final double dstH = dst.height;
+
+    if (repeat == YogaBorderImageRepeat.round) {
+      if (isHorizontal) {
+        double count = (dstW / srcW).roundToDouble();
+        if (count < 1) count = 1;
+        double tileW = dstW / count;
+        for (int i = 0; i < count; i++) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(dst.left + i * tileW, dst.top, tileW, dstH),
+            Paint(),
+          );
+        }
+      } else {
+        double count = (dstH / srcH).roundToDouble();
+        if (count < 1) count = 1;
+        double tileH = dstH / count;
+        for (int i = 0; i < count; i++) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(dst.left, dst.top + i * tileH, dstW, tileH),
+            Paint(),
+          );
+        }
+      }
+    } else if (repeat == YogaBorderImageRepeat.repeat) {
+      // Centered tiling
+      if (isHorizontal) {
+        double x = dst.center.dx - srcW / 2;
+        // Draw center one
+        canvas.drawImageRect(
+          image,
+          src,
+          Rect.fromLTWH(x, dst.top, srcW, dstH),
+          Paint(),
+        );
+
+        // Draw left
+        double currX = x - srcW;
+        while (currX + srcW > dst.left) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(currX, dst.top, srcW, dstH),
+            Paint(),
+          );
+          currX -= srcW;
+        }
+
+        // Draw right
+        currX = x + srcW;
+        while (currX < dst.right) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(currX, dst.top, srcW, dstH),
+            Paint(),
+          );
+          currX += srcW;
+        }
+      } else {
+        // Vertical centered tiling
+        double y = dst.center.dy - srcH / 2;
+        canvas.drawImageRect(
+          image,
+          src,
+          Rect.fromLTWH(dst.left, y, dstW, srcH),
+          Paint(),
+        );
+
+        // Draw up
+        double currY = y - srcH;
+        while (currY + srcH > dst.top) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(dst.left, currY, dstW, srcH),
+            Paint(),
+          );
+          currY -= srcH;
+        }
+
+        // Draw down
+        currY = y + srcH;
+        while (currY < dst.bottom) {
+          canvas.drawImageRect(
+            image,
+            src,
+            Rect.fromLTWH(dst.left, currY, dstW, srcH),
+            Paint(),
+          );
+          currY += srcH;
+        }
+      }
+    } else {
+      // Space or others, fallback to stretch
+      canvas.drawImageRect(image, src, dst, Paint());
+    }
+
+    canvas.restore();
+  }
+
+  void _resolveBorderImage(
+    RenderBox child,
+    YogaLayoutParentData childParentData,
+  ) {
+    final borderImage = childParentData.border?.image;
+    if (borderImage == null) {
+      _disposeBorderImage(childParentData);
+      return;
+    }
+
+    final ImageConfiguration config = ImageConfiguration(
+      size: child.size,
+      textDirection: TextDirection.ltr,
+    );
+    final ImageStream newStream = borderImage.source.resolve(config);
+
+    if (newStream.key != childParentData._borderImageStream?.key) {
+      _disposeBorderImage(childParentData);
+      childParentData._borderImageStream = newStream;
+      childParentData._borderImageListener = ImageStreamListener((
+        ImageInfo imageInfo,
+        bool synchronousCall,
+      ) {
+        childParentData._borderImageInfo = imageInfo;
+        markNeedsPaint();
+      });
+      newStream.addListener(childParentData._borderImageListener!);
+    }
+  }
+
+  void _disposeBorderImage(YogaLayoutParentData childParentData) {
+    if (childParentData._borderImageStream != null) {
+      childParentData._borderImageStream!.removeListener(
+        childParentData._borderImageListener!,
+      );
+      childParentData._borderImageStream = null;
+      childParentData._borderImageListener = null;
+      childParentData._borderImageInfo = null;
     }
   }
 

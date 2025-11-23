@@ -3,8 +3,10 @@ import '../rendering/yoga_layout.dart';
 import '../yoga_ffi.dart';
 import '../yoga_node.dart';
 import '../yoga_value.dart';
+import '../yoga_border.dart';
 
 export '../yoga_value.dart';
+export '../yoga_border.dart';
 
 class YogaLayout extends MultiChildRenderObjectWidget {
   final int flexDirection;
@@ -81,9 +83,10 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final YogaValue? width;
   final YogaValue? height;
   final YogaEdgeInsets? margin;
-  final EdgeInsets? borderWidth;
+  final YogaBorder? border;
   final int? alignSelf;
   final List<YogaBoxShadow>? boxShadow;
+  final YogaBoxSizing? boxSizing;
 
   const YogaItem({
     super.key,
@@ -94,9 +97,10 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.width,
     this.height,
     this.margin,
-    this.borderWidth,
+    this.border,
     this.alignSelf,
     this.boxShadow,
+    this.boxSizing,
     required super.child,
   });
 
@@ -111,6 +115,17 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     }
 
     final node = parentData.yogaNode!;
+
+    if (parentData.boxSizing != boxSizing) {
+      parentData.boxSizing = boxSizing;
+      // boxSizing affects how width/height are applied, so we need to re-apply them
+      // But width/height application logic is currently in _applyWidth/_applyHeight which are simple setters.
+      // The actual box-sizing logic needs to happen in RenderYogaLayout.performLayout or here if we have enough info.
+      // Since we don't have padding/border info fully resolved here (border depends on direction),
+      // we should defer the calculation to RenderYogaLayout.performLayout.
+      // So we just mark needsLayout.
+      needsLayout = true;
+    }
 
     if (parentData.flexGrow != flexGrow) {
       parentData.flexGrow = flexGrow;
@@ -180,16 +195,13 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       needsLayout = true;
     }
 
-    if (parentData.borderWidth != borderWidth) {
-      parentData.borderWidth = borderWidth;
-      if (borderWidth != null) {
-        node.setBorder(YGEdge.left, borderWidth!.left);
-        node.setBorder(YGEdge.top, borderWidth!.top);
-        node.setBorder(YGEdge.right, borderWidth!.right);
-        node.setBorder(YGEdge.bottom, borderWidth!.bottom);
-      } else {
-        node.setBorder(YGEdge.all, 0);
-      }
+    if (parentData.border != border) {
+      parentData.border = border;
+      // We can't fully resolve border here without TextDirection,
+      // but we can set physical borders if they are explicit.
+      // However, RenderYogaLayout.performLayout will handle the full resolution
+      // and setting of border widths on the YogaNode.
+      // So we just mark for layout.
       needsLayout = true;
     }
 

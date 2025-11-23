@@ -2,6 +2,8 @@ import 'package:flutter/painting.dart';
 
 enum YogaUnit { point, percent, auto, undefined }
 
+enum YogaBoxSizing { borderBox, contentBox }
+
 class YogaValue {
   final double value;
   final YogaUnit unit;

@@ -12,6 +12,8 @@ import 'examples/web_defaults_page.dart';
 import 'examples/margin_page.dart';
 import 'examples/padding_page.dart';
 import 'examples/box_shadow_page.dart';
+import 'examples/border_image_page.dart';
+import 'examples/box_sizing_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -55,6 +57,8 @@ class _MyAppState extends State<MyApp> {
         '/margin': (context) => const MarginPage(),
         '/padding': (context) => const PaddingPage(),
         '/box_shadow': (context) => const BoxShadowPage(),
+        '/border_image': (context) => const BorderImagePage(),
+        '/box_sizing': (context) => const BoxSizingPage(),
       },
     );
   }
