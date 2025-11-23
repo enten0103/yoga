@@ -21,8 +21,12 @@ class YogaNode implements Finalizable {
   final List<YogaNode> _children = [];
 
   /// Creates a new YogaNode.
-  YogaNode() {
-    _nativeNode = _yoga.newNode();
+  YogaNode([YogaConfig? config]) {
+    if (config != null) {
+      _nativeNode = _yoga.newNodeWithConfig(config._nativeConfig);
+    } else {
+      _nativeNode = _yoga.newNode();
+    }
     _finalizer.attach(this, _nativeNode, detach: this);
   }
 

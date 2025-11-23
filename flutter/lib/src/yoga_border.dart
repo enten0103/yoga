@@ -283,6 +283,19 @@ class YogaBorder {
     this.image,
   });
 
+  /// Creates a border with all sides the same.
+  factory YogaBorder.all({
+    Color color = const Color(0xFF000000),
+    double width = 1.0,
+    YogaBorderStyle style = YogaBorderStyle.solid,
+    YogaBorderRadius? borderRadius,
+  }) {
+    return YogaBorder(
+      all: YogaBorderSide(color: color, width: width, style: style),
+      borderRadius: borderRadius,
+    );
+  }
+
   /// Resolves logical sides to physical sides based on the text direction.
   ResolvedYogaBorder resolve(TextDirection direction) {
     YogaBorderSide resolveSide(

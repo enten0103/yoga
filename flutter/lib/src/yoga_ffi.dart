@@ -107,6 +107,9 @@ final class YGSize extends Struct {
 typedef YGNodeNewFunc = Pointer<Void> Function();
 typedef YGNodeNew = Pointer<Void> Function();
 
+typedef YGNodeNewWithConfigFunc = Pointer<Void> Function(Pointer<Void>);
+typedef YGNodeNewWithConfig = Pointer<Void> Function(Pointer<Void>);
+
 typedef YGNodeFreeFunc = Void Function(Pointer<Void>);
 typedef YGNodeFree = void Function(Pointer<Void>);
 
@@ -337,10 +340,14 @@ typedef YGNodeSetConfig = void Function(Pointer<Void>, Pointer<Void>);
 typedef YGNodeStyleGetFlexDirectionFunc = Int32 Function(Pointer<Void>);
 typedef YGNodeStyleGetFlexDirection = int Function(Pointer<Void>);
 
+typedef YGNodeStyleGetAlignItemsFunc = Int32 Function(Pointer<Void>);
+typedef YGNodeStyleGetAlignItems = int Function(Pointer<Void>);
+
 class Yoga {
   late DynamicLibrary _lib;
 
   late YGNodeNew _ygNodeNew;
+  late YGNodeNewWithConfig _ygNodeNewWithConfig;
   late YGNodeFree _ygNodeFree;
   late YGNodeReset _ygNodeReset;
   late YGNodeFreeRecursive _ygNodeFreeRecursive;
@@ -453,6 +460,11 @@ class Yoga {
     try {
       _ygNodeNew = _lib
           .lookup<NativeFunction<YGNodeNewFunc>>('YGNodeNew')
+          .asFunction();
+      _ygNodeNewWithConfig = _lib
+          .lookup<NativeFunction<YGNodeNewWithConfigFunc>>(
+            'YGNodeNewWithConfig',
+          )
           .asFunction();
       _ygNodeFree = _lib
           .lookup<NativeFunction<YGNodeFreeFunc>>('YGNodeFree')
@@ -789,6 +801,8 @@ class Yoga {
   }
 
   Pointer<Void> newNode() => _ygNodeNew();
+  Pointer<Void> newNodeWithConfig(Pointer<Void> config) =>
+      _ygNodeNewWithConfig(config);
   void freeNode(Pointer<Void> node) => _ygNodeFree(node);
   void resetNode(Pointer<Void> node) => _ygNodeReset(node);
   void freeNodeRecursive(Pointer<Void> node) => _ygNodeFreeRecursive(node);

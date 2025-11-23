@@ -22,6 +22,8 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   int? alignSelf;
   List<YogaBoxShadow>? boxShadow;
   YogaOverflow? overflow;
+  Matrix4? transform;
+  AlignmentGeometry? transformOrigin;
 
   // Effective margin after collapsing (runtime only, not set by user)
   EdgeInsets? effectiveMargin;
@@ -50,16 +52,31 @@ class RenderYogaLayout extends RenderBox
         RenderBoxContainerDefaultsMixin<RenderBox, YogaLayoutParentData> {
   late final YogaNode _rootNode;
   late final YogaConfig _config;
+  bool _useWebDefaults = false;
   bool _enableMarginCollapsing = false;
   YogaEdgeInsets? _padding;
+  int _alignItems = YGAlign.stretch; // Default for YogaLayout widget is stretch
   EdgeInsets _borderWidth = EdgeInsets.zero;
   YogaValue? _width;
   YogaValue? _height;
 
+  // YogaItem properties
+  double? _flexGrow;
+  double? _flexShrink;
+  double? _flexBasis;
+  YogaDisplay? _display;
+  YogaEdgeInsets? _margin;
+  YogaBorder? _border;
+  int? _alignSelf;
+  List<YogaBoxShadow>? _boxShadow;
+  YogaBoxSizing? _boxSizing;
+  YogaOverflow? _overflow;
+  Matrix4? _transform;
+  AlignmentGeometry? _transformOrigin;
+
   RenderYogaLayout() {
     _config = YogaConfig();
-    _rootNode = YogaNode();
-    _rootNode.setConfig(_config);
+    _rootNode = YogaNode(_config);
   }
 
   YogaNode get rootNode => _rootNode;
@@ -67,6 +84,7 @@ class RenderYogaLayout extends RenderBox
   set width(YogaValue? value) {
     if (_width != value) {
       _width = value;
+      _updateParentData((pd) => pd.width = value);
       markNeedsLayout();
     }
   }
@@ -74,11 +92,157 @@ class RenderYogaLayout extends RenderBox
   set height(YogaValue? value) {
     if (_height != value) {
       _height = value;
+      _updateParentData((pd) => pd.height = value);
       markNeedsLayout();
     }
   }
 
+  set flexGrow(double? value) {
+    if (_flexGrow != value) {
+      _flexGrow = value;
+      _updateParentData((pd) => pd.flexGrow = value);
+    }
+  }
+
+  set flexShrink(double? value) {
+    if (_flexShrink != value) {
+      _flexShrink = value;
+      _updateParentData((pd) => pd.flexShrink = value);
+    }
+  }
+
+  set flexBasis(double? value) {
+    if (_flexBasis != value) {
+      _flexBasis = value;
+      _updateParentData((pd) => pd.flexBasis = value);
+    }
+  }
+
+  set display(YogaDisplay? value) {
+    if (_display != value) {
+      _display = value;
+      _updateParentData((pd) => pd.display = value);
+    }
+  }
+
+  set margin(YogaEdgeInsets? value) {
+    if (_margin != value) {
+      _margin = value;
+      _updateParentData((pd) => pd.margin = value);
+    }
+  }
+
+  set border(YogaBorder? value) {
+    if (_border != value) {
+      _border = value;
+      _updateParentData((pd) => pd.border = value);
+
+      // Apply border widths to root node so content is inset correctly
+      if (value != null) {
+        final resolved = value.resolve(TextDirection.ltr);
+        final fb = resolved.toFlutterBorder();
+        _rootNode.setBorder(YGEdge.top, fb.top.width);
+        _rootNode.setBorder(YGEdge.right, fb.right.width);
+        _rootNode.setBorder(YGEdge.bottom, fb.bottom.width);
+        _rootNode.setBorder(YGEdge.left, fb.left.width);
+      } else {
+        // Fallback to borderWidth if border is null, or 0
+        if (_borderWidth != EdgeInsets.zero) {
+          _rootNode.setBorder(YGEdge.top, _borderWidth.top);
+          _rootNode.setBorder(YGEdge.right, _borderWidth.right);
+          _rootNode.setBorder(YGEdge.bottom, _borderWidth.bottom);
+          _rootNode.setBorder(YGEdge.left, _borderWidth.left);
+        } else {
+          _rootNode.setBorder(YGEdge.all, 0);
+        }
+      }
+      markNeedsLayout();
+    }
+  }
+
+  set alignItems(int value) {
+    if (_alignItems != value) {
+      _alignItems = value;
+      _rootNode.alignItems = value;
+      markNeedsLayout();
+    }
+  }
+
+  set alignSelf(int? value) {
+    if (_alignSelf != value) {
+      _alignSelf = value;
+      _updateParentData((pd) => pd.alignSelf = value);
+    }
+  }
+
+  set boxShadow(List<YogaBoxShadow>? value) {
+    if (_boxShadow != value) {
+      _boxShadow = value;
+      _updateParentData((pd) => pd.boxShadow = value);
+    }
+  }
+
+  set boxSizing(YogaBoxSizing? value) {
+    if (_boxSizing != value) {
+      _boxSizing = value;
+      _updateParentData((pd) => pd.boxSizing = value);
+    }
+  }
+
+  set overflow(YogaOverflow? value) {
+    if (_overflow != value) {
+      _overflow = value;
+      _updateParentData((pd) => pd.overflow = value);
+    }
+  }
+
+  set transform(Matrix4? value) {
+    if (_transform != value) {
+      _transform = value;
+      _updateParentData((pd) => pd.transform = value);
+    }
+  }
+
+  set transformOrigin(AlignmentGeometry? value) {
+    if (_transformOrigin != value) {
+      _transformOrigin = value;
+      _updateParentData((pd) => pd.transformOrigin = value);
+    }
+  }
+
+  void _updateParentData(void Function(YogaLayoutParentData) updater) {
+    if (parentData is YogaLayoutParentData) {
+      updater(parentData as YogaLayoutParentData);
+      if (parent != null) {
+        parent!.markNeedsLayout();
+      }
+    }
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    if (parentData is YogaLayoutParentData) {
+      final pd = parentData as YogaLayoutParentData;
+      pd.width = _width;
+      pd.height = _height;
+      pd.flexGrow = _flexGrow;
+      pd.flexShrink = _flexShrink;
+      pd.flexBasis = _flexBasis;
+      pd.display = _display;
+      pd.margin = _margin;
+      pd.border = _border;
+      pd.alignSelf = _alignSelf;
+      pd.boxShadow = _boxShadow;
+      pd.boxSizing = _boxSizing;
+      pd.overflow = _overflow;
+      pd.transform = _transform;
+      pd.transformOrigin = _transformOrigin;
+    }
+  }
+
   set useWebDefaults(bool value) {
+    _useWebDefaults = value;
     _config.useWebDefaults = value;
     markNeedsLayout();
   }
@@ -97,22 +261,19 @@ class RenderYogaLayout extends RenderBox
   }
 
   set borderWidth(EdgeInsets? value) {
-    // Deprecated or mapped to internal border logic if needed.
-    // For now, we keep it for backward compatibility or remove it if we fully switch.
-    // But RenderYogaLayout uses _borderWidth for collapsing logic on the root node.
-    // The root node is configured by YogaLayout widget properties.
-    // YogaLayout widget still has borderWidth property?
-    // Let's check YogaLayout widget.
     _borderWidth = value ?? EdgeInsets.zero;
-    if (value != null) {
-      _rootNode.setBorder(YGEdge.left, value.left);
-      _rootNode.setBorder(YGEdge.top, value.top);
-      _rootNode.setBorder(YGEdge.right, value.right);
-      _rootNode.setBorder(YGEdge.bottom, value.bottom);
-    } else {
-      _rootNode.setBorder(YGEdge.all, 0);
+    // Only apply if _border is null. If _border is set, it takes precedence.
+    if (_border == null) {
+      if (value != null) {
+        _rootNode.setBorder(YGEdge.left, value.left);
+        _rootNode.setBorder(YGEdge.top, value.top);
+        _rootNode.setBorder(YGEdge.right, value.right);
+        _rootNode.setBorder(YGEdge.bottom, value.bottom);
+      } else {
+        _rootNode.setBorder(YGEdge.all, 0);
+      }
+      markNeedsLayout();
     }
-    markNeedsLayout();
   }
 
   @override
@@ -126,9 +287,19 @@ class RenderYogaLayout extends RenderBox
   void insert(RenderBox child, {RenderBox? after}) {
     super.insert(child, after: after);
     final childParentData = child.parentData as YogaLayoutParentData;
-    childParentData.yogaNode ??= YogaNode();
+
+    if (child is RenderYogaLayout) {
+      // Link the existing rootNode of the nested YogaLayout
+      childParentData.yogaNode = child.rootNode;
+    } else {
+      // Always recreate the node to ensure it matches the current config (especially UseWebDefaults)
+      if (childParentData.yogaNode != null) {
+        childParentData.yogaNode!.dispose();
+      }
+      childParentData.yogaNode = YogaNode(_config);
+    }
+
     final childNode = childParentData.yogaNode!;
-    childNode.setConfig(_config);
 
     int index = 0;
     RenderBox? current = firstChild;
@@ -157,123 +328,8 @@ class RenderYogaLayout extends RenderBox
 
   @override
   void performLayout() {
-    // 1. Sync Root Constraints
-    if (_width != null) {
-      _applyWidth(_rootNode, _width!);
-    } else if (constraints.hasBoundedWidth) {
-      _rootNode.width = constraints.maxWidth;
-    } else {
-      _rootNode.setWidthAuto();
-    }
-
-    if (_height != null) {
-      _applyHeight(_rootNode, _height!);
-    } else if (constraints.hasBoundedHeight) {
-      _rootNode.height = constraints.maxHeight;
-    } else {
-      _rootNode.setHeightAuto();
-    }
-
-    // 2. Sync Children Size
-    RenderBox? child = firstChild;
-    while (child != null) {
-      final childParentData = child.parentData as YogaLayoutParentData;
-      final childNode = childParentData.yogaNode!;
-
-      // Apply Border Widths to YogaNode
-      double borderTop = 0;
-      double borderRight = 0;
-      double borderBottom = 0;
-      double borderLeft = 0;
-
-      if (childParentData.border != null) {
-        // We assume LTR for now for layout purposes if direction is not available in context easily here?
-        // Actually RenderBox has no directionality unless we look up.
-        // But YogaNode needs physical edges.
-        // Let's assume LTR for layout calculation or try to get direction.
-        // In a real implementation we should pass direction to performLayout or store it.
-        // For now, default to LTR.
-        final resolvedBorder = childParentData.border!.resolve(
-          TextDirection.ltr,
-        );
-        final flutterBorder = resolvedBorder.toFlutterBorder();
-
-        borderTop = flutterBorder.top.width;
-        borderRight = flutterBorder.right.width;
-        borderBottom = flutterBorder.bottom.width;
-        borderLeft = flutterBorder.left.width;
-
-        childNode.setBorder(YGEdge.top, borderTop);
-        childNode.setBorder(YGEdge.right, borderRight);
-        childNode.setBorder(YGEdge.bottom, borderBottom);
-        childNode.setBorder(YGEdge.left, borderLeft);
-      } else {
-        childNode.setBorder(YGEdge.all, 0);
-      }
-
-      // Apply Box Sizing (Content-Box adjustment)
-      // Yoga defaults to Border-Box behavior (width specifies the node's total width).
-      // If box-sizing is content-box, we need to add border width to the specified width.
-      if (childParentData.boxSizing == YogaBoxSizing.contentBox) {
-        if (childParentData.width != null &&
-            childParentData.width!.unit == YogaUnit.point) {
-          childNode.width =
-              childParentData.width!.value + borderLeft + borderRight;
-        }
-        if (childParentData.height != null &&
-            childParentData.height!.unit == YogaUnit.point) {
-          childNode.height =
-              childParentData.height!.value + borderTop + borderBottom;
-        }
-      } else {
-        // Ensure we reset to original value if we switched back to border-box
-        // or if we are just ensuring consistency.
-        // However, YogaItem.applyParentData sets the value.
-        // If we don't touch it here, it stays as set by YogaItem.
-        // But if we previously set it to (width + border), and now we want (width),
-        // we rely on YogaItem.applyParentData to have reset it?
-        // No, applyParentData is only called when widget config changes.
-        // If only layout happens (e.g. parent size change), applyParentData is NOT called.
-        // So we MUST reset/re-apply the width from childParentData here to be safe,
-        // OR ensure that we always set it.
-
-        // To be safe and stateless, we should re-apply the width/height from parentData
-        // if it is a fixed point value.
-        if (childParentData.width != null &&
-            childParentData.width!.unit == YogaUnit.point) {
-          childNode.width = childParentData.width!.value;
-        }
-        if (childParentData.height != null &&
-            childParentData.height!.unit == YogaUnit.point) {
-          childNode.height = childParentData.height!.value;
-        }
-      }
-
-      // If the user didn't specify an explicit size, we try to measure the child's content size
-      // and set it on the Yoga node. This is a simplified "Auto" sizing.
-      // Note: We must NOT overwrite width/height if width/height is set (unless it's auto).
-
-      bool widthIsSet =
-          childParentData.width != null &&
-          childParentData.width!.unit != YogaUnit.auto &&
-          childParentData.width!.unit != YogaUnit.undefined;
-      bool heightIsSet =
-          childParentData.height != null &&
-          childParentData.height!.unit != YogaUnit.auto &&
-          childParentData.height!.unit != YogaUnit.undefined;
-
-      if (!widthIsSet || !heightIsSet) {
-        final Size childSize = child.getDryLayout(const BoxConstraints());
-        if (!widthIsSet) {
-          childNode.width = childSize.width.ceilToDouble();
-        }
-        if (!heightIsSet) {
-          childNode.height = childSize.height.ceilToDouble();
-        }
-      }
-
-      child = childParentData.nextSibling;
-    }
+    _syncRootConstraints(constraints);
+    _syncChildren(dryRun: false);
 
     if (_enableMarginCollapsing) {
       _collapseMarginsRecursive(this);
@@ -293,7 +349,7 @@ class RenderYogaLayout extends RenderBox
     );
 
     // 4. Apply Layout to Children
-    child = firstChild;
+    RenderBox? child = firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
       final childNode = childParentData.yogaNode!;
@@ -324,6 +380,275 @@ class RenderYogaLayout extends RenderBox
     size = constraints.constrain(
       Size(rootW.isNaN ? 0.0 : rootW, rootH.isNaN ? 0.0 : rootH),
     );
+  }
+
+  @override
+  Size computeDryLayout(BoxConstraints constraints) {
+    _syncRootConstraints(constraints);
+    _syncChildren(dryRun: true);
+
+    // Note: Margin collapsing is stateful on the nodes (modifies margins).
+    // We should probably run it for dry layout too to get accurate size,
+    // but we must be careful not to leave the nodes in a bad state if performLayout expects clean state.
+    // However, performLayout resets margins via _resetMarginsRecursive if collapsing is disabled,
+    // or re-runs collapsing.
+    // So it should be fine to run it here.
+    if (_enableMarginCollapsing) {
+      _collapseMarginsRecursive(this);
+    } else {
+      _resetMarginsRecursive(this);
+    }
+
+    _rootNode.calculateLayout(
+      availableWidth: constraints.hasBoundedWidth
+          ? constraints.maxWidth
+          : double.nan,
+      availableHeight: constraints.hasBoundedHeight
+          ? constraints.maxHeight
+          : double.nan,
+    );
+
+    final double rootW = _rootNode.layoutWidth;
+    final double rootH = _rootNode.layoutHeight;
+
+    return constraints.constrain(
+      Size(rootW.isNaN ? 0.0 : rootW, rootH.isNaN ? 0.0 : rootH),
+    );
+  }
+
+  void _syncRootConstraints(BoxConstraints constraints) {
+    // If constraints are tight, we MUST be that size.
+    // This overrides any user-specified width/height (especially percentages),
+    // because the parent has already resolved those percentages to this tight constraint.
+    // If we don't do this, calculateLayout might resolve the percentage again against the constraint,
+    // leading to double-scaling (e.g. 50% of 50% = 25%).
+
+    if (constraints.hasTightWidth) {
+      _rootNode.width = constraints.maxWidth;
+    } else if (_width != null) {
+      _applyWidth(_rootNode, _width!);
+    } else if (constraints.hasBoundedWidth) {
+      _rootNode.width = constraints.maxWidth;
+    } else {
+      _rootNode.setWidthAuto();
+    }
+
+    if (constraints.hasTightHeight) {
+      _rootNode.height = constraints.maxHeight;
+    } else if (_height != null) {
+      _applyHeight(_rootNode, _height!);
+    } else if (constraints.hasBoundedHeight) {
+      _rootNode.height = constraints.maxHeight;
+    } else {
+      _rootNode.setHeightAuto();
+    }
+  }
+
+  void _syncChildren({required bool dryRun}) {
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final childParentData = child.parentData as YogaLayoutParentData;
+      final childNode = childParentData.yogaNode!;
+
+      // Resolve effective properties (ParentData > Child RenderObject properties)
+      YogaValue? width = childParentData.width;
+      YogaValue? height = childParentData.height;
+      double? flexGrow = childParentData.flexGrow;
+      double? flexShrink = childParentData.flexShrink;
+      double? flexBasis = childParentData.flexBasis;
+      YogaDisplay? display = childParentData.display;
+      YogaEdgeInsets? margin = childParentData.margin;
+      YogaBorder? border = childParentData.border;
+      int? alignSelf = childParentData.alignSelf;
+      YogaBoxSizing? boxSizing = childParentData.boxSizing;
+
+      if (child is RenderYogaLayout) {
+        width ??= child._width;
+        height ??= child._height;
+        flexGrow ??= child._flexGrow;
+        flexShrink ??= child._flexShrink;
+        flexBasis ??= child._flexBasis;
+        display ??= child._display;
+        margin ??= child._margin;
+        border ??= child._border;
+        alignSelf ??= child._alignSelf;
+        boxSizing ??= child._boxSizing;
+      }
+
+      // 1. Sync Basic Layout Properties
+      if (width != null) {
+        _applyWidth(childNode, width);
+      } else {
+        // If width is null, we don't reset it here because it might be auto/undefined
+        // But we should probably ensure it's auto if not set?
+        // YogaItem sets it to auto if null.
+        // Let's assume if it's null in parentData, it should be auto.
+        // However, we need to be careful about display:block behavior (width: 100%).
+        if (display == YogaDisplay.block) {
+          childNode.setWidthPercent(100);
+        } else {
+          childNode.setWidthAuto();
+        }
+      }
+
+      if (height != null) {
+        _applyHeight(childNode, height);
+      } else {
+        childNode.setHeightAuto();
+      }
+
+      if (flexGrow != null) {
+        childNode.flexGrow = flexGrow;
+      } else {
+        childNode.flexGrow = 0; // Default
+      }
+
+      if (flexShrink != null) {
+        childNode.flexShrink = flexShrink;
+      } else {
+        // Default (Yoga default is 0, Web is 1)
+        childNode.flexShrink = _useWebDefaults ? 1 : 0;
+      }
+
+      if (flexBasis != null) {
+        childNode.flexBasis = flexBasis;
+      } else {
+        childNode.setFlexBasisAuto();
+      }
+
+      if (alignSelf != null) {
+        childNode.alignSelf = alignSelf;
+      } else {
+        childNode.alignSelf = YGAlign.auto;
+      }
+
+      if (display != null) {
+        childNode.display = display == YogaDisplay.none
+            ? YGDisplay.none
+            : YGDisplay.flex;
+      } else {
+        childNode.display = YGDisplay.flex;
+      }
+
+      // 2. Sync Margins
+      _setMarginEdge(childNode, YGEdge.left, margin?.left);
+      _setMarginEdge(childNode, YGEdge.top, margin?.top);
+      _setMarginEdge(childNode, YGEdge.right, margin?.right);
+      _setMarginEdge(childNode, YGEdge.bottom, margin?.bottom);
+
+      // 3. Apply Border Widths to YogaNode
+      double borderTop = 0;
+      double borderRight = 0;
+      double borderBottom = 0;
+      double borderLeft = 0;
+
+      if (border != null) {
+        final resolvedBorder = border.resolve(TextDirection.ltr);
+        final flutterBorder = resolvedBorder.toFlutterBorder();
+
+        borderTop = flutterBorder.top.width;
+        borderRight = flutterBorder.right.width;
+        borderBottom = flutterBorder.bottom.width;
+        borderLeft = flutterBorder.left.width;
+
+        childNode.setBorder(YGEdge.top, borderTop);
+        childNode.setBorder(YGEdge.right, borderRight);
+        childNode.setBorder(YGEdge.bottom, borderBottom);
+        childNode.setBorder(YGEdge.left, borderLeft);
+      } else {
+        childNode.setBorder(YGEdge.all, 0);
+      }
+
+      // 4. Apply Box Sizing (Content-Box adjustment)
+      if (boxSizing == YogaBoxSizing.contentBox) {
+        if (width != null && width.unit == YogaUnit.point) {
+          childNode.width = width.value + borderLeft + borderRight;
+        }
+        if (height != null && height.unit == YogaUnit.point) {
+          childNode.height = height.value + borderTop + borderBottom;
+        }
+      } else {
+        // Re-apply width/height to ensure it's not stale from previous content-box calculation
+        if (width != null && width.unit == YogaUnit.point) {
+          childNode.width = width.value;
+        }
+        if (height != null && height.unit == YogaUnit.point) {
+          childNode.height = height.value;
+        }
+      }
+
+      // 5. Measure child if needed
+      bool widthIsSet =
+          width != null &&
+          width.unit != YogaUnit.auto &&
+          width.unit != YogaUnit.undefined;
+      bool heightIsSet =
+          height != null &&
+          height.unit != YogaUnit.auto &&
+          height.unit != YogaUnit.undefined;
+
+      // If child is RenderYogaLayout, we skip manual measurement because we linked its rootNode.
+      // Yoga will handle the layout of the subtree automatically.
+      if ((!widthIsSet || !heightIsSet) && child is! RenderYogaLayout) {
+        // Check if we should skip measurement because of stretch alignment
+        bool skipWidth = false;
+        bool skipHeight = false;
+
+        final int parentFlexDirection = _rootNode.flexDirection;
+        final int parentAlignItems = _alignItems;
+
+        // Determine effective alignment for the child
+        int effectiveAlign = alignSelf ?? YGAlign.auto;
+        if (effectiveAlign == YGAlign.auto) {
+          effectiveAlign = parentAlignItems;
+        }
+        // If still auto (and parent was auto/initial), default depends on config but usually stretch for alignItems
+        // However, YGAlign.auto is 0. YGAlign.stretch is 4.
+        // If parentAlignItems returned 0 (auto), it might mean "not set", which defaults to stretch in Yoga.
+        // Let's assume if effectiveAlign is auto or stretch, it stretches.
+        // Note: alignSelf: auto inherits parent alignItems.
+
+        bool isStretch = effectiveAlign == YGAlign.stretch;
+        // If useWebDefaults is true, default alignItems is stretch.
+        // But _rootNode.alignItems might return auto (0) if not explicitly set?
+        // If we set useWebDefaults, Yoga config handles the default.
+        // But here we are checking the property value.
+        // If property is auto, and useWebDefaults is true, it acts as stretch.
+        if (effectiveAlign == YGAlign.auto && _useWebDefaults) {
+          isStretch = true;
+        }
+
+        if (isStretch) {
+          if (parentFlexDirection == YGFlexDirection.column ||
+              parentFlexDirection == YGFlexDirection.columnReverse) {
+            // Cross axis is Width
+            skipWidth = true;
+          } else {
+            // Cross axis is Height
+            skipHeight = true;
+          }
+        }
+
+        Size childSize;
+        if (dryRun) {
+          childSize = child.getDryLayout(const BoxConstraints());
+        } else {
+          // During performLayout, we can't call layout() to get size without laying out.
+          // But we need the size BEFORE layout to feed to Yoga.
+          // So we use getDryLayout even in performLayout.
+          childSize = child.getDryLayout(const BoxConstraints());
+        }
+
+        if (!widthIsSet && !skipWidth) {
+          childNode.width = childSize.width.ceilToDouble();
+        }
+        if (!heightIsSet && !skipHeight) {
+          childNode.height = childSize.height.ceilToDouble();
+        }
+      }
+
+      child = childParentData.nextSibling;
+    }
   }
 
   void _applyWidth(YogaNode node, YogaValue width) {
@@ -362,71 +687,190 @@ class RenderYogaLayout extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    // Check if we need to paint our own decoration
+    // If parent is RenderYogaLayout, it paints our decoration (border, shadow, transform)
+    // based on our parentData.
+    bool parentHandlesDecoration = parent is RenderYogaLayout;
+
+    if (parentHandlesDecoration) {
+      _paintChildren(context, offset);
+    } else {
+      // We are root (or not inside YogaLayout), so we paint our own decoration
+      if (_transform != null) {
+        final Matrix4 transform = _transform!;
+        final AlignmentGeometry originAlignment =
+            _transformOrigin ?? Alignment.center;
+        final Offset originOffset = originAlignment
+            .resolve(TextDirection.ltr)
+            .alongSize(size);
+        final Matrix4 effectiveTransform =
+            Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
+              ..multiply(transform)
+              ..translate(-originOffset.dx, -originOffset.dy);
+
+        context.pushTransform(needsCompositing, offset, effectiveTransform, (
+          context,
+          offset,
+        ) {
+          _paintSelfWithDecoration(context, offset);
+        });
+      } else {
+        _paintSelfWithDecoration(context, offset);
+      }
+    }
+  }
+
+  void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
+    // 1. Shadow
+    if (_boxShadow != null) {
+      _paintShadows(context, offset, size, _boxShadow!);
+    }
+
+    // 2. Clip (Overflow) & Children
+    if (_overflow == YogaOverflow.hidden) {
+      ResolvedYogaBorder? resolvedBorder;
+      if (_border != null) {
+        resolvedBorder = _border!.resolve(TextDirection.ltr);
+      }
+
+      final Rect rect = offset & size;
+      if (resolvedBorder != null &&
+          resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+        final RRect rrect = resolvedBorder.borderRadius
+            .toFlutterBorderRadius(size)
+            .toRRect(rect);
+        context.pushClipRRect(needsCompositing, offset, rect, rrect, (
+          context,
+          offset,
+        ) {
+          _paintChildren(context, offset);
+        });
+      } else {
+        context.pushClipRect(needsCompositing, offset, rect, (context, offset) {
+          _paintChildren(context, offset);
+        });
+      }
+    } else {
+      _paintChildren(context, offset);
+    }
+
+    // 3. Border
+    if (_border != null) {
+      // We don't support border image on root for now (no ImageInfo stored in RenderObject)
+      _paintBorder(context, offset, size, _border!, null);
+    }
+  }
+
+  void _paintChildren(PaintingContext context, Offset offset) {
     RenderBox? child = firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
-
-      // Paint shadow
-      if (childParentData.boxShadow != null) {
-        _paintShadows(
-          context,
-          offset + childParentData.offset,
-          child.size,
-          childParentData.boxShadow!,
-        );
-      }
-
-      // Paint child
-      ResolvedYogaBorder? resolvedBorder;
-      if (childParentData.border != null) {
-        resolvedBorder = childParentData.border!.resolve(TextDirection.ltr);
-      }
-
       final Offset childOffset = childParentData.offset + offset;
-      final Rect childRect = childOffset & child.size;
-      final RenderBox childRenderBox = child;
 
-      if (childParentData.overflow == YogaOverflow.hidden) {
-        if (resolvedBorder != null &&
-            resolvedBorder.borderRadius != YogaBorderRadius.zero) {
-          final RRect rrect = resolvedBorder.borderRadius
-              .toFlutterBorderRadius(child.size)
-              .toRRect(childRect);
-          context.pushClipRRect(needsCompositing, offset, childRect, rrect, (
-            context,
-            offset,
-          ) {
-            context.paintChild(childRenderBox, childOffset);
-          });
-        } else {
-          context.pushClipRect(needsCompositing, offset, childRect, (
-            context,
-            offset,
-          ) {
-            context.paintChild(childRenderBox, childOffset);
-          });
-        }
+      if (childParentData.transform != null) {
+        _paintWithTransform(context, child, childParentData, childOffset);
       } else {
-        context.paintChild(child, childOffset);
-      }
-
-      // Paint border
-      if (childParentData.border != null) {
-        // Resolve border image if present (now that child has been laid out)
-        if (childParentData.border!.image != null) {
-          _resolveBorderImage(child, childParentData);
-        }
-
-        _paintBorder(
-          context,
-          childOffset,
-          child.size,
-          childParentData.border!,
-          childParentData._borderImageInfo,
-        );
+        _paintChildContent(context, child, childParentData, childOffset);
       }
 
       child = childParentData.nextSibling;
+    }
+  }
+
+  void _paintWithTransform(
+    PaintingContext context,
+    RenderBox child,
+    YogaLayoutParentData childParentData,
+    Offset childOffset,
+  ) {
+    final Matrix4 transform = childParentData.transform!;
+    final AlignmentGeometry originAlignment =
+        childParentData.transformOrigin ?? Alignment.center;
+    final Offset originOffset = originAlignment
+        .resolve(TextDirection.ltr)
+        .alongSize(child.size);
+
+    // Create the effective transform matrix
+    // We want to transform around the origin.
+    // The matrix passed in `transform` is usually just the rotation/scale.
+    // We need to: Translate(origin) -> Transform -> Translate(-origin)
+
+    final Matrix4 effectiveTransform =
+        Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
+          ..multiply(transform)
+          ..translate(-originOffset.dx, -originOffset.dy);
+
+    context.pushTransform(needsCompositing, childOffset, effectiveTransform, (
+      PaintingContext context,
+      Offset offset,
+    ) {
+      _paintChildContent(context, child, childParentData, offset);
+    });
+  }
+
+  void _paintChildContent(
+    PaintingContext context,
+    RenderBox child,
+    YogaLayoutParentData childParentData,
+    Offset paintOffset,
+  ) {
+    // Paint shadow
+    if (childParentData.boxShadow != null) {
+      _paintShadows(
+        context,
+        paintOffset,
+        child.size,
+        childParentData.boxShadow!,
+      );
+    }
+
+    // Paint child
+    ResolvedYogaBorder? resolvedBorder;
+    if (childParentData.border != null) {
+      resolvedBorder = childParentData.border!.resolve(TextDirection.ltr);
+    }
+
+    final Rect childRect = paintOffset & child.size;
+    final RenderBox childRenderBox = child;
+
+    if (childParentData.overflow == YogaOverflow.hidden) {
+      if (resolvedBorder != null &&
+          resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+        final RRect rrect = resolvedBorder.borderRadius
+            .toFlutterBorderRadius(child.size)
+            .toRRect(childRect);
+        context.pushClipRRect(needsCompositing, paintOffset, childRect, rrect, (
+          context,
+          offset,
+        ) {
+          context.paintChild(childRenderBox, offset);
+        });
+      } else {
+        context.pushClipRect(needsCompositing, paintOffset, childRect, (
+          context,
+          offset,
+        ) {
+          context.paintChild(childRenderBox, offset);
+        });
+      }
+    } else {
+      context.paintChild(child, paintOffset);
+    }
+
+    // Paint border
+    if (childParentData.border != null) {
+      // Resolve border image if present (now that child has been laid out)
+      if (childParentData.border!.image != null) {
+        _resolveBorderImage(child, childParentData);
+      }
+
+      _paintBorder(
+        context,
+        paintOffset,
+        child.size,
+        childParentData.border!,
+        childParentData._borderImageInfo,
+      );
     }
   }
 

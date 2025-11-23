@@ -31,6 +31,7 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Border Style Examples', '/border_style'),
           _buildListTile(context, 'Border Radius Examples', '/border_radius'),
           _buildListTile(context, 'Box Sizing Examples', '/box_sizing'),
+          _buildListTile(context, 'Transform Examples', '/transform'),
         ],
       ),
     );

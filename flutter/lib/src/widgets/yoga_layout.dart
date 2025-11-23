@@ -21,6 +21,20 @@ class YogaLayout extends MultiChildRenderObjectWidget {
   final bool useWebDefaults;
   final bool enableMarginCollapsing;
 
+  // YogaItem properties
+  final double? flexGrow;
+  final double? flexShrink;
+  final double? flexBasis;
+  final YogaDisplay? display;
+  final YogaEdgeInsets? margin;
+  final YogaBorder? border;
+  final int? alignSelf;
+  final List<YogaBoxShadow>? boxShadow;
+  final YogaBoxSizing? boxSizing;
+  final YogaOverflow? overflow;
+  final Matrix4? transform;
+  final AlignmentGeometry? transformOrigin;
+
   const YogaLayout({
     super.key,
     this.flexDirection = YGFlexDirection.column,
@@ -34,6 +48,18 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.borderWidth,
     this.useWebDefaults = false,
     this.enableMarginCollapsing = false,
+    this.flexGrow,
+    this.flexShrink,
+    this.flexBasis,
+    this.display,
+    this.margin,
+    this.border,
+    this.alignSelf,
+    this.boxShadow,
+    this.boxSizing,
+    this.overflow,
+    this.transform,
+    this.transformOrigin,
     super.children,
   });
 
@@ -42,7 +68,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     return RenderYogaLayout()
       ..rootNode.flexDirection = flexDirection
       ..rootNode.justifyContent = justifyContent
-      ..rootNode.alignItems = alignItems
+      ..alignItems = alignItems
       ..rootNode.alignContent = alignContent
       ..rootNode.flexWrap = flexWrap
       ..width = width
@@ -50,7 +76,20 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
-      ..borderWidth = borderWidth;
+      ..borderWidth = borderWidth
+      // YogaItem properties
+      ..flexGrow = flexGrow
+      ..flexShrink = flexShrink
+      ..flexBasis = flexBasis
+      ..display = display
+      ..margin = margin
+      ..border = border
+      ..alignSelf = alignSelf
+      ..boxShadow = boxShadow
+      ..boxSizing = boxSizing
+      ..overflow = overflow
+      ..transform = transform
+      ..transformOrigin = transformOrigin;
   }
 
   @override
@@ -61,7 +100,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     renderObject
       ..rootNode.flexDirection = flexDirection
       ..rootNode.justifyContent = justifyContent
-      ..rootNode.alignItems = alignItems
+      ..alignItems = alignItems
       ..rootNode.alignContent = alignContent
       ..rootNode.flexWrap = flexWrap
       ..width = width
@@ -69,7 +108,20 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
-      ..borderWidth = borderWidth;
+      ..borderWidth = borderWidth
+      // YogaItem properties
+      ..flexGrow = flexGrow
+      ..flexShrink = flexShrink
+      ..flexBasis = flexBasis
+      ..display = display
+      ..margin = margin
+      ..border = border
+      ..alignSelf = alignSelf
+      ..boxShadow = boxShadow
+      ..boxSizing = boxSizing
+      ..overflow = overflow
+      ..transform = transform
+      ..transformOrigin = transformOrigin;
 
     renderObject.markNeedsLayout();
   }
@@ -88,6 +140,8 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final List<YogaBoxShadow>? boxShadow;
   final YogaBoxSizing? boxSizing;
   final YogaOverflow? overflow;
+  final Matrix4? transform;
+  final AlignmentGeometry? transformOrigin;
 
   const YogaItem({
     super.key,
@@ -103,6 +157,8 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.boxShadow,
     this.boxSizing,
     this.overflow,
+    this.transform,
+    this.transformOrigin,
     required super.child,
   });
 
@@ -110,6 +166,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   void applyParentData(RenderObject renderObject) {
     final parentData = renderObject.parentData as YogaLayoutParentData;
     bool needsLayout = false;
+    bool needsPaint = false;
 
     if (parentData.yogaNode == null) {
       parentData.yogaNode = YogaNode();
@@ -117,6 +174,16 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     }
 
     final node = parentData.yogaNode!;
+
+    if (parentData.transform != transform) {
+      parentData.transform = transform;
+      needsPaint = true;
+    }
+
+    if (parentData.transformOrigin != transformOrigin) {
+      parentData.transformOrigin = transformOrigin;
+      needsPaint = true;
+    }
 
     if (parentData.boxSizing != boxSizing) {
       parentData.boxSizing = boxSizing;
@@ -128,7 +195,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       // Overflow affects painting, so we need to repaint.
       // But if it changes layout (scroll), it might need layout.
       // For now, we only support visible/hidden which is paint/clip.
-      renderObject.markNeedsPaint();
+      needsPaint = true;
     }
 
     if (parentData.flexGrow != flexGrow) {
@@ -219,6 +286,11 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       final targetParent = renderObject.parent;
       if (targetParent is RenderObject) {
         targetParent.markNeedsLayout();
+      }
+    } else if (needsPaint) {
+      final targetParent = renderObject.parent;
+      if (targetParent is RenderObject) {
+        targetParent.markNeedsPaint();
       }
     }
   }
