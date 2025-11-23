@@ -718,8 +718,67 @@ class RenderYogaLayout extends RenderBox
 
       if (alignSelf != null) {
         childNode.alignSelf = alignSelf;
+
+        // If user explicitly set stretch, but also set width: fit-content.
+        // CSS says width wins. So we should change alignSelf to flexStart?
+        bool preventStretchWidth =
+            width?.unit == YogaUnit.fitContent ||
+            width?.unit == YogaUnit.maxContent ||
+            width?.unit == YogaUnit.minContent;
+        bool preventStretchHeight =
+            height?.unit == YogaUnit.fitContent ||
+            height?.unit == YogaUnit.maxContent ||
+            height?.unit == YogaUnit.minContent;
+
+        int parentFlexDirection = _rootNode.flexDirection;
+        bool isCrossAxisWidth =
+            parentFlexDirection == YGFlexDirection.column ||
+            parentFlexDirection == YGFlexDirection.columnReverse;
+
+        if (isCrossAxisWidth &&
+            preventStretchWidth &&
+            alignSelf == YGAlign.stretch) {
+          childNode.alignSelf = YGAlign.flexStart;
+        }
+        if (!isCrossAxisWidth &&
+            preventStretchHeight &&
+            alignSelf == YGAlign.stretch) {
+          childNode.alignSelf = YGAlign.flexStart;
+        }
       } else {
-        childNode.alignSelf = YGAlign.auto;
+        // alignSelf is Auto.
+        // If parent aligns to stretch, we need to override.
+        bool preventStretchWidth =
+            width?.unit == YogaUnit.fitContent ||
+            width?.unit == YogaUnit.maxContent ||
+            width?.unit == YogaUnit.minContent;
+        bool preventStretchHeight =
+            height?.unit == YogaUnit.fitContent ||
+            height?.unit == YogaUnit.maxContent ||
+            height?.unit == YogaUnit.minContent;
+
+        int parentFlexDirection = _rootNode.flexDirection;
+        bool isCrossAxisWidth =
+            parentFlexDirection == YGFlexDirection.column ||
+            parentFlexDirection == YGFlexDirection.columnReverse;
+
+        int effectiveAlignItems = _alignItems ?? YGAlign.stretch;
+
+        if (isCrossAxisWidth && preventStretchWidth) {
+          if (effectiveAlignItems == YGAlign.stretch) {
+            childNode.alignSelf = YGAlign.flexStart;
+          } else {
+            childNode.alignSelf = YGAlign.auto;
+          }
+        } else if (!isCrossAxisWidth && preventStretchHeight) {
+          if (effectiveAlignItems == YGAlign.stretch) {
+            childNode.alignSelf = YGAlign.flexStart;
+          } else {
+            childNode.alignSelf = YGAlign.auto;
+          }
+        } else {
+          childNode.alignSelf = YGAlign.auto;
+        }
       }
 
       if (display != null) {
@@ -868,39 +927,13 @@ class RenderYogaLayout extends RenderBox
 
         if (needDryLayout) {
           try {
-            if (dryRun) {
-              childSize = child.getDryLayout(const BoxConstraints());
-            } else {
-              // When performing actual layout, we should avoid calling getDryLayout if possible,
-              // especially if the child is a RenderFlex which might assert on size access during dry layout.
-              // Instead, we can try to use intrinsics first, or just use getDryLayout as a fallback.
-              // However, getDryLayout is the correct way to get the size without laying out.
-              // The issue "RenderBox.size accessed in RenderFlex.computeDryLayout" suggests that
-              // RenderFlex is accessing size during dry layout, which is a bug in RenderFlex or how we call it.
-              // To be safe, we wrap this in try-catch, but if the error is an Assertion failure that is NOT caught
-              // by 'catch (e)', we might need to be more careful.
-              // Actually, 'catch (e)' catches everything in Dart.
-              // If the app crashes, maybe it's because we are not catching it?
-              // Let's try to use intrinsics as primary method for auto sizing if getDryLayout is risky.
-              
-              // Try intrinsics first for auto size
-              double w = child.getMaxIntrinsicWidth(double.infinity);
-              double h = child.getMaxIntrinsicHeight(double.infinity);
-              childSize = Size(w, h);
-            }
+            childSize = child.getDryLayout(const BoxConstraints());
           } catch (e) {
-            // Fallback if intrinsics fail (or getDryLayout failed in dryRun)
-            if (dryRun) {
-               // If dry layout failed during dry run, we can't do much.
-               childSize = Size.zero;
-            } else {
-               // During performLayout, we can try getDryLayout as fallback if intrinsics failed
-               try {
-                 childSize = child.getDryLayout(const BoxConstraints());
-               } catch (_) {
-                 childSize = Size.zero;
-               }
-            }
+            // Fallback to intrinsic size if dry layout fails (e.g. RenderFlex assertion)
+            childSize = Size(
+              child.getMaxIntrinsicWidth(double.infinity),
+              child.getMaxIntrinsicHeight(double.infinity),
+            );
           }
         }
 

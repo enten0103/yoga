@@ -36,6 +36,11 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Text Align', '/text_align'),
           _buildListTile(context, 'Background', '/background'),
           _buildListTile(context, 'Intrinsic Sizing', '/intrinsic_sizing'),
+          _buildListTile(
+            context,
+            'Fit Content & Margin Auto',
+            '/fit_content_margin_auto',
+          ),
         ],
       ),
     );
