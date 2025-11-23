@@ -16,6 +16,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
   final int flexWrap;
   final YogaValue? width;
   final YogaValue? height;
+  final YogaValue? minWidth;
+  final YogaValue? maxWidth;
+  final YogaValue? minHeight;
+  final YogaValue? maxHeight;
   final YogaEdgeInsets? padding;
   final EdgeInsets? borderWidth;
   final bool useWebDefaults;
@@ -44,6 +48,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.flexWrap = YGWrap.noWrap,
     this.width,
     this.height,
+    this.minWidth,
+    this.maxWidth,
+    this.minHeight,
+    this.maxHeight,
     this.padding,
     this.borderWidth,
     this.flexGrow,
@@ -73,6 +81,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..rootNode.flexWrap = flexWrap
       ..width = width
       ..height = height
+      ..minWidth = minWidth
+      ..maxWidth = maxWidth
+      ..minHeight = minHeight
+      ..maxHeight = maxHeight
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
@@ -105,6 +117,10 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..rootNode.flexWrap = flexWrap
       ..width = width
       ..height = height
+      ..minWidth = minWidth
+      ..maxWidth = maxWidth
+      ..minHeight = minHeight
+      ..maxHeight = maxHeight
       ..useWebDefaults = useWebDefaults
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
@@ -134,6 +150,10 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final YogaDisplay? display;
   final YogaValue? width;
   final YogaValue? height;
+  final YogaValue? minWidth;
+  final YogaValue? maxWidth;
+  final YogaValue? minHeight;
+  final YogaValue? maxHeight;
   final YogaEdgeInsets? margin;
   final YogaBorder? border;
   final int? alignSelf;
@@ -151,6 +171,10 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.display,
     this.width,
     this.height,
+    this.minWidth,
+    this.maxWidth,
+    this.minHeight,
+    this.maxHeight,
     this.margin,
     this.border,
     this.alignSelf,
@@ -258,6 +282,52 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       }
       needsLayout = true;
     }
+
+    if (parentData.minWidth != minWidth) {
+      parentData.minWidth = minWidth;
+      if (minWidth != null) {
+        _applyMinWidth(node, minWidth!);
+      } else {
+        // Default minWidth is usually 0 or auto depending on context, but Yoga default is NaN (undefined) which means 0 usually?
+        // Actually Yoga default minWidth is 0.
+        // But we don't have a "clear" method easily exposed here without checking unit.
+        // Let's assume if null, we set to undefined/0.
+        // YogaNode.setMinWidth(NaN) -> undefined.
+        node.minWidth = double.nan;
+      }
+      needsLayout = true;
+    }
+
+    if (parentData.maxWidth != maxWidth) {
+      parentData.maxWidth = maxWidth;
+      if (maxWidth != null) {
+        _applyMaxWidth(node, maxWidth!);
+      } else {
+        node.maxWidth = double.nan;
+      }
+      needsLayout = true;
+    }
+
+    if (parentData.minHeight != minHeight) {
+      parentData.minHeight = minHeight;
+      if (minHeight != null) {
+        _applyMinHeight(node, minHeight!);
+      } else {
+        node.minHeight = double.nan;
+      }
+      needsLayout = true;
+    }
+
+    if (parentData.maxHeight != maxHeight) {
+      parentData.maxHeight = maxHeight;
+      if (maxHeight != null) {
+        _applyMaxHeight(node, maxHeight!);
+      } else {
+        node.maxHeight = double.nan;
+      }
+      needsLayout = true;
+    }
+
     if (parentData.margin != margin || parentData.boxShadow != boxShadow) {
       parentData.margin = margin;
       parentData.boxShadow = boxShadow;
@@ -325,6 +395,66 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         break;
       case YogaUnit.undefined:
         node.setHeightAuto();
+        break;
+    }
+  }
+
+  void _applyMinWidth(YogaNode node, YogaValue minWidth) {
+    switch (minWidth.unit) {
+      case YogaUnit.point:
+        node.minWidth = minWidth.value;
+        break;
+      case YogaUnit.percent:
+        node.setMinWidthPercent(minWidth.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.minWidth = double.nan;
+        break;
+    }
+  }
+
+  void _applyMaxWidth(YogaNode node, YogaValue maxWidth) {
+    switch (maxWidth.unit) {
+      case YogaUnit.point:
+        node.maxWidth = maxWidth.value;
+        break;
+      case YogaUnit.percent:
+        node.setMaxWidthPercent(maxWidth.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.maxWidth = double.nan;
+        break;
+    }
+  }
+
+  void _applyMinHeight(YogaNode node, YogaValue minHeight) {
+    switch (minHeight.unit) {
+      case YogaUnit.point:
+        node.minHeight = minHeight.value;
+        break;
+      case YogaUnit.percent:
+        node.setMinHeightPercent(minHeight.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.minHeight = double.nan;
+        break;
+    }
+  }
+
+  void _applyMaxHeight(YogaNode node, YogaValue maxHeight) {
+    switch (maxHeight.unit) {
+      case YogaUnit.point:
+        node.maxHeight = maxHeight.value;
+        break;
+      case YogaUnit.percent:
+        node.setMaxHeightPercent(maxHeight.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.maxHeight = double.nan;
         break;
     }
   }

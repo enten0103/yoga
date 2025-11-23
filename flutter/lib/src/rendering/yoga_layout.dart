@@ -16,6 +16,10 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaDisplay? display;
   YogaValue? width;
   YogaValue? height;
+  YogaValue? minWidth;
+  YogaValue? maxWidth;
+  YogaValue? minHeight;
+  YogaValue? maxHeight;
   YogaEdgeInsets? margin;
   YogaBorder? border;
   YogaBoxSizing? boxSizing;
@@ -59,6 +63,10 @@ class RenderYogaLayout extends RenderBox
   EdgeInsets _borderWidth = EdgeInsets.zero;
   YogaValue? _width;
   YogaValue? _height;
+  YogaValue? _minWidth;
+  YogaValue? _maxWidth;
+  YogaValue? _minHeight;
+  YogaValue? _maxHeight;
 
   // YogaItem properties
   double? _flexGrow;
@@ -210,6 +218,38 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
+  set minWidth(YogaValue? value) {
+    if (_minWidth != value) {
+      _minWidth = value;
+      _updateParentData((pd) => pd.minWidth = value);
+      markNeedsLayout();
+    }
+  }
+
+  set maxWidth(YogaValue? value) {
+    if (_maxWidth != value) {
+      _maxWidth = value;
+      _updateParentData((pd) => pd.maxWidth = value);
+      markNeedsLayout();
+    }
+  }
+
+  set minHeight(YogaValue? value) {
+    if (_minHeight != value) {
+      _minHeight = value;
+      _updateParentData((pd) => pd.minHeight = value);
+      markNeedsLayout();
+    }
+  }
+
+  set maxHeight(YogaValue? value) {
+    if (_maxHeight != value) {
+      _maxHeight = value;
+      _updateParentData((pd) => pd.maxHeight = value);
+      markNeedsLayout();
+    }
+  }
+
   void _updateParentData(void Function(YogaLayoutParentData) updater) {
     if (parentData is YogaLayoutParentData) {
       updater(parentData as YogaLayoutParentData);
@@ -226,6 +266,10 @@ class RenderYogaLayout extends RenderBox
       final pd = parentData as YogaLayoutParentData;
       pd.width = _width;
       pd.height = _height;
+      pd.minWidth = _minWidth;
+      pd.maxWidth = _maxWidth;
+      pd.minHeight = _minHeight;
+      pd.maxHeight = _maxHeight;
       pd.flexGrow = _flexGrow;
       pd.flexShrink = _flexShrink;
       pd.flexBasis = _flexBasis;
@@ -442,6 +486,30 @@ class RenderYogaLayout extends RenderBox
     } else {
       _rootNode.setHeightAuto();
     }
+
+    if (_minWidth != null) {
+      _applyMinWidth(_rootNode, _minWidth!);
+    } else {
+      _rootNode.minWidth = double.nan;
+    }
+
+    if (_maxWidth != null) {
+      _applyMaxWidth(_rootNode, _maxWidth!);
+    } else {
+      _rootNode.maxWidth = double.nan;
+    }
+
+    if (_minHeight != null) {
+      _applyMinHeight(_rootNode, _minHeight!);
+    } else {
+      _rootNode.minHeight = double.nan;
+    }
+
+    if (_maxHeight != null) {
+      _applyMaxHeight(_rootNode, _maxHeight!);
+    } else {
+      _rootNode.maxHeight = double.nan;
+    }
   }
 
   void _syncChildren({required bool dryRun}) {
@@ -453,6 +521,10 @@ class RenderYogaLayout extends RenderBox
       // Resolve effective properties (ParentData > Child RenderObject properties)
       YogaValue? width = childParentData.width;
       YogaValue? height = childParentData.height;
+      YogaValue? minWidth = childParentData.minWidth;
+      YogaValue? maxWidth = childParentData.maxWidth;
+      YogaValue? minHeight = childParentData.minHeight;
+      YogaValue? maxHeight = childParentData.maxHeight;
       double? flexGrow = childParentData.flexGrow;
       double? flexShrink = childParentData.flexShrink;
       double? flexBasis = childParentData.flexBasis;
@@ -465,6 +537,10 @@ class RenderYogaLayout extends RenderBox
       if (child is RenderYogaLayout) {
         width ??= child._width;
         height ??= child._height;
+        minWidth ??= child._minWidth;
+        maxWidth ??= child._maxWidth;
+        minHeight ??= child._minHeight;
+        maxHeight ??= child._maxHeight;
         flexGrow ??= child._flexGrow;
         flexShrink ??= child._flexShrink;
         flexBasis ??= child._flexBasis;
@@ -495,6 +571,30 @@ class RenderYogaLayout extends RenderBox
         _applyHeight(childNode, height);
       } else {
         childNode.setHeightAuto();
+      }
+
+      if (minWidth != null) {
+        _applyMinWidth(childNode, minWidth);
+      } else {
+        childNode.minWidth = double.nan;
+      }
+
+      if (maxWidth != null) {
+        _applyMaxWidth(childNode, maxWidth);
+      } else {
+        childNode.maxWidth = double.nan;
+      }
+
+      if (minHeight != null) {
+        _applyMinHeight(childNode, minHeight);
+      } else {
+        childNode.minHeight = double.nan;
+      }
+
+      if (maxHeight != null) {
+        _applyMaxHeight(childNode, maxHeight);
+      } else {
+        childNode.maxHeight = double.nan;
       }
 
       if (flexGrow != null) {
@@ -681,6 +781,66 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.undefined:
         node.setHeightAuto();
+        break;
+    }
+  }
+
+  void _applyMinWidth(YogaNode node, YogaValue minWidth) {
+    switch (minWidth.unit) {
+      case YogaUnit.point:
+        node.minWidth = minWidth.value;
+        break;
+      case YogaUnit.percent:
+        node.setMinWidthPercent(minWidth.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.minWidth = double.nan;
+        break;
+    }
+  }
+
+  void _applyMaxWidth(YogaNode node, YogaValue maxWidth) {
+    switch (maxWidth.unit) {
+      case YogaUnit.point:
+        node.maxWidth = maxWidth.value;
+        break;
+      case YogaUnit.percent:
+        node.setMaxWidthPercent(maxWidth.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.maxWidth = double.nan;
+        break;
+    }
+  }
+
+  void _applyMinHeight(YogaNode node, YogaValue minHeight) {
+    switch (minHeight.unit) {
+      case YogaUnit.point:
+        node.minHeight = minHeight.value;
+        break;
+      case YogaUnit.percent:
+        node.setMinHeightPercent(minHeight.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.minHeight = double.nan;
+        break;
+    }
+  }
+
+  void _applyMaxHeight(YogaNode node, YogaValue maxHeight) {
+    switch (maxHeight.unit) {
+      case YogaUnit.point:
+        node.maxHeight = maxHeight.value;
+        break;
+      case YogaUnit.percent:
+        node.setMaxHeightPercent(maxHeight.value);
+        break;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        node.maxHeight = double.nan;
         break;
     }
   }
