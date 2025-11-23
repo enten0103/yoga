@@ -867,10 +867,23 @@ class RenderYogaLayout extends RenderBox
         }
 
         if (needDryLayout) {
-          if (dryRun) {
-            childSize = child.getDryLayout(const BoxConstraints());
-          } else {
-            childSize = child.getDryLayout(const BoxConstraints());
+          try {
+            if (dryRun) {
+              childSize = child.getDryLayout(const BoxConstraints());
+            } else {
+              childSize = child.getDryLayout(const BoxConstraints());
+            }
+          } catch (e) {
+            // Fallback to intrinsics if dry layout fails (e.g. RenderFlex with Expanded needs constraints)
+            double w = 0;
+            double h = 0;
+            try {
+              w = child.getMaxIntrinsicWidth(double.infinity);
+            } catch (_) {}
+            try {
+              h = child.getMaxIntrinsicHeight(double.infinity);
+            } catch (_) {}
+            childSize = Size(w, h);
           }
         }
 
