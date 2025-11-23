@@ -17,6 +17,7 @@ import 'examples/box_sizing_page.dart';
 import 'examples/border_style_page.dart';
 import 'examples/border_radius_page.dart';
 import 'examples/transform_page.dart';
+import 'examples/min_max_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -65,6 +66,7 @@ class _MyAppState extends State<MyApp> {
         '/border_style': (context) => const BorderStylePage(),
         '/border_radius': (context) => const BorderRadiusPage(),
         '/transform': (context) => const TransformPage(),
+        '/min_max': (context) => const MinMaxPage(),
       },
     );
   }
