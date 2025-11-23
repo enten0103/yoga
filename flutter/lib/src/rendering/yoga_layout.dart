@@ -871,19 +871,36 @@ class RenderYogaLayout extends RenderBox
             if (dryRun) {
               childSize = child.getDryLayout(const BoxConstraints());
             } else {
-              childSize = child.getDryLayout(const BoxConstraints());
+              // When performing actual layout, we should avoid calling getDryLayout if possible,
+              // especially if the child is a RenderFlex which might assert on size access during dry layout.
+              // Instead, we can try to use intrinsics first, or just use getDryLayout as a fallback.
+              // However, getDryLayout is the correct way to get the size without laying out.
+              // The issue "RenderBox.size accessed in RenderFlex.computeDryLayout" suggests that
+              // RenderFlex is accessing size during dry layout, which is a bug in RenderFlex or how we call it.
+              // To be safe, we wrap this in try-catch, but if the error is an Assertion failure that is NOT caught
+              // by 'catch (e)', we might need to be more careful.
+              // Actually, 'catch (e)' catches everything in Dart.
+              // If the app crashes, maybe it's because we are not catching it?
+              // Let's try to use intrinsics as primary method for auto sizing if getDryLayout is risky.
+              
+              // Try intrinsics first for auto size
+              double w = child.getMaxIntrinsicWidth(double.infinity);
+              double h = child.getMaxIntrinsicHeight(double.infinity);
+              childSize = Size(w, h);
             }
           } catch (e) {
-            // Fallback to intrinsics if dry layout fails (e.g. RenderFlex with Expanded needs constraints)
-            double w = 0;
-            double h = 0;
-            try {
-              w = child.getMaxIntrinsicWidth(double.infinity);
-            } catch (_) {}
-            try {
-              h = child.getMaxIntrinsicHeight(double.infinity);
-            } catch (_) {}
-            childSize = Size(w, h);
+            // Fallback if intrinsics fail (or getDryLayout failed in dryRun)
+            if (dryRun) {
+               // If dry layout failed during dry run, we can't do much.
+               childSize = Size.zero;
+            } else {
+               // During performLayout, we can try getDryLayout as fallback if intrinsics failed
+               try {
+                 childSize = child.getDryLayout(const BoxConstraints());
+               } catch (_) {
+                 childSize = Size.zero;
+               }
+            }
           }
         }
 
