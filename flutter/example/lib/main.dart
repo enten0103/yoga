@@ -20,6 +20,7 @@ import 'examples/transform_page.dart';
 import 'examples/min_max_page.dart';
 import 'examples/text_align_page.dart';
 import 'examples/background_page.dart';
+import 'examples/intrinsic_sizing_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -71,6 +72,7 @@ class _MyAppState extends State<MyApp> {
         '/min_max': (context) => const MinMaxPage(),
         '/text_align': (context) => const TextAlignPage(),
         '/background': (context) => const BackgroundPage(),
+        '/intrinsic_sizing': (context) => const IntrinsicSizingPage(),
       },
     );
   }

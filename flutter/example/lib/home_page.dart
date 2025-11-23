@@ -35,6 +35,7 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Min/Max Dimensions', '/min_max'),
           _buildListTile(context, 'Text Align', '/text_align'),
           _buildListTile(context, 'Background', '/background'),
+          _buildListTile(context, 'Intrinsic Sizing', '/intrinsic_sizing'),
         ],
       ),
     );

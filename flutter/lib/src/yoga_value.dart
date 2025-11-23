@@ -13,6 +13,15 @@ enum YogaUnit {
 
   /// The value is undefined.
   undefined,
+
+  /// The width is determined by the maximum size of the content.
+  maxContent,
+
+  /// The width is determined by the minimum size of the content.
+  minContent,
+
+  /// The width is determined by the content size, clamped by the available space.
+  fitContent,
 }
 
 /// Controls how the size of a box is calculated.
@@ -58,6 +67,15 @@ class YogaValue {
   /// Creates an undefined value.
   const YogaValue.undefined() : value = double.nan, unit = YogaUnit.undefined;
 
+  /// Creates a max-content value.
+  const YogaValue.maxContent() : value = double.nan, unit = YogaUnit.maxContent;
+
+  /// Creates a min-content value.
+  const YogaValue.minContent() : value = double.nan, unit = YogaUnit.minContent;
+
+  /// Creates a fit-content value.
+  const YogaValue.fitContent() : value = double.nan, unit = YogaUnit.fitContent;
+
   /// A value of 0 points.
   static const zero = YogaValue.point(0);
 
@@ -92,6 +110,12 @@ class YogaValue {
         return 'auto';
       case YogaUnit.undefined:
         return 'undefined';
+      case YogaUnit.maxContent:
+        return 'max-content';
+      case YogaUnit.minContent:
+        return 'min-content';
+      case YogaUnit.fitContent:
+        return 'fit-content';
     }
   }
 }

@@ -217,6 +217,9 @@ class YogaBorderRadius {
           );
         case YogaUnit.auto:
         case YogaUnit.undefined:
+        case YogaUnit.maxContent:
+        case YogaUnit.minContent:
+        case YogaUnit.fitContent:
           return Radius.zero;
       }
     }

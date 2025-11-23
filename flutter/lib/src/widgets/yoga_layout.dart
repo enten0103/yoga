@@ -389,6 +389,15 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       case YogaUnit.undefined:
         node.setWidthAuto(); // Or undefined?
         break;
+      case YogaUnit.maxContent:
+        node.setWidthAuto();
+        break;
+      case YogaUnit.minContent:
+        node.setWidthAuto();
+        break;
+      case YogaUnit.fitContent:
+        node.setWidthAuto();
+        break;
     }
   }
 
@@ -406,6 +415,15 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       case YogaUnit.undefined:
         node.setHeightAuto();
         break;
+      case YogaUnit.maxContent:
+        node.setHeightAuto();
+        break;
+      case YogaUnit.minContent:
+        node.setHeightAuto();
+        break;
+      case YogaUnit.fitContent:
+        node.setHeightAuto();
+        break;
     }
   }
 
@@ -419,6 +437,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.minWidth = double.nan;
         break;
     }
@@ -434,6 +455,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.maxWidth = double.nan;
         break;
     }
@@ -449,6 +473,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.minHeight = double.nan;
         break;
     }
@@ -464,6 +491,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.maxHeight = double.nan;
         break;
     }
@@ -492,6 +522,11 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         node.setMarginAuto(edge);
         break;
       case YogaUnit.undefined:
+        node.setMargin(edge, 0);
+        break;
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.setMargin(edge, 0);
         break;
     }

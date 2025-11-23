@@ -781,11 +781,17 @@ class RenderYogaLayout extends RenderBox
       bool widthIsSet =
           width != null &&
           width.unit != YogaUnit.auto &&
-          width.unit != YogaUnit.undefined;
+          width.unit != YogaUnit.undefined &&
+          width.unit != YogaUnit.maxContent &&
+          width.unit != YogaUnit.minContent &&
+          width.unit != YogaUnit.fitContent;
       bool heightIsSet =
           height != null &&
           height.unit != YogaUnit.auto &&
-          height.unit != YogaUnit.undefined;
+          height.unit != YogaUnit.undefined &&
+          height.unit != YogaUnit.maxContent &&
+          height.unit != YogaUnit.minContent &&
+          height.unit != YogaUnit.fitContent;
 
       // If child is RenderYogaLayout, we skip manual measurement because we linked its rootNode.
       // Yoga will handle the layout of the subtree automatically.
@@ -829,21 +835,58 @@ class RenderYogaLayout extends RenderBox
           }
         }
 
-        Size childSize;
-        if (dryRun) {
-          childSize = child.getDryLayout(const BoxConstraints());
-        } else {
-          // During performLayout, we can't call layout() to get size without laying out.
-          // But we need the size BEFORE layout to feed to Yoga.
-          // So we use getDryLayout even in performLayout.
-          childSize = child.getDryLayout(const BoxConstraints());
+        Size childSize = Size.zero;
+        // Only call getDryLayout if we need it (for auto/undefined/maxContent/fitContent default)
+        // For minContent we use getMinIntrinsicWidth/Height
+        bool needDryLayout = false;
+
+        if (!widthIsSet && !skipWidth) {
+          if (width?.unit == YogaUnit.minContent) {
+            childNode.width = child.getMinIntrinsicWidth(double.infinity);
+          } else if (width?.unit == YogaUnit.maxContent) {
+            childNode.width = child.getMaxIntrinsicWidth(double.infinity);
+          } else if (width?.unit == YogaUnit.fitContent) {
+            // fit-content: use max-content (will shrink if flexShrink is set)
+            childNode.width = child.getMaxIntrinsicWidth(double.infinity);
+          } else {
+            // Auto / Undefined
+            needDryLayout = true;
+          }
+        }
+
+        if (!heightIsSet && !skipHeight) {
+          if (height?.unit == YogaUnit.minContent) {
+            childNode.height = child.getMinIntrinsicHeight(double.infinity);
+          } else if (height?.unit == YogaUnit.maxContent) {
+            childNode.height = child.getMaxIntrinsicHeight(double.infinity);
+          } else if (height?.unit == YogaUnit.fitContent) {
+            childNode.height = child.getMaxIntrinsicHeight(double.infinity);
+          } else {
+            needDryLayout = true;
+          }
+        }
+
+        if (needDryLayout) {
+          if (dryRun) {
+            childSize = child.getDryLayout(const BoxConstraints());
+          } else {
+            childSize = child.getDryLayout(const BoxConstraints());
+          }
         }
 
         if (!widthIsSet && !skipWidth) {
-          childNode.width = childSize.width.ceilToDouble();
+          if (width?.unit == YogaUnit.auto ||
+              width?.unit == YogaUnit.undefined ||
+              width == null) {
+            childNode.width = childSize.width.ceilToDouble();
+          }
         }
         if (!heightIsSet && !skipHeight) {
-          childNode.height = childSize.height.ceilToDouble();
+          if (height?.unit == YogaUnit.auto ||
+              height?.unit == YogaUnit.undefined ||
+              height == null) {
+            childNode.height = childSize.height.ceilToDouble();
+          }
         }
       }
 
@@ -860,9 +903,10 @@ class RenderYogaLayout extends RenderBox
         node.setWidthPercent(width.value);
         break;
       case YogaUnit.auto:
-        node.setWidthAuto();
-        break;
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.setWidthAuto();
         break;
     }
@@ -877,9 +921,10 @@ class RenderYogaLayout extends RenderBox
         node.setHeightPercent(height.value);
         break;
       case YogaUnit.auto:
-        node.setHeightAuto();
-        break;
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.setHeightAuto();
         break;
     }
@@ -895,6 +940,9 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.minWidth = double.nan;
         break;
     }
@@ -910,6 +958,9 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.maxWidth = double.nan;
         break;
     }
@@ -925,6 +976,9 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.minHeight = double.nan;
         break;
     }
@@ -940,6 +994,9 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.maxHeight = double.nan;
         break;
     }
@@ -1840,6 +1897,9 @@ class RenderYogaLayout extends RenderBox
         return value.value * base / 100.0;
       case YogaUnit.auto:
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         return 0;
     }
   }
@@ -1890,6 +1950,9 @@ class RenderYogaLayout extends RenderBox
         node.setMarginAuto(edge);
         break;
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.setMargin(edge, 0);
         break;
     }
@@ -2125,6 +2188,9 @@ class RenderYogaLayout extends RenderBox
         node.setPadding(edge, 0);
         break;
       case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
         node.setPadding(edge, 0);
         break;
     }
