@@ -706,7 +706,13 @@ class RenderYogaLayout extends RenderBox
         final Matrix4 effectiveTransform =
             Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
               ..multiply(transform)
-              ..translate(-originOffset.dx, -originOffset.dy);
+              ..multiply(
+                Matrix4.translationValues(
+                  -originOffset.dx,
+                  -originOffset.dy,
+                  0.0,
+                ),
+              );
 
         context.pushTransform(needsCompositing, offset, effectiveTransform, (
           context,
@@ -798,7 +804,9 @@ class RenderYogaLayout extends RenderBox
     final Matrix4 effectiveTransform =
         Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
           ..multiply(transform)
-          ..translate(-originOffset.dx, -originOffset.dy);
+          ..multiply(
+            Matrix4.translationValues(-originOffset.dx, -originOffset.dy, 0.0),
+          );
 
     context.pushTransform(needsCompositing, childOffset, effectiveTransform, (
       PaintingContext context,

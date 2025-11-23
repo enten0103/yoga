@@ -114,7 +114,7 @@ class NestedLayoutPage extends StatelessWidget {
                     YogaItem(
                       flexGrow: 1,
                       child: Container(
-                        color: Colors.green.withOpacity(0.1),
+                        color: Colors.green.withValues(alpha: 0.1),
                         child: const Center(
                           child: Text(
                             "This content fills the remaining space inside the green box.",
