@@ -17,6 +17,7 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaEdgeInsets? margin;
   EdgeInsets? borderWidth;
   int? alignSelf;
+  List<YogaBoxShadow>? boxShadow;
 
   // Effective margin after collapsing (runtime only, not set by user)
   EdgeInsets? effectiveMargin;
@@ -268,7 +269,64 @@ class RenderYogaLayout extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    defaultPaint(context, offset);
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final childParentData = child.parentData as YogaLayoutParentData;
+
+      // Paint shadow
+      if (childParentData.boxShadow != null) {
+        _paintShadows(
+          context,
+          offset + childParentData.offset,
+          child.size,
+          childParentData.boxShadow!,
+        );
+      }
+
+      // Paint child
+      context.paintChild(child, childParentData.offset + offset);
+
+      child = childParentData.nextSibling;
+    }
+  }
+
+  void _paintShadows(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    List<YogaBoxShadow> shadows,
+  ) {
+    for (int i = shadows.length - 1; i >= 0; i--) {
+      final shadow = shadows[i];
+      final Paint paint = Paint()
+        ..color = shadow.color
+        ..maskFilter = MaskFilter.blur(
+          shadow.blurStyle,
+          _resolveValue(shadow.blurRadius, size.width),
+        );
+
+      final double dx = _resolveValue(shadow.offsetDX, size.width);
+      final double dy = _resolveValue(shadow.offsetDY, size.height);
+      final double spread = _resolveValue(shadow.spreadRadius, size.width);
+
+      final Rect rect = (offset & size).inflate(spread).shift(Offset(dx, dy));
+
+      // We assume rectangular shadow for now as YogaItem doesn't know about borderRadius.
+      // If we want rounded shadows, we need to add borderRadius to YogaItem.
+      context.canvas.drawRect(rect, paint);
+    }
+  }
+
+  double _resolveValue(YogaValue value, double base) {
+    switch (value.unit) {
+      case YogaUnit.point:
+        return value.value;
+      case YogaUnit.percent:
+        return value.value * base / 100.0;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+        return 0;
+    }
   }
 
   @override

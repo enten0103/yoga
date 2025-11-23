@@ -26,6 +26,7 @@ class HomePage extends StatelessWidget {
           _buildListTile(context, 'Web Defaults', '/web_defaults'),
           _buildListTile(context, 'Margin Examples', '/margin'),
           _buildListTile(context, 'Padding Examples', '/padding'),
+          _buildListTile(context, 'Box Shadow Examples', '/box_shadow'),
         ],
       ),
     );

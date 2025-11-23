@@ -83,6 +83,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final YogaEdgeInsets? margin;
   final EdgeInsets? borderWidth;
   final int? alignSelf;
+  final List<YogaBoxShadow>? boxShadow;
 
   const YogaItem({
     super.key,
@@ -95,6 +96,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.margin,
     this.borderWidth,
     this.alignSelf,
+    this.boxShadow,
     required super.child,
   });
 
@@ -170,8 +172,9 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
       }
       needsLayout = true;
     }
-    if (parentData.margin != margin) {
+    if (parentData.margin != margin || parentData.boxShadow != boxShadow) {
       parentData.margin = margin;
+      parentData.boxShadow = boxShadow;
 
       _applyMargin(node, margin);
       needsLayout = true;

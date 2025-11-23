@@ -1,3 +1,5 @@
+import 'package:flutter/painting.dart';
+
 enum YogaUnit { point, percent, auto, undefined }
 
 class YogaValue {
@@ -85,4 +87,44 @@ class YogaEdgeInsets {
   @override
   String toString() =>
       'YogaEdgeInsets(left: $left, top: $top, right: $right, bottom: $bottom)';
+}
+
+class YogaBoxShadow {
+  final Color color;
+  final YogaValue offsetDX;
+  final YogaValue offsetDY;
+  final YogaValue blurRadius;
+  final YogaValue spreadRadius;
+  final BlurStyle blurStyle;
+
+  const YogaBoxShadow({
+    this.color = const Color(0xFF000000),
+    this.offsetDX = YogaValue.zero,
+    this.offsetDY = YogaValue.zero,
+    this.blurRadius = YogaValue.zero,
+    this.spreadRadius = YogaValue.zero,
+    this.blurStyle = BlurStyle.normal,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is YogaBoxShadow &&
+        other.color == color &&
+        other.offsetDX == offsetDX &&
+        other.offsetDY == offsetDY &&
+        other.blurRadius == blurRadius &&
+        other.spreadRadius == spreadRadius &&
+        other.blurStyle == blurStyle;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    color,
+    offsetDX,
+    offsetDY,
+    blurRadius,
+    spreadRadius,
+    blurStyle,
+  );
 }
