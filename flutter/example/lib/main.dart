@@ -19,6 +19,7 @@ import 'examples/border_radius_page.dart';
 import 'examples/transform_page.dart';
 import 'examples/min_max_page.dart';
 import 'examples/text_align_page.dart';
+import 'examples/background_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -69,6 +70,7 @@ class _MyAppState extends State<MyApp> {
         '/transform': (context) => const TransformPage(),
         '/min_max': (context) => const MinMaxPage(),
         '/text_align': (context) => const TextAlignPage(),
+        '/background': (context) => const BackgroundPage(),
       },
     );
   }

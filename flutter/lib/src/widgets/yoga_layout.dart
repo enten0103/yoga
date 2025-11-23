@@ -4,9 +4,11 @@ import '../yoga_ffi.dart';
 import '../yoga_node.dart';
 import '../yoga_value.dart';
 import '../yoga_border.dart';
+import '../yoga_background.dart';
 
 export '../yoga_value.dart';
 export '../yoga_border.dart';
+export '../yoga_background.dart';
 
 class YogaLayout extends MultiChildRenderObjectWidget {
   final int flexDirection;
@@ -23,6 +25,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
   final YogaValue? maxHeight;
   final YogaEdgeInsets? padding;
   final EdgeInsets? borderWidth;
+  final YogaBackground? background;
   final bool useWebDefaults;
   final bool enableMarginCollapsing;
 
@@ -56,6 +59,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.maxHeight,
     this.padding,
     this.borderWidth,
+    this.background,
     this.flexGrow,
     this.flexShrink,
     this.flexBasis,
@@ -92,6 +96,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
       ..borderWidth = borderWidth
+      ..background = background
       // YogaItem properties
       ..flexGrow = flexGrow
       ..flexShrink = flexShrink
@@ -129,6 +134,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
       ..enableMarginCollapsing = enableMarginCollapsing
       ..padding = padding
       ..borderWidth = borderWidth
+      ..background = background
       // YogaItem properties
       ..flexGrow = flexGrow
       ..flexShrink = flexShrink

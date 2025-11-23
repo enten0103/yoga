@@ -5,6 +5,7 @@ import '../yoga_ffi.dart';
 import '../yoga_node.dart';
 import '../yoga_value.dart';
 import '../yoga_border.dart';
+import '../yoga_background.dart';
 
 class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaNode? yogaNode;
@@ -63,7 +64,14 @@ class RenderYogaLayout extends RenderBox
   int? _alignItems;
   TextAlign? _textAlign;
   EdgeInsets _borderWidth = EdgeInsets.zero;
+  YogaBackground? _background;
   YogaValue? _width;
+
+  // Background Image Runtime Data
+  ImageStream? _backgroundImageStream;
+  ImageInfo? _backgroundImageInfo;
+  ImageStreamListener? _backgroundImageListener;
+
   YogaValue? _height;
   YogaValue? _minWidth;
   YogaValue? _maxWidth;
@@ -90,6 +98,66 @@ class RenderYogaLayout extends RenderBox
   }
 
   YogaNode get rootNode => _rootNode;
+
+  set background(YogaBackground? value) {
+    if (_background == value) return;
+    // debugPrint('YogaLayout: set background: $value');
+    _background = value;
+    if (value?.image != null) {
+      _resolveBackgroundImage();
+    } else {
+      _disposeBackgroundImage();
+    }
+    markNeedsPaint();
+  }
+
+  void _resolveBackgroundImage() {
+    final ImageProvider? imageProvider = _background?.image;
+    if (imageProvider == null) {
+      _disposeBackgroundImage();
+      return;
+    }
+
+    // debugPrint('YogaLayout: Resolving background image: $imageProvider');
+
+    // Note: size might be zero here if called before layout.
+    // Ideally we should resolve in paint or layout if size is needed for configuration.
+    // But ImageProvider usually needs configuration.
+    // We can re-resolve in paint if size changes.
+    final ImageConfiguration config = ImageConfiguration(
+      size: hasSize ? size : Size.zero,
+      textDirection: TextDirection.ltr,
+    );
+    final ImageStream newStream = imageProvider.resolve(config);
+
+    if (newStream.key != _backgroundImageStream?.key) {
+      // debugPrint('YogaLayout: New stream detected. Adding listener.');
+      _disposeBackgroundImage();
+      _backgroundImageStream = newStream;
+      _backgroundImageListener = ImageStreamListener(
+        (ImageInfo imageInfo, bool synchronousCall) {
+          // debugPrint('YogaLayout: Image loaded: ${imageInfo.image.width}x${imageInfo.image.height} (sync: $synchronousCall)');
+          _backgroundImageInfo = imageInfo;
+          markNeedsPaint();
+        },
+        onError: (exception, stackTrace) {
+          debugPrint('YogaLayout: Error loading background image: $exception');
+        },
+      );
+      newStream.addListener(_backgroundImageListener!);
+    } else {
+      // debugPrint('YogaLayout: Stream key matches existing stream. Ignoring.');
+    }
+  }
+
+  void _disposeBackgroundImage() {
+    if (_backgroundImageStream != null) {
+      _backgroundImageStream!.removeListener(_backgroundImageListener!);
+      _backgroundImageStream = null;
+      _backgroundImageListener = null;
+      _backgroundImageInfo = null;
+    }
+  }
 
   set width(YogaValue? value) {
     if (_width != value) {
@@ -288,6 +356,11 @@ class RenderYogaLayout extends RenderBox
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
+    // Re-resolve background image if needed (e.g. after detach/attach)
+    if (_background?.image != null && _backgroundImageInfo == null) {
+      _resolveBackgroundImage();
+    }
+
     if (parentData is YogaLayoutParentData) {
       final pd = parentData as YogaLayoutParentData;
       pd.width = _width;
@@ -390,10 +463,11 @@ class RenderYogaLayout extends RenderBox
   }
 
   @override
-  void dispose() {
+  void detach() {
+    _disposeBackgroundImage();
     _rootNode.dispose(recursive: false);
     _config.dispose();
-    super.dispose();
+    super.detach();
   }
 
   @override
@@ -879,6 +953,13 @@ class RenderYogaLayout extends RenderBox
     bool parentHandlesDecoration = parent is RenderYogaLayout;
 
     if (parentHandlesDecoration) {
+      // Even if parent handles decoration (border, shadow, transform),
+      // we are still responsible for painting our own background.
+      // The parent paints shadow BEFORE calling us, and border AFTER calling us.
+      // So we just need to paint background and then children.
+      if (_background != null) {
+        _paintBackground(context, offset, size, _background!);
+      }
       _paintChildren(context, offset);
     } else {
       // We are root (or not inside YogaLayout), so we paint our own decoration
@@ -913,6 +994,11 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
+    // 0. Background
+    if (_background != null) {
+      _paintBackground(context, offset, size, _background!);
+    }
+
     // 1. Shadow
     if (_boxShadow != null) {
       _paintShadows(context, offset, size, _boxShadow!);
@@ -1546,9 +1632,7 @@ class RenderYogaLayout extends RenderBox
       // For center, we should ideally tile in both directions.
       // For now, let's just stretch or simple tile.
       // Implementing full 2D tiling for center is complex and rarely used with complex repeats.
-      // Let's use stretch for center if fill is true, or simple stretch.
-      // Or reuse _drawTile logic but it's 1D.
-      // Let's just stretch center for now as a simplification, or use paintImage.
+      // Let's use stretch for center for now as a simplification, or use paintImage.
       if (!dstCenter.isEmpty && !srcCenter.isEmpty) {
         canvas.drawImageRect(imageInfo.image, srcCenter, dstCenter, paint);
       }
@@ -1692,7 +1776,6 @@ class RenderYogaLayout extends RenderBox
     }
 
     final ImageConfiguration config = ImageConfiguration(
-      size: child.size,
       textDirection: TextDirection.ltr,
     );
     final ImageStream newStream = borderImage.source.resolve(config);
@@ -2037,7 +2120,7 @@ class RenderYogaLayout extends RenderBox
         node.setPaddingPercent(edge, value.value);
         break;
       case YogaUnit.auto:
-        // Padding auto is not really a thing in CSS/Yoga usually, treats as 0?
+        //
         // Yoga doesn't have setPaddingAuto.
         node.setPadding(edge, 0);
         break;
@@ -2121,5 +2204,190 @@ class RenderYogaLayout extends RenderBox
 
     _rootNode.justifyContent = effectiveJustifyContent;
     _rootNode.alignItems = effectiveAlignItems;
+  }
+
+  void _paintBackground(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    YogaBackground background,
+  ) {
+    final Canvas canvas = context.canvas;
+    final Rect rect = offset & size;
+
+    // 1. Background Color
+    if (background.color != null) {
+      RRect? rrect;
+      if (_border != null) {
+        final resolvedBorder = _border!.resolve(TextDirection.ltr);
+        if (resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+          rrect = resolvedBorder.borderRadius
+              .toFlutterBorderRadius(size)
+              .toRRect(rect);
+        }
+      }
+
+      final Paint paint = Paint()..color = background.color!;
+      if (rrect != null) {
+        canvas.drawRRect(rrect, paint);
+      } else {
+        canvas.drawRect(rect, paint);
+      }
+    }
+
+    // 2. Background Image
+    if (background.image != null && _backgroundImageInfo != null) {
+      _paintBackgroundImage(
+        context,
+        offset,
+        size,
+        background,
+        _backgroundImageInfo!,
+      );
+    }
+  }
+
+  void _paintBackgroundImage(
+    PaintingContext context,
+    Offset offset,
+    Size size,
+    YogaBackground background,
+    ImageInfo imageInfo,
+  ) {
+    Rect positioningArea = offset & size;
+
+    // Adjust for origin
+    EdgeInsets border = EdgeInsets.zero;
+    if (_border != null) {
+      final resolved = _border!.resolve(TextDirection.ltr);
+      final fb = resolved.toFlutterBorder();
+      border = fb.dimensions as EdgeInsets;
+    } else {
+      border = _borderWidth;
+    }
+
+    EdgeInsets padding = EdgeInsets.zero;
+    if (_padding != null) {
+      padding = EdgeInsets.only(
+        left: _resolveValue(_padding!.left, size.width),
+        top: _resolveValue(_padding!.top, size.height),
+        right: _resolveValue(_padding!.right, size.width),
+        bottom: _resolveValue(_padding!.bottom, size.height),
+      );
+    }
+
+    if (background.origin == YogaBackgroundOrigin.contentBox) {
+      positioningArea = padding.deflateRect(
+        border.deflateRect(positioningArea),
+      );
+    } else if (background.origin == YogaBackgroundOrigin.paddingBox) {
+      positioningArea = border.deflateRect(positioningArea);
+    }
+
+    // Clip to border radius
+    RRect? clipRRect;
+    if (_border != null) {
+      final resolvedBorder = _border!.resolve(TextDirection.ltr);
+      if (resolvedBorder.borderRadius != YogaBorderRadius.zero) {
+        clipRRect = resolvedBorder.borderRadius
+            .toFlutterBorderRadius(size)
+            .toRRect(offset & size);
+      }
+    }
+
+    context.canvas.save();
+    if (clipRRect != null) {
+      context.canvas.clipRRect(clipRRect);
+    } else {
+      context.canvas.clipRect(offset & size);
+    }
+
+    Rect drawingRect = positioningArea;
+    BoxFit fit = BoxFit.none;
+    Alignment alignment = _mapBackgroundPositionToAlignment(
+      background.position,
+    );
+
+    if (background.size.mode == YogaBackgroundSizeMode.explicit) {
+      // If explicit size, we calculate the target rect size
+      double w = _resolveValue(background.size.width, positioningArea.width);
+      double h = _resolveValue(background.size.height, positioningArea.height);
+
+      // If auto, use image size
+      if (background.size.width.unit == YogaUnit.auto) {
+        w = imageInfo.image.width.toDouble();
+      }
+      if (background.size.height.unit == YogaUnit.auto) {
+        h = imageInfo.image.height.toDouble();
+      }
+
+      // If no-repeat, we can simulate explicit size by adjusting drawingRect
+      if (background.repeat == ImageRepeat.noRepeat) {
+        // Align the smaller rect within positioningArea
+        drawingRect = alignment.inscribe(Size(w, h), positioningArea);
+        fit = BoxFit.fill;
+        alignment = Alignment.center; // Already aligned by inscribe
+      } else {
+        // If repeat, paintImage ignores fit/size.
+        // We can't easily support explicit size with repeat using paintImage.
+        // Fallback to auto/none.
+        fit = BoxFit.none;
+      }
+    } else {
+      switch (background.size.mode) {
+        case YogaBackgroundSizeMode.cover:
+          fit = BoxFit.cover;
+          break;
+        case YogaBackgroundSizeMode.contain:
+          fit = BoxFit.contain;
+          break;
+        case YogaBackgroundSizeMode.auto:
+        default:
+          // Use scaleDown to ensure image is visible even if larger than container,
+          // and behaves like none (original size) if smaller.
+          fit = BoxFit.scaleDown;
+          break;
+      }
+    }
+
+    // Debug print
+    // debugPrint(
+    //   'Painting background: mode=${background.size.mode}, fit=$fit, repeat=${background.repeat}, rect=$drawingRect, image=${imageInfo.image.width}x${imageInfo.image.height}',
+    // );
+
+    paintImage(
+      canvas: context.canvas,
+      rect: drawingRect,
+      image: imageInfo.image,
+      fit: fit,
+      alignment: alignment,
+      repeat: background.repeat,
+      scale: imageInfo.scale,
+    );
+    context.canvas.restore();
+  }
+
+  Alignment _mapBackgroundPositionToAlignment(YogaBackgroundPosition pos) {
+    double x = 0;
+    double y = 0;
+
+    if (pos.x.unit == YogaUnit.percent) {
+      x = (pos.x.value * 2 / 100) - 1.0;
+    } else if (pos.x.unit == YogaUnit.point) {
+      // Alignment doesn't support points easily without knowing size.
+      // But paintImage uses Alignment to position within rect.
+      // If we have points, we can't map to -1..1 without size.
+      // But we can approximate or default to center/start.
+      // Let's assume 0 if point.
+      x = -1.0;
+    }
+
+    if (pos.y.unit == YogaUnit.percent) {
+      y = (pos.y.value * 2 / 100) - 1.0;
+    } else if (pos.y.unit == YogaUnit.point) {
+      y = -1.0;
+    }
+
+    return Alignment(x, y);
   }
 }
