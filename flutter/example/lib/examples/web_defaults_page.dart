@@ -127,7 +127,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               children: [
                 YogaItem(
                   display: YogaDisplay.block,
-                  height: 50,
+                  height: YogaValue.pt(50),
                   child: Container(
                     color: Colors.red,
                     alignment: Alignment.center,
@@ -136,7 +136,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
                 ),
                 YogaItem(
                   display: YogaDisplay.inlineBlock,
-                  height: 50,
+                  height: YogaValue.pt(50),
                   child: Container(
                     color: Colors.green,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -146,8 +146,8 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
                 ),
                 YogaItem(
                   display: YogaDisplay.none,
-                  width: 100,
-                  height: 50,
+                  width: YogaValue.pt(100),
+                  height: YogaValue.pt(50),
                   child: Container(
                     color: Colors.blue,
                     alignment: Alignment.center,
@@ -156,7 +156,7 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
                 ),
                 YogaItem(
                   display: YogaDisplay.inlineBlock,
-                  height: 50,
+                  height: YogaValue.pt(50),
                   child: Container(
                     color: Colors.orange,
                     padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -199,8 +199,8 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
               flexDirection: YGFlexDirection.row,
               children: [
                 YogaItem(
-                  widthPercent: 50,
-                  heightPercent: 50,
+                  width: YogaValue.pct(50),
+                  height: YogaValue.pct(50),
                   child: Container(
                     color: Colors.red,
                     alignment: Alignment.center,
@@ -208,8 +208,8 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
                   ),
                 ),
                 YogaItem(
-                  widthPercent: 25,
-                  heightPercent: 100,
+                  width: YogaValue.pct(25),
+                  height: YogaValue.pct(100),
                   child: Container(
                     color: Colors.green,
                     alignment: Alignment.center,
@@ -237,8 +237,8 @@ class _WebDefaultsPageState extends State<WebDefaultsPage> {
   Widget _buildItem(Color color, String text, double width) {
     // We do NOT set flexShrink here, so it uses the default.
     return YogaItem(
-      width: width,
-      height: 80,
+      width: YogaValue.pt(width),
+      height: YogaValue.pt(80),
       child: Container(
         color: color,
         alignment: Alignment.center,
@@ -307,7 +307,7 @@ class _DynamicDisplayDemoState extends State<_DynamicDisplayDemo> {
               ),
               YogaItem(
                 display: _display,
-                height: 50,
+                height: YogaValue.pt(50),
                 child: Container(
                   color: Colors.orange,
                   padding: const EdgeInsets.all(8),

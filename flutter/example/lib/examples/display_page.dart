@@ -29,11 +29,11 @@ class _DisplayPageState extends State<DisplayPage> {
                 flexDirection: YGFlexDirection.row,
                 alignItems: YGAlign.center,
                 justifyContent: YGJustify.spaceAround,
-                padding: const EdgeInsets.all(20),
+                padding: const YogaEdgeInsets.all(YogaValue.point(20)),
                 children: [
                   YogaItem(
-                    width: 80,
-                    height: 80,
+                    width: YogaValue.pt(80),
+                    height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.red,
                       child: const Center(child: Text("Item 1")),
@@ -57,8 +57,8 @@ class _DisplayPageState extends State<DisplayPage> {
                   // If I add 'display' to YogaItem, I can keep the widget in the tree but hide it layout-wise.
                   if (_showItem2)
                     YogaItem(
-                      width: 80,
-                      height: 80,
+                      width: YogaValue.pt(80),
+                      height: YogaValue.pt(80),
                       child: Container(
                         color: Colors.green,
                         child: const Center(child: Text("Item 2")),
@@ -66,8 +66,8 @@ class _DisplayPageState extends State<DisplayPage> {
                     ),
 
                   YogaItem(
-                    width: 80,
-                    height: 80,
+                    width: YogaValue.pt(80),
+                    height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.blue,
                       child: const Center(child: Text("Item 3")),

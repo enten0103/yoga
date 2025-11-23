@@ -27,7 +27,7 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
                 flexDirection: _flexDirection,
                 justifyContent: _justifyContent,
                 alignItems: _alignItems,
-                padding: const EdgeInsets.all(10),
+                padding: const YogaEdgeInsets.all(YogaValue.point(10)),
                 children: [
                   _buildBox(Colors.red, "1", 50, 50),
                   _buildBox(Colors.green, "2", 70, 70),
@@ -43,8 +43,8 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
 
   Widget _buildBox(Color color, String text, double w, double h) {
     return YogaItem(
-      width: w,
-      height: h,
+      width: YogaValue.pt(w),
+      height: YogaValue.pt(h),
       child: Container(
         color: color,
         child: Center(

@@ -16,37 +16,37 @@ class NestedLayoutPage extends StatelessWidget {
           alignItems: YGAlign.center,
           children: [
             YogaItem(
-              width: 300,
-              height: 300,
+              width: YogaValue.pt(300),
+              height: YogaValue.pt(300),
               child: Container(
                 color: Colors.white,
                 child: YogaLayout(
                   flexDirection: YGFlexDirection.row,
                   justifyContent: YGJustify.spaceAround,
                   alignItems: YGAlign.center,
-                  padding: const EdgeInsets.all(10),
+                  padding: const YogaEdgeInsets.all(YogaValue.point(10)),
                   children: [
                     YogaItem(
-                      width: 80,
-                      height: 80,
+                      width: YogaValue.pt(80),
+                      height: YogaValue.pt(80),
                       child: Container(color: Colors.red),
                     ),
                     YogaItem(
-                      width: 80,
-                      height: 200, // Taller item
+                      width: YogaValue.pt(80),
+                      height: YogaValue.pt(200), // Taller item
                       child: Container(
                         color: Colors.blue,
                         child: YogaLayout(
                           flexDirection: YGFlexDirection.column,
                           justifyContent: YGJustify.spaceBetween,
-                          padding: const EdgeInsets.all(5),
+                          padding: const YogaEdgeInsets.all(YogaValue.point(5)),
                           children: [
                             YogaItem(
-                              height: 30,
+                              height: YogaValue.pt(30),
                               child: Container(color: Colors.yellow),
                             ),
                             YogaItem(
-                              height: 30,
+                              height: YogaValue.pt(30),
                               child: Container(color: Colors.yellow),
                             ),
                           ],
@@ -54,8 +54,8 @@ class NestedLayoutPage extends StatelessWidget {
                       ),
                     ),
                     YogaItem(
-                      width: 80,
-                      height: 80,
+                      width: YogaValue.pt(80),
+                      height: YogaValue.pt(80),
                       child: Container(color: Colors.green),
                     ),
                   ],

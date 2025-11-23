@@ -14,11 +14,11 @@ class ScrollingPage extends StatelessWidget {
           child: YogaLayout(
             flexDirection: YGFlexDirection.column,
             alignItems: YGAlign.stretch,
-            padding: const EdgeInsets.all(10),
+            padding: const YogaEdgeInsets.all(YogaValue.point(10)),
             children: List.generate(20, (index) {
               return YogaItem(
-                height: 80,
-                margin: const EdgeInsets.only(bottom: 10),
+                height: const YogaValue.point(80),
+                margin: const YogaEdgeInsets.only(bottom: YogaValue.point(10)),
                 child: Container(
                   color: Colors.primaries[index % Colors.primaries.length],
                   child: Center(

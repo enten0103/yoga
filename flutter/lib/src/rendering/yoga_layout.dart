@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/rendering.dart';
 import '../yoga_ffi.dart';
 import '../yoga_node.dart';
+import '../yoga_value.dart';
 
 class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaNode? yogaNode;
@@ -11,12 +12,9 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   double? flexShrink;
   double? flexBasis;
   YogaDisplay? display;
-  double? width;
-  double? widthPercent;
-  double? height;
-  double? heightPercent;
-  EdgeInsets? margin;
-  EdgeInsets? marginPercent;
+  YogaValue? width;
+  YogaValue? height;
+  YogaEdgeInsets? margin;
   EdgeInsets? borderWidth;
   int? alignSelf;
 
@@ -34,8 +32,10 @@ class RenderYogaLayout extends RenderBox
   late final YogaNode _rootNode;
   late final YogaConfig _config;
   bool _enableMarginCollapsing = false;
-  EdgeInsets _padding = EdgeInsets.zero;
+  YogaEdgeInsets? _padding;
   EdgeInsets _borderWidth = EdgeInsets.zero;
+  YogaValue? _width;
+  YogaValue? _height;
 
   RenderYogaLayout() {
     _config = YogaConfig();
@@ -44,6 +44,20 @@ class RenderYogaLayout extends RenderBox
   }
 
   YogaNode get rootNode => _rootNode;
+
+  set width(YogaValue? value) {
+    if (_width != value) {
+      _width = value;
+      markNeedsLayout();
+    }
+  }
+
+  set height(YogaValue? value) {
+    if (_height != value) {
+      _height = value;
+      markNeedsLayout();
+    }
+  }
 
   set useWebDefaults(bool value) {
     _config.useWebDefaults = value;
@@ -57,16 +71,9 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  set padding(EdgeInsets? value) {
-    _padding = value ?? EdgeInsets.zero;
-    if (value != null) {
-      _rootNode.setPadding(YGEdge.left, value.left);
-      _rootNode.setPadding(YGEdge.top, value.top);
-      _rootNode.setPadding(YGEdge.right, value.right);
-      _rootNode.setPadding(YGEdge.bottom, value.bottom);
-    } else {
-      _rootNode.setPadding(YGEdge.all, 0);
-    }
+  set padding(YogaEdgeInsets? value) {
+    _padding = value;
+    _applyPadding(_rootNode, value);
     markNeedsLayout();
   }
 
@@ -126,13 +133,17 @@ class RenderYogaLayout extends RenderBox
   @override
   void performLayout() {
     // 1. Sync Root Constraints
-    if (constraints.hasBoundedWidth) {
+    if (_width != null) {
+      _applyWidth(_rootNode, _width!);
+    } else if (constraints.hasBoundedWidth) {
       _rootNode.width = constraints.maxWidth;
     } else {
       _rootNode.setWidthAuto();
     }
 
-    if (constraints.hasBoundedHeight) {
+    if (_height != null) {
+      _applyHeight(_rootNode, _height!);
+    } else if (constraints.hasBoundedHeight) {
       _rootNode.height = constraints.maxHeight;
     } else {
       _rootNode.setHeightAuto();
@@ -146,17 +157,25 @@ class RenderYogaLayout extends RenderBox
 
       // If the user didn't specify an explicit size, we try to measure the child's content size
       // and set it on the Yoga node. This is a simplified "Auto" sizing.
-      // Note: We must NOT overwrite width/height if widthPercent/heightPercent is set.
-      if (childParentData.width == null &&
-          childParentData.widthPercent == null) {
-        final Size childSize = child.getDryLayout(const BoxConstraints());
-        childNode.width = childSize.width.ceilToDouble();
-      }
+      // Note: We must NOT overwrite width/height if width/height is set (unless it's auto).
 
-      if (childParentData.height == null &&
-          childParentData.heightPercent == null) {
+      bool widthIsSet =
+          childParentData.width != null &&
+          childParentData.width!.unit != YogaUnit.auto &&
+          childParentData.width!.unit != YogaUnit.undefined;
+      bool heightIsSet =
+          childParentData.height != null &&
+          childParentData.height!.unit != YogaUnit.auto &&
+          childParentData.height!.unit != YogaUnit.undefined;
+
+      if (!widthIsSet || !heightIsSet) {
         final Size childSize = child.getDryLayout(const BoxConstraints());
-        childNode.height = childSize.height.ceilToDouble();
+        if (!widthIsSet) {
+          childNode.width = childSize.width.ceilToDouble();
+        }
+        if (!heightIsSet) {
+          childNode.height = childSize.height.ceilToDouble();
+        }
       }
 
       child = childParentData.nextSibling;
@@ -213,6 +232,40 @@ class RenderYogaLayout extends RenderBox
     );
   }
 
+  void _applyWidth(YogaNode node, YogaValue width) {
+    switch (width.unit) {
+      case YogaUnit.point:
+        node.width = width.value;
+        break;
+      case YogaUnit.percent:
+        node.setWidthPercent(width.value);
+        break;
+      case YogaUnit.auto:
+        node.setWidthAuto();
+        break;
+      case YogaUnit.undefined:
+        node.setWidthAuto();
+        break;
+    }
+  }
+
+  void _applyHeight(YogaNode node, YogaValue height) {
+    switch (height.unit) {
+      case YogaUnit.point:
+        node.height = height.value;
+        break;
+      case YogaUnit.percent:
+        node.setHeightPercent(height.value);
+        break;
+      case YogaUnit.auto:
+        node.setHeightAuto();
+        break;
+      case YogaUnit.undefined:
+        node.setHeightAuto();
+        break;
+    }
+  }
+
   @override
   void paint(PaintingContext context, Offset offset) {
     defaultPaint(context, offset);
@@ -231,11 +284,7 @@ class RenderYogaLayout extends RenderBox
       childParentData.effectiveMargin = null;
 
       if (childParentData.yogaNode != null) {
-        _resetMargins(
-          childParentData.yogaNode!,
-          childParentData.margin,
-          childParentData.marginPercent,
-        );
+        _resetMargins(childParentData.yogaNode!, childParentData.margin);
       }
 
       if (child is RenderYogaLayout) {
@@ -245,24 +294,31 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  void _resetMargins(
-    YogaNode node,
-    EdgeInsets? margin,
-    EdgeInsets? marginPercent,
-  ) {
-    _setMarginEdge(node, YGEdge.left, margin?.left, marginPercent?.left);
-    _setMarginEdge(node, YGEdge.top, margin?.top, marginPercent?.top);
-    _setMarginEdge(node, YGEdge.right, margin?.right, marginPercent?.right);
-    _setMarginEdge(node, YGEdge.bottom, margin?.bottom, marginPercent?.bottom);
+  void _resetMargins(YogaNode node, YogaEdgeInsets? margin) {
+    _setMarginEdge(node, YGEdge.left, margin?.left);
+    _setMarginEdge(node, YGEdge.top, margin?.top);
+    _setMarginEdge(node, YGEdge.right, margin?.right);
+    _setMarginEdge(node, YGEdge.bottom, margin?.bottom);
   }
 
-  void _setMarginEdge(YogaNode node, int edge, double? px, double? pct) {
-    if (pct != null && pct != 0) {
-      node.setMarginPercent(edge, pct);
-    } else if (px != null) {
-      node.setMargin(edge, px);
-    } else {
+  void _setMarginEdge(YogaNode node, int edge, YogaValue? value) {
+    if (value == null) {
       node.setMargin(edge, 0);
+      return;
+    }
+    switch (value.unit) {
+      case YogaUnit.point:
+        node.setMargin(edge, value.value);
+        break;
+      case YogaUnit.percent:
+        node.setMarginPercent(edge, value.value);
+        break;
+      case YogaUnit.auto:
+        node.setMarginAuto(edge);
+        break;
+      case YogaUnit.undefined:
+        node.setMargin(edge, 0);
+        break;
     }
   }
 
@@ -275,11 +331,7 @@ class RenderYogaLayout extends RenderBox
       // Reset margins for this child
       childParentData.effectiveMargin = null;
       if (childParentData.yogaNode != null) {
-        _resetMargins(
-          childParentData.yogaNode!,
-          childParentData.margin,
-          childParentData.marginPercent,
-        );
+        _resetMargins(childParentData.yogaNode!, childParentData.margin);
       }
 
       if (child is RenderYogaLayout) {
@@ -296,7 +348,24 @@ class RenderYogaLayout extends RenderBox
   }
 
   EdgeInsets _getEffectiveMargin(YogaLayoutParentData pd) {
-    return pd.effectiveMargin ?? pd.margin ?? EdgeInsets.zero;
+    // Convert YogaEdgeInsets to EdgeInsets for calculation if possible
+    // Note: We can only collapse point values in Dart.
+    // If margin is percent, we can't easily collapse it here without knowing parent width.
+    // So we fallback to 0 or whatever is safe.
+
+    // If effectiveMargin is set, use it.
+    if (pd.effectiveMargin != null) return pd.effectiveMargin!;
+
+    // Otherwise convert pd.margin
+    final margin = pd.margin;
+    if (margin == null) return EdgeInsets.zero;
+
+    return EdgeInsets.only(
+      left: margin.left.unit == YogaUnit.point ? margin.left.value : 0,
+      top: margin.top.unit == YogaUnit.point ? margin.top.value : 0,
+      right: margin.right.unit == YogaUnit.point ? margin.right.value : 0,
+      bottom: margin.bottom.unit == YogaUnit.point ? margin.bottom.value : 0,
+    );
   }
 
   void _updateEffectiveMargin(YogaLayoutParentData pd, int edge, double value) {
@@ -327,8 +396,8 @@ class RenderYogaLayout extends RenderBox
         final nextNode = nextParentData.yogaNode!;
 
         // Skip collapsing if either margin is percentage-based
-        if ((childParentData.marginPercent?.bottom ?? 0) != 0 ||
-            (nextParentData.marginPercent?.top ?? 0) != 0) {
+        if ((childParentData.margin?.bottom.unit == YogaUnit.percent) ||
+            (nextParentData.margin?.top.unit == YogaUnit.percent)) {
           child = nextChild;
           continue;
         }
@@ -359,14 +428,14 @@ class RenderYogaLayout extends RenderBox
     }
 
     // Top Collapsing
-    if (_padding.top == 0 && _borderWidth.top == 0) {
+    if (_isZero(_padding?.top) && _borderWidth.top == 0) {
       final firstChild = this.firstChild;
       if (firstChild != null) {
         final childParentData = firstChild.parentData as YogaLayoutParentData;
         final childNode = childParentData.yogaNode!;
 
         // Skip if child has percentage top margin
-        if ((childParentData.marginPercent?.top ?? 0) != 0) {
+        if (childParentData.margin?.top.unit == YogaUnit.percent) {
           // Do nothing
         } else {
           // My top margin
@@ -375,7 +444,7 @@ class RenderYogaLayout extends RenderBox
           if (parentData is YogaLayoutParentData) {
             final pd = parentData as YogaLayoutParentData;
             myMarginTop = _getEffectiveMargin(pd).top;
-            if ((pd.marginPercent?.top ?? 0) != 0) {
+            if (pd.margin?.top.unit == YogaUnit.percent) {
               myMarginIsPercent = true;
             }
           }
@@ -403,7 +472,7 @@ class RenderYogaLayout extends RenderBox
 
     // Bottom Collapsing
     if (!constraints.hasBoundedHeight &&
-        _padding.bottom == 0 &&
+        _isZero(_padding?.bottom) &&
         _borderWidth.bottom == 0) {
       final lastChild = this.lastChild;
       if (lastChild != null) {
@@ -411,7 +480,7 @@ class RenderYogaLayout extends RenderBox
         final childNode = childParentData.yogaNode!;
 
         // Skip if child has percentage bottom margin
-        if ((childParentData.marginPercent?.bottom ?? 0) != 0) {
+        if (childParentData.margin?.bottom.unit == YogaUnit.percent) {
           // Do nothing
         } else {
           double myMarginBottom = 0.0;
@@ -419,7 +488,7 @@ class RenderYogaLayout extends RenderBox
           if (parentData is YogaLayoutParentData) {
             final pd = parentData as YogaLayoutParentData;
             myMarginBottom = _getEffectiveMargin(pd).bottom;
-            if ((pd.marginPercent?.bottom ?? 0) != 0) {
+            if (pd.margin?.bottom.unit == YogaUnit.percent) {
               myMarginIsPercent = true;
             }
           }
@@ -446,6 +515,43 @@ class RenderYogaLayout extends RenderBox
         }
       }
     }
+  }
+
+  void _applyPadding(YogaNode node, YogaEdgeInsets? padding) {
+    _setPaddingEdge(node, YGEdge.left, padding?.left);
+    _setPaddingEdge(node, YGEdge.top, padding?.top);
+    _setPaddingEdge(node, YGEdge.right, padding?.right);
+    _setPaddingEdge(node, YGEdge.bottom, padding?.bottom);
+  }
+
+  void _setPaddingEdge(YogaNode node, int edge, YogaValue? value) {
+    if (value == null) {
+      node.setPadding(edge, 0);
+      return;
+    }
+    switch (value.unit) {
+      case YogaUnit.point:
+        node.setPadding(edge, value.value);
+        break;
+      case YogaUnit.percent:
+        node.setPaddingPercent(edge, value.value);
+        break;
+      case YogaUnit.auto:
+        // Padding auto is not really a thing in CSS/Yoga usually, treats as 0?
+        // Yoga doesn't have setPaddingAuto.
+        node.setPadding(edge, 0);
+        break;
+      case YogaUnit.undefined:
+        node.setPadding(edge, 0);
+        break;
+    }
+  }
+
+  bool _isZero(YogaValue? value) {
+    if (value == null) return true;
+    if (value.unit == YogaUnit.point && value.value == 0) return true;
+    if (value.unit == YogaUnit.percent && value.value == 0) return true;
+    return false;
   }
 
   double _collapse(double m1, double m2) {

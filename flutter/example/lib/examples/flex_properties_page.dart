@@ -27,12 +27,12 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
               child: YogaLayout(
                 flexDirection: YGFlexDirection.row,
                 alignItems: YGAlign.center,
-                padding: const EdgeInsets.all(10),
+                padding: const YogaEdgeInsets.all(YogaValue.point(10)),
                 children: [
                   // Fixed Item
                   YogaItem(
-                    width: 80,
-                    height: 80,
+                    width: YogaValue.pt(80),
+                    height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.red,
                       child: const Center(child: Text("Fixed\n80px")),
@@ -43,8 +43,10 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
                     flexGrow: _flexGrow,
                     flexShrink: _flexShrink,
                     flexBasis: _flexBasis,
-                    height: 80,
-                    margin: const EdgeInsets.symmetric(horizontal: 5),
+                    height: YogaValue.pt(80),
+                    margin: const YogaEdgeInsets.symmetric(
+                      horizontal: YogaValue.point(5),
+                    ),
                     child: Container(
                       color: Colors.blue,
                       child: Center(
@@ -61,8 +63,8 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
                   ),
                   // Fixed Item
                   YogaItem(
-                    width: 80,
-                    height: 80,
+                    width: YogaValue.pt(80),
+                    height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.green,
                       child: const Center(child: Text("Fixed\n80px")),

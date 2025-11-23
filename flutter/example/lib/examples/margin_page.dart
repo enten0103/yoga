@@ -95,9 +95,11 @@ class _MarginPageState extends State<MarginPage> {
               justifyContent: YGJustify.center,
               children: [
                 YogaItem(
-                  width: 100,
-                  height: 50,
-                  margin: const EdgeInsets.only(bottom: 20),
+                  width: YogaValue.pt(100),
+                  height: YogaValue.pt(50),
+                  margin: const YogaEdgeInsets.only(
+                    bottom: YogaValue.point(20),
+                  ),
                   child: Container(
                     color: Colors.red,
                     alignment: Alignment.center,
@@ -108,9 +110,9 @@ class _MarginPageState extends State<MarginPage> {
                   ),
                 ),
                 YogaItem(
-                  width: 100,
-                  height: 50,
-                  margin: const EdgeInsets.only(top: 20),
+                  width: YogaValue.pt(100),
+                  height: YogaValue.pt(50),
+                  margin: const YogaEdgeInsets.only(top: YogaValue.point(20)),
                   child: Container(
                     color: Colors.green,
                     alignment: Alignment.center,
@@ -155,8 +157,8 @@ class _MarginPageState extends State<MarginPage> {
               children: [
                 // Inner Container
                 YogaItem(
-                  width: 200,
-                  height: 100,
+                  width: YogaValue.pt(200),
+                  height: YogaValue.pt(100),
                   child: Container(
                     color: Colors.blue[200], // Inner background
                     child: YogaLayout(
@@ -167,9 +169,11 @@ class _MarginPageState extends State<MarginPage> {
                       flexDirection: YGFlexDirection.column,
                       children: [
                         YogaItem(
-                          width: 100,
-                          height: 50,
-                          margin: const EdgeInsets.only(top: 30),
+                          width: YogaValue.pt(100),
+                          height: YogaValue.pt(50),
+                          margin: const YogaEdgeInsets.only(
+                            top: YogaValue.point(30),
+                          ),
                           child: Container(
                             color: Colors.red,
                             alignment: Alignment.center,
@@ -222,9 +226,11 @@ class _MarginPageState extends State<MarginPage> {
                     justifyContent: YGJustify.center,
                     children: [
                       YogaItem(
-                        width: 100,
-                        height: 50,
-                        margin: const EdgeInsets.only(bottom: 20),
+                        width: YogaValue.pt(100),
+                        height: YogaValue.pt(50),
+                        margin: const YogaEdgeInsets.only(
+                          bottom: YogaValue.point(20),
+                        ),
                         child: Container(
                           color: Colors.red,
                           alignment: Alignment.center,
@@ -232,9 +238,11 @@ class _MarginPageState extends State<MarginPage> {
                         ),
                       ),
                       YogaItem(
-                        width: 100,
-                        height: 50,
-                        margin: const EdgeInsets.only(top: -10),
+                        width: YogaValue.pt(100),
+                        height: YogaValue.pt(50),
+                        margin: const YogaEdgeInsets.only(
+                          top: YogaValue.point(-10),
+                        ),
                         child: Container(
                           color: Colors.green,
                           alignment: Alignment.center,
@@ -257,9 +265,11 @@ class _MarginPageState extends State<MarginPage> {
                     justifyContent: YGJustify.center,
                     children: [
                       YogaItem(
-                        width: 100,
-                        height: 50,
-                        margin: const EdgeInsets.only(bottom: -10),
+                        width: YogaValue.pt(100),
+                        height: YogaValue.pt(50),
+                        margin: const YogaEdgeInsets.only(
+                          bottom: YogaValue.point(-10),
+                        ),
                         child: Container(
                           color: Colors.red,
                           alignment: Alignment.center,
@@ -267,9 +277,11 @@ class _MarginPageState extends State<MarginPage> {
                         ),
                       ),
                       YogaItem(
-                        width: 100,
-                        height: 50,
-                        margin: const EdgeInsets.only(top: -20),
+                        width: YogaValue.pt(100),
+                        height: YogaValue.pt(50),
+                        margin: const YogaEdgeInsets.only(
+                          top: YogaValue.point(-20),
+                        ),
                         child: Container(
                           color: Colors.green,
                           alignment: Alignment.center,
@@ -302,8 +314,10 @@ class _MarginPageState extends State<MarginPage> {
               flexDirection: YGFlexDirection.row,
               children: [
                 YogaItem(
-                  widthPercent: 50,
-                  marginPercent: const EdgeInsets.only(left: 25),
+                  width: YogaValue.pct(50),
+                  margin: const YogaEdgeInsets.only(
+                    left: YogaValue.percent(25),
+                  ),
                   child: Container(
                     color: Colors.blue,
                     alignment: Alignment.center,
@@ -337,10 +351,12 @@ class _MarginPageState extends State<MarginPage> {
               alignItems: YGAlign.flexStart,
               children: [
                 YogaItem(
-                  width: 100,
-                  height: 50,
-                  margin: const EdgeInsets.symmetric(vertical: 20),
-                  marginPercent: const EdgeInsets.symmetric(horizontal: 10),
+                  width: YogaValue.pt(100),
+                  height: YogaValue.pt(50),
+                  margin: const YogaEdgeInsets.symmetric(
+                    vertical: YogaValue.point(20),
+                    horizontal: YogaValue.percent(10),
+                  ),
                   child: Container(
                     color: Colors.orange,
                     alignment: Alignment.center,
@@ -364,16 +380,19 @@ class _MarginPageState extends State<MarginPage> {
           Container(
             color: Colors.grey[300],
             width: double.infinity,
+            padding: EdgeInsets.all(10),
             height: 100,
             child: YogaLayout(
               useWebDefaults: _useWebDefaults,
               flexDirection: YGFlexDirection.row,
               // Add padding to container so we can see the negative margin pull it out
-              padding: const EdgeInsets.only(left: 50),
+              padding: const YogaEdgeInsets.only(left: YogaValue.point(50)),
               children: [
                 YogaItem(
-                  widthPercent: 50,
-                  marginPercent: const EdgeInsets.only(left: -10),
+                  width: YogaValue.pct(50),
+                  margin: const YogaEdgeInsets.only(
+                    left: YogaValue.percent(-10),
+                  ),
                   child: Container(
                     color: Colors.purple,
                     alignment: Alignment.center,
@@ -407,7 +426,7 @@ class _MarginPageState extends State<MarginPage> {
               final margin1 = width * 0.10;
               final margin2 = width * -0.05;
               final gap = margin1 + margin2;
-              
+
               return Column(
                 children: [
                   Text('当前父容器宽度: ${width.toStringAsFixed(1)}'),
@@ -427,9 +446,11 @@ class _MarginPageState extends State<MarginPage> {
                       justifyContent: YGJustify.center,
                       children: [
                         YogaItem(
-                          width: 100,
-                          height: 50,
-                          marginPercent: const EdgeInsets.only(bottom: 10),
+                          width: YogaValue.pt(100),
+                          height: YogaValue.pt(50),
+                          margin: const YogaEdgeInsets.only(
+                            bottom: YogaValue.percent(10),
+                          ),
                           child: Container(
                             color: Colors.red,
                             alignment: Alignment.center,
@@ -437,9 +458,11 @@ class _MarginPageState extends State<MarginPage> {
                           ),
                         ),
                         YogaItem(
-                          width: 100,
-                          height: 50,
-                          marginPercent: const EdgeInsets.only(top: -5),
+                          width: YogaValue.pt(100),
+                          height: YogaValue.pt(50),
+                          margin: const YogaEdgeInsets.only(
+                            top: YogaValue.percent(-5),
+                          ),
                           child: Container(
                             color: Colors.green,
                             alignment: Alignment.center,

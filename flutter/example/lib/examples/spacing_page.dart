@@ -27,12 +27,12 @@ class _SpacingPageState extends State<SpacingPage> {
                 child: Container(
                   color: Colors.white,
                   child: YogaLayout(
-                    width: 300,
-                    height: 300,
+                    width: YogaValue.pt(300),
+                    height: YogaValue.pt(300),
                     flexDirection: YGFlexDirection.column,
                     justifyContent: YGJustify.flexStart,
                     alignItems: YGAlign.stretch,
-                    padding: EdgeInsets.all(_padding),
+                    padding: YogaEdgeInsets.all(YogaValue.point(_padding)),
                     borderWidth: EdgeInsets.all(_borderWidth),
                     children: [
                       // We need to visualize the border since Yoga only reserves space.
@@ -48,8 +48,8 @@ class _SpacingPageState extends State<SpacingPage> {
                       // The padding pushes the blue box in.
                       // The border width also pushes the blue box in (additive to padding in terms of content box).
                       YogaItem(
-                        height: 50,
-                        margin: EdgeInsets.all(_margin),
+                        height: YogaValue.pt(50),
+                        margin: YogaEdgeInsets.all(YogaValue.point(_margin)),
                         child: Container(
                           color: Colors.blue,
                           child: const Center(child: Text("Item 1 (Margin)")),
