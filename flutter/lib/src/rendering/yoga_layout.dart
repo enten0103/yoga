@@ -480,13 +480,23 @@ class RenderYogaLayout extends RenderBox
     }
 
     // 3. Calculate Layout
+    double availableWidth = double.nan;
+    if (constraints.hasBoundedWidth) {
+      availableWidth = constraints.maxWidth;
+    }
+
+    double availableHeight = double.nan;
+    if (constraints.hasBoundedHeight) {
+      final bool heightIsAuto =
+          _height == null || _height!.unit == YogaUnit.auto;
+      if (constraints.hasTightHeight || !heightIsAuto) {
+        availableHeight = constraints.maxHeight;
+      }
+    }
+
     _rootNode.calculateLayout(
-      availableWidth: constraints.hasBoundedWidth
-          ? constraints.maxWidth
-          : double.nan,
-      availableHeight: constraints.hasBoundedHeight
-          ? constraints.maxHeight
-          : double.nan,
+      availableWidth: availableWidth,
+      availableHeight: availableHeight,
     );
 
     // 4. Apply Layout to Children
@@ -540,13 +550,23 @@ class RenderYogaLayout extends RenderBox
       _resetMarginsRecursive(this);
     }
 
+    double availableWidth = double.nan;
+    if (constraints.hasBoundedWidth) {
+      availableWidth = constraints.maxWidth;
+    }
+
+    double availableHeight = double.nan;
+    if (constraints.hasBoundedHeight) {
+      final bool heightIsAuto =
+          _height == null || _height!.unit == YogaUnit.auto;
+      if (constraints.hasTightHeight || !heightIsAuto) {
+        availableHeight = constraints.maxHeight;
+      }
+    }
+
     _rootNode.calculateLayout(
-      availableWidth: constraints.hasBoundedWidth
-          ? constraints.maxWidth
-          : double.nan,
-      availableHeight: constraints.hasBoundedHeight
-          ? constraints.maxHeight
-          : double.nan,
+      availableWidth: availableWidth,
+      availableHeight: availableHeight,
     );
 
     final double rootW = _rootNode.layoutWidth;
@@ -578,8 +598,6 @@ class RenderYogaLayout extends RenderBox
       _rootNode.height = constraints.maxHeight;
     } else if (_height != null) {
       _applyHeight(_rootNode, _height!);
-    } else if (constraints.hasBoundedHeight) {
-      _rootNode.height = constraints.maxHeight;
     } else {
       _rootNode.setHeightAuto();
     }
