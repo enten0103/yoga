@@ -45,11 +45,11 @@ class YogaLayout extends MultiChildRenderObjectWidget {
 
   const YogaLayout({
     super.key,
-    this.flexDirection = YGFlexDirection.column,
+    this.flexDirection = YGFlexDirection.row,
     this.justifyContent,
-    this.alignItems,
+    this.alignItems = YGAlign.baseline,
     this.alignContent = YGAlign.flexStart,
-    this.flexWrap = YGWrap.noWrap,
+    this.flexWrap = YGWrap.wrap,
     this.textAlign,
     this.width,
     this.height,
@@ -79,14 +79,13 @@ class YogaLayout extends MultiChildRenderObjectWidget {
 
   @override
   RenderYogaLayout createRenderObject(BuildContext context) {
-    final isBlock = display == YogaDisplay.block;
     return RenderYogaLayout()
-      ..flexDirection = isBlock ? YGFlexDirection.column : flexDirection
-      ..justifyContent = isBlock ? YGJustify.flexStart : justifyContent
-      ..alignItems = isBlock ? YGAlign.stretch : alignItems
+      ..flexDirection = flexDirection
+      ..justifyContent = justifyContent
+      ..alignItems = alignItems
       ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
-      ..rootNode.flexWrap = isBlock ? YGWrap.noWrap : flexWrap
+      ..rootNode.flexWrap = flexWrap
       ..width = width
       ..height = height
       ..minWidth = minWidth
@@ -118,14 +117,13 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     BuildContext context,
     covariant RenderYogaLayout renderObject,
   ) {
-    final isBlock = display == YogaDisplay.block;
     renderObject
-      ..flexDirection = isBlock ? YGFlexDirection.column : flexDirection
-      ..justifyContent = isBlock ? YGJustify.flexStart : justifyContent
-      ..alignItems = isBlock ? YGAlign.stretch : alignItems
+      ..flexDirection = flexDirection
+      ..justifyContent = justifyContent
+      ..alignItems = alignItems
       ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
-      ..rootNode.flexWrap = isBlock ? YGWrap.noWrap : flexWrap
+      ..rootNode.flexWrap = flexWrap
       ..width = width
       ..height = height
       ..minWidth = minWidth

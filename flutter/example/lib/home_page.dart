@@ -43,6 +43,11 @@ class HomePage extends StatelessWidget {
           ),
           _buildListTile(context, 'HTML Replica', '/html_replica'),
           _buildListTile(context, 'Image Example', '/image_example'),
+          _buildListTile(
+            context,
+            'Display Interaction (Block/Inline)',
+            '/display_interaction',
+          ),
         ],
       ),
     );
