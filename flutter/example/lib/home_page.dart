@@ -41,6 +41,7 @@ class HomePage extends StatelessWidget {
             'Fit Content & Margin Auto',
             '/fit_content_margin_auto',
           ),
+          _buildListTile(context, 'HTML Replica', '/html_replica'),
         ],
       ),
     );

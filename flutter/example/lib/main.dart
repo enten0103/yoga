@@ -22,6 +22,7 @@ import 'examples/text_align_page.dart';
 import 'examples/background_page.dart';
 import 'examples/intrinsic_sizing_page.dart';
 import 'examples/fit_content_margin_auto_page.dart';
+import 'examples/html_replica_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -76,6 +77,7 @@ class _MyAppState extends State<MyApp> {
         '/intrinsic_sizing': (context) => const IntrinsicSizingPage(),
         '/fit_content_margin_auto': (context) =>
             const FitContentMarginAutoPage(),
+        '/html_replica': (context) => const HtmlReplicaPage(),
       },
     );
   }

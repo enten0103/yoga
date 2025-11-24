@@ -1,4 +1,6 @@
 import 'dart:ffi';
+import 'dart:ui' as ui;
+import 'package:ffi/ffi.dart';
 import 'yoga_ffi.dart';
 
 enum YogaDisplay { flex, none, block, inline, inlineBlock }
@@ -36,6 +38,7 @@ class YogaNode implements Finalizable {
   /// Note: This does not dispose the Dart [YogaNode] objects of the children,
   /// so you should ensure they are not used afterwards.
   void dispose({bool recursive = false}) {
+    _measureCallbacks.remove(_nativeNode.address);
     _finalizer.detach(this);
     if (recursive) {
       _yoga.freeNodeRecursive(_nativeNode);
@@ -187,7 +190,91 @@ class YogaNode implements Finalizable {
   void setConfig(YogaConfig config) {
     _yoga.setNodeConfig(_nativeNode, config._nativeConfig);
   }
+
+  // --- Measure Func ---
+
+  static final Map<int, _MeasureCallback> _measureCallbacks = {};
+
+  void setMeasureFunc(
+    ui.Size Function(
+      YogaNode node,
+      double width,
+      int widthMode,
+      double height,
+      int heightMode,
+    )?
+    measureFunc,
+  ) {
+    if (measureFunc == null) {
+      _yoga.setMeasureFunc(_nativeNode, nullptr);
+      _measureCallbacks.remove(_nativeNode.address);
+      return;
+    }
+
+    _measureCallbacks[_nativeNode.address] =
+        (width, widthMode, height, heightMode) {
+          return measureFunc(this, width, widthMode, height, heightMode);
+        };
+
+    // Set context to node address so we can recover it in the static callback
+    // We actually don't need to set context if we use the node pointer passed to the callback
+    // as the key. The node pointer in the callback IS _nativeNode.
+    // But we need to ensure _nativeNode.address matches the pointer address.
+    // Yes, it should.
+
+    _yoga.setMeasureFunc(
+      _nativeNode,
+      Pointer.fromFunction(_measureFuncTrampoline),
+    );
+  }
+
+  static YGSize _measureFuncTrampoline(
+    Pointer<Void> nodePtr,
+    double width,
+    int widthMode,
+    double height,
+    int heightMode,
+  ) {
+    final callback = _measureCallbacks[nodePtr.address];
+    if (callback != null) {
+      final size = callback(width, widthMode, height, heightMode);
+      // We need to return YGSize by value.
+      // Since we can't easily create a stack-allocated struct in Dart to return,
+      // we use a thread-local or temporary allocation.
+      // However, for FFI callbacks returning structs, we can allocate, populate, and return .ref
+      // The FFI bridge should copy the value.
+      // To avoid leaks, we should ideally reuse a buffer or rely on the fact that .ref returns a view
+      // that is copied when returned?
+      // Actually, `calloc` memory needs to be freed. If we return `.ref`, we are returning a view.
+      // If we free the pointer immediately, the view is invalid?
+      // No, returning `.ref` from a function returning `Struct` copies the struct data.
+      // So we can allocate, get ref, free, return ref?
+      // No, if we free, the memory is gone.
+      // We need a way to return the value without leaking.
+      // Since this is a synchronous callback, we can use a static/global buffer if we are single-threaded?
+      // Dart is single-threaded.
+      // So we can have a static pointer for return value.
+
+      _returnSizePtr.ref.width = size.width;
+      _returnSizePtr.ref.height = size.height;
+      return _returnSizePtr.ref;
+    }
+
+    _returnSizePtr.ref.width = 0;
+    _returnSizePtr.ref.height = 0;
+    return _returnSizePtr.ref;
+  }
+
+  static final Pointer<YGSize> _returnSizePtr = calloc<YGSize>();
 }
+
+typedef _MeasureCallback =
+    ui.Size Function(
+      double width,
+      int widthMode,
+      double height,
+      int heightMode,
+    );
 
 /// A wrapper around Yoga configuration.
 class YogaConfig implements Finalizable {

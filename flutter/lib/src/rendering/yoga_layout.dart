@@ -431,16 +431,13 @@ class RenderYogaLayout extends RenderBox
     super.insert(child, after: after);
     final childParentData = child.parentData as YogaLayoutParentData;
 
-    if (child is RenderYogaLayout) {
-      // Link the existing rootNode of the nested YogaLayout
-      childParentData.yogaNode = child.rootNode;
-    } else {
-      // Always recreate the node to ensure it matches the current config (especially UseWebDefaults)
-      if (childParentData.yogaNode != null) {
-        childParentData.yogaNode!.dispose();
-      }
-      childParentData.yogaNode = YogaNode(_config);
+    // Always create a new node for the child in this layout context.
+    // Even if the child is a RenderYogaLayout, we treat it as a black box (leaf node)
+    // in this layout tree, and measure it via callback.
+    if (childParentData.yogaNode != null) {
+      childParentData.yogaNode!.dispose();
     }
+    childParentData.yogaNode = YogaNode(_config);
 
     final childNode = childParentData.yogaNode!;
 
@@ -852,104 +849,58 @@ class RenderYogaLayout extends RenderBox
           height.unit != YogaUnit.minContent &&
           height.unit != YogaUnit.fitContent;
 
-      // If child is RenderYogaLayout, we skip manual measurement because we linked its rootNode.
-      // Yoga will handle the layout of the subtree automatically.
-      if ((!widthIsSet || !heightIsSet) && child is! RenderYogaLayout) {
-        // Check if we should skip measurement because of stretch alignment
-        bool skipWidth = false;
-        bool skipHeight = false;
+      if (true) {
+        final RenderBox currentChild = child;
+        if (!widthIsSet || !heightIsSet) {
+          childNode.setMeasureFunc((
+            YogaNode node,
+            double width,
+            int widthMode,
+            double height,
+            int heightMode,
+          ) {
+            try {
+              double minWidth = 0.0;
+              double maxWidth = double.infinity;
 
-        final int parentFlexDirection = _rootNode.flexDirection;
-        final int parentAlignItems = _alignItems ?? YGAlign.stretch;
+              if (widthMode == YGMeasureMode.exactly) {
+                minWidth = width.isNaN ? 0.0 : width;
+                maxWidth = width.isNaN ? 0.0 : width;
+              } else if (widthMode == YGMeasureMode.atMost) {
+                maxWidth = width.isNaN ? double.infinity : width;
+              }
 
-        // Determine effective alignment for the child
-        int effectiveAlign = alignSelf ?? YGAlign.auto;
-        if (effectiveAlign == YGAlign.auto) {
-          effectiveAlign = parentAlignItems;
-        }
-        // If still auto (and parent was auto/initial), default depends on config but usually stretch for alignItems
-        // However, YGAlign.auto is 0. YGAlign.stretch is 4.
-        // If parentAlignItems returned 0 (auto), it might mean "not set", which defaults to stretch in Yoga.
-        // Let's assume if effectiveAlign is auto or stretch, it stretches.
-        // Note: alignSelf: auto inherits parent alignItems.
+              double minHeight = 0.0;
+              double maxHeight = double.infinity;
 
-        bool isStretch = effectiveAlign == YGAlign.stretch;
-        // If useWebDefaults is true, default alignItems is stretch.
-        // But _rootNode.alignItems might return auto (0) if not explicitly set?
-        // If we set useWebDefaults, Yoga config handles the default.
-        // But here we are checking the property value.
-        // If property is auto, and useWebDefaults is true, it acts as stretch.
-        if (effectiveAlign == YGAlign.auto && _useWebDefaults) {
-          isStretch = true;
-        }
+              if (heightMode == YGMeasureMode.exactly) {
+                minHeight = height.isNaN ? 0.0 : height;
+                maxHeight = height.isNaN ? 0.0 : height;
+              } else if (heightMode == YGMeasureMode.atMost) {
+                maxHeight = height.isNaN ? double.infinity : height;
+              }
 
-        if (isStretch) {
-          if (parentFlexDirection == YGFlexDirection.column ||
-              parentFlexDirection == YGFlexDirection.columnReverse) {
-            // Cross axis is Width
-            skipWidth = true;
-          } else {
-            // Cross axis is Height
-            skipHeight = true;
-          }
-        }
+              final constraints = BoxConstraints(
+                minWidth: minWidth,
+                maxWidth: maxWidth,
+                minHeight: minHeight,
+                maxHeight: maxHeight,
+              );
 
-        Size childSize = Size.zero;
-        // Only call getDryLayout if we need it (for auto/undefined/maxContent/fitContent default)
-        // For minContent we use getMinIntrinsicWidth/Height
-        bool needDryLayout = false;
-
-        if (!widthIsSet && !skipWidth) {
-          if (width?.unit == YogaUnit.minContent) {
-            childNode.width = child.getMinIntrinsicWidth(double.infinity);
-          } else if (width?.unit == YogaUnit.maxContent) {
-            childNode.width = child.getMaxIntrinsicWidth(double.infinity);
-          } else if (width?.unit == YogaUnit.fitContent) {
-            // fit-content: use max-content (will shrink if flexShrink is set)
-            childNode.width = child.getMaxIntrinsicWidth(double.infinity);
-          } else {
-            // Auto / Undefined
-            needDryLayout = true;
-          }
-        }
-
-        if (!heightIsSet && !skipHeight) {
-          if (height?.unit == YogaUnit.minContent) {
-            childNode.height = child.getMinIntrinsicHeight(double.infinity);
-          } else if (height?.unit == YogaUnit.maxContent) {
-            childNode.height = child.getMaxIntrinsicHeight(double.infinity);
-          } else if (height?.unit == YogaUnit.fitContent) {
-            childNode.height = child.getMaxIntrinsicHeight(double.infinity);
-          } else {
-            needDryLayout = true;
-          }
-        }
-
-        if (needDryLayout) {
-          try {
-            childSize = child.getDryLayout(const BoxConstraints());
-          } catch (e) {
-            // Fallback to intrinsic size if dry layout fails (e.g. RenderFlex assertion)
-            childSize = Size(
-              child.getMaxIntrinsicWidth(double.infinity),
-              child.getMaxIntrinsicHeight(double.infinity),
-            );
-          }
-        }
-
-        if (!widthIsSet && !skipWidth) {
-          if (width?.unit == YogaUnit.auto ||
-              width?.unit == YogaUnit.undefined ||
-              width == null) {
-            childNode.width = childSize.width.ceilToDouble();
-          }
-        }
-        if (!heightIsSet && !skipHeight) {
-          if (height?.unit == YogaUnit.auto ||
-              height?.unit == YogaUnit.undefined ||
-              height == null) {
-            childNode.height = childSize.height.ceilToDouble();
-          }
+              return currentChild.getDryLayout(constraints);
+            } catch (e) {
+              // Fallback to intrinsics if dry layout fails
+              try {
+                final w = currentChild.getMinIntrinsicWidth(double.infinity);
+                final h = currentChild.getMinIntrinsicHeight(w);
+                return Size(w, h);
+              } catch (e2) {
+                return Size.zero;
+              }
+            }
+          });
+        } else {
+          childNode.setMeasureFunc(null);
         }
       }
 
