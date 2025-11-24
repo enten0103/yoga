@@ -42,6 +42,7 @@ class HomePage extends StatelessWidget {
             '/fit_content_margin_auto',
           ),
           _buildListTile(context, 'HTML Replica', '/html_replica'),
+          _buildListTile(context, 'Image Example', '/image_example'),
         ],
       ),
     );

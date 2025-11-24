@@ -851,6 +851,7 @@ class RenderYogaLayout extends RenderBox
 
       if (true) {
         final RenderBox currentChild = child;
+
         if (!widthIsSet || !heightIsSet) {
           childNode.setMeasureFunc((
             YogaNode node,
@@ -899,6 +900,12 @@ class RenderYogaLayout extends RenderBox
               }
             }
           });
+
+          // If the child needs layout (e.g. image loaded, text changed), we must mark the Yoga node as dirty
+          // so that Yoga calls the measure function again.
+          if (currentChild.debugNeedsLayout) {
+            childNode.markDirty();
+          }
         } else {
           childNode.setMeasureFunc(null);
         }

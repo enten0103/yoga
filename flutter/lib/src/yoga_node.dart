@@ -185,6 +185,9 @@ class YogaNode implements Finalizable {
 
   set aspectRatio(double value) => _yoga.setAspectRatio(_nativeNode, value);
 
+  /// Marks the node as dirty, triggering a re-layout.
+  void markDirty() => _yoga.markDirty(_nativeNode);
+
   // --- Config ---
 
   void setConfig(YogaConfig config) {

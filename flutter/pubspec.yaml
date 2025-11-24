@@ -1,6 +1,6 @@
 name: flutter_yoga
 description: "A powerful Flutter plugin that brings the Yoga Layout engine to Flutter with full Flexbox support and CSS-like styling."
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/enten0103/yoga
 repository: https://github.com/enten0103/yoga
 
