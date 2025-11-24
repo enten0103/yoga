@@ -63,7 +63,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.flexGrow,
     this.flexShrink,
     this.flexBasis,
-    this.display,
+    this.display = YogaDisplay.block,
     this.margin,
     this.border,
     this.alignSelf,
@@ -79,13 +79,14 @@ class YogaLayout extends MultiChildRenderObjectWidget {
 
   @override
   RenderYogaLayout createRenderObject(BuildContext context) {
+    final isBlock = display == YogaDisplay.block;
     return RenderYogaLayout()
-      ..flexDirection = flexDirection
-      ..justifyContent = justifyContent
-      ..alignItems = alignItems
+      ..flexDirection = isBlock ? YGFlexDirection.column : flexDirection
+      ..justifyContent = isBlock ? YGJustify.flexStart : justifyContent
+      ..alignItems = isBlock ? YGAlign.stretch : alignItems
       ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
-      ..rootNode.flexWrap = flexWrap
+      ..rootNode.flexWrap = isBlock ? YGWrap.noWrap : flexWrap
       ..width = width
       ..height = height
       ..minWidth = minWidth
@@ -117,13 +118,14 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     BuildContext context,
     covariant RenderYogaLayout renderObject,
   ) {
+    final isBlock = display == YogaDisplay.block;
     renderObject
-      ..flexDirection = flexDirection
-      ..justifyContent = justifyContent
-      ..alignItems = alignItems
+      ..flexDirection = isBlock ? YGFlexDirection.column : flexDirection
+      ..justifyContent = isBlock ? YGJustify.flexStart : justifyContent
+      ..alignItems = isBlock ? YGAlign.stretch : alignItems
       ..textAlign = textAlign
       ..rootNode.alignContent = alignContent
-      ..rootNode.flexWrap = flexWrap
+      ..rootNode.flexWrap = isBlock ? YGWrap.noWrap : flexWrap
       ..width = width
       ..height = height
       ..minWidth = minWidth

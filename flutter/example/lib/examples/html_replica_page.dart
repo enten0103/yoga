@@ -11,28 +11,20 @@ class HtmlReplicaPage extends StatelessWidget {
       body: SingleChildScrollView(
         child: YogaLayout(
           useWebDefaults: true,
-          width: YogaValue.percent(100),
-          height: YogaValue.auto(),
-          justifyContent: YGJustify.center,
-          alignItems: YGAlign.center,
           padding: YogaEdgeInsets.all(YogaValue.point(20)),
           children: [
             YogaItem(
-              width: YogaValue.percent(100),
               maxWidth: YogaValue.point(800),
-              // padding removed from here, moved to child YogaLayout
               border: YogaBorder.all(color: Colors.grey.shade300, width: 1),
-              boxShadow: [],
               child: YogaLayout(
-                useWebDefaults: true,
                 padding: YogaEdgeInsets.all(YogaValue.point(20)),
-                flexDirection: YGFlexDirection.column,
                 children: [
                   // h3
                   YogaItem(
                     margin: YogaEdgeInsets.only(bottom: YogaValue.point(10)),
                     child: const Text(
                       '简介',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -42,7 +34,6 @@ class HtmlReplicaPage extends StatelessWidget {
                   // hr
                   YogaItem(
                     height: YogaValue.point(1),
-                    width: YogaValue.percent(100),
                     margin: YogaEdgeInsets.symmetric(
                       vertical: YogaValue.point(10),
                     ),
