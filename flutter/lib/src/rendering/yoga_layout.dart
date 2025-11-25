@@ -2530,7 +2530,7 @@ class RenderYogaLayout extends RenderBox
     );
     final double paddingTop = _resolveValue(
       _padding?.top ?? YogaValue.zero,
-      constraints.maxHeight,
+      constraints.maxWidth,
     );
     final double paddingRight = _resolveValue(
       _padding?.right ?? YogaValue.zero,
@@ -2538,7 +2538,7 @@ class RenderYogaLayout extends RenderBox
     );
     final double paddingBottom = _resolveValue(
       _padding?.bottom ?? YogaValue.zero,
-      constraints.maxHeight,
+      constraints.maxWidth,
     );
 
     final EdgeInsets border =
@@ -2649,9 +2649,9 @@ class RenderYogaLayout extends RenderBox
       bool isBlock =
           display == YogaDisplay.block || display == YogaDisplay.flex;
       if (display == null) {
-        // In CSS Block Layout, children default to block-level (stacking vertically)
-        // unless explicitly set to inline.
-        isBlock = true;
+        // In CSS Block Layout, we default to inline to support text flow naturally.
+        // Explicit block elements (like nested YogaLayouts) will have display: block set.
+        isBlock = false;
       }
 
       BoxConstraints childConstraints;
@@ -2668,13 +2668,49 @@ class RenderYogaLayout extends RenderBox
             availableWidth - childMargin.left - childMargin.right;
         if (childAvailableWidth < 0) childAvailableWidth = 0;
 
-        double targetWidth = resolvedWidth ?? childAvailableWidth;
+        bool isFitContent = width?.unit == YogaUnit.fitContent;
+        bool isMaxContent = width?.unit == YogaUnit.maxContent;
+        bool isMinContent = width?.unit == YogaUnit.minContent;
 
-        if (resolvedMinWidth != null && targetWidth < resolvedMinWidth) {
-          targetWidth = resolvedMinWidth;
+        double minW;
+        double maxW;
+
+        if (isFitContent || isMinContent || isMaxContent) {
+          double minIntrinsic = child.getMinIntrinsicWidth(double.infinity);
+
+          if (isMinContent) {
+            minW = minIntrinsic;
+            maxW = minIntrinsic;
+          } else if (isMaxContent) {
+            minW = minIntrinsic;
+            maxW = double.infinity;
+          } else {
+            // fit-content
+            minW = minIntrinsic;
+            maxW = math.max(childAvailableWidth, minIntrinsic);
+          }
+        } else {
+          if (resolvedWidth == null && childAvailableWidth.isInfinite) {
+            minW = 0;
+            maxW = double.infinity;
+          } else {
+            double targetWidth = resolvedWidth ?? childAvailableWidth;
+            minW = targetWidth;
+            maxW = targetWidth;
+          }
         }
-        if (resolvedMaxWidth != null && targetWidth > resolvedMaxWidth) {
-          targetWidth = resolvedMaxWidth;
+
+        if (resolvedMinWidth != null) {
+          if (minW < resolvedMinWidth) minW = resolvedMinWidth;
+          if (maxW < resolvedMinWidth) maxW = resolvedMinWidth;
+        }
+        if (resolvedMaxWidth != null) {
+          if (maxW > resolvedMaxWidth) maxW = resolvedMaxWidth;
+          if (minW > resolvedMaxWidth) minW = resolvedMaxWidth;
+        }
+
+        if (minW > maxW) {
+          maxW = minW;
         }
 
         double minH = resolvedMinHeight ?? 0;
@@ -2690,18 +2726,53 @@ class RenderYogaLayout extends RenderBox
         }
 
         childConstraints = BoxConstraints(
-          minWidth: targetWidth,
-          maxWidth: targetWidth,
+          minWidth: minW,
+          maxWidth: maxW,
           minHeight: minH,
           maxHeight: maxH,
         );
       } else {
-        double minW = resolvedMinWidth ?? 0;
-        double maxW = resolvedMaxWidth ?? availableWidth;
+        // Inline elements
+        bool isFitContent = width?.unit == YogaUnit.fitContent;
+        bool isMaxContent = width?.unit == YogaUnit.maxContent;
+        bool isMinContent = width?.unit == YogaUnit.minContent;
 
-        if (resolvedWidth != null) {
+        double minW;
+        double maxW;
+
+        if (isFitContent || isMinContent || isMaxContent) {
+          double minIntrinsic = child.getMinIntrinsicWidth(double.infinity);
+
+          if (isMinContent) {
+            minW = minIntrinsic;
+            maxW = minIntrinsic;
+          } else if (isMaxContent) {
+            minW = minIntrinsic;
+            maxW = double.infinity;
+          } else {
+            // fit-content
+            minW = minIntrinsic;
+            maxW = math.max(availableWidth, minIntrinsic);
+          }
+        } else if (resolvedWidth != null) {
           minW = resolvedWidth;
           maxW = resolvedWidth;
+        } else {
+          minW = resolvedMinWidth ?? 0;
+          maxW = resolvedMaxWidth ?? availableWidth;
+        }
+
+        if (resolvedMinWidth != null) {
+          if (minW < resolvedMinWidth) minW = resolvedMinWidth;
+          if (maxW < resolvedMinWidth) maxW = resolvedMinWidth;
+        }
+        if (resolvedMaxWidth != null) {
+          if (maxW > resolvedMaxWidth) maxW = resolvedMaxWidth;
+          if (minW > resolvedMaxWidth) minW = resolvedMaxWidth;
+        }
+
+        if (minW > maxW) {
+          maxW = minW;
         }
 
         double minH = resolvedMinHeight ?? 0;
@@ -2734,6 +2805,30 @@ class RenderYogaLayout extends RenderBox
       if (isBlock) {
         flushLine();
 
+        // Horizontal Margin Auto Resolution
+        double marginLeft = childMargin.left;
+
+        bool isMarginLeftAuto =
+            childParentData.margin?.left.unit == YogaUnit.auto;
+        bool isMarginRightAuto =
+            childParentData.margin?.right.unit == YogaUnit.auto;
+
+        if ((isMarginLeftAuto || isMarginRightAuto) &&
+            availableWidth.isFinite) {
+          // childMargin has 0 for auto, so we just subtract the fixed parts (if any) and child width
+          double availableSpace =
+              availableWidth - childW - childMargin.left - childMargin.right;
+
+          if (availableSpace > 0) {
+            if (isMarginLeftAuto && isMarginRightAuto) {
+              marginLeft += availableSpace / 2;
+            } else if (isMarginLeftAuto) {
+              marginLeft += availableSpace;
+            }
+            // If only right is auto, marginLeft remains as is (aligned left), which is correct.
+          }
+        }
+
         // Sibling Margin Collapsing
         double marginTop = childMargin.top;
         double marginBottom = childMargin.bottom;
@@ -2751,7 +2846,7 @@ class RenderYogaLayout extends RenderBox
         double childY = cursorY + effectiveSpacing;
 
         childParentData.offset = Offset(
-          contentLeft + childMargin.left,
+          contentLeft + marginLeft,
           contentTop + childY,
         );
 

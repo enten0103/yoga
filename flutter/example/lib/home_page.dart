@@ -48,6 +48,7 @@ class HomePage extends StatelessWidget {
             'Display Interaction (Block/Inline)',
             '/display_interaction',
           ),
+          _buildListTile(context, 'Fit Content (Block)', '/fit_content'),
         ],
       ),
     );
