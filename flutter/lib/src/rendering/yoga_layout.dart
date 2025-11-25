@@ -469,6 +469,11 @@ class RenderYogaLayout extends RenderBox
 
   @override
   void performLayout() {
+    if (_display == YogaDisplay.block) {
+      _performCSSBlockLayout();
+      return;
+    }
+
     _syncRootConstraints(constraints);
     _syncChildren(dryRun: false);
 
@@ -1948,6 +1953,11 @@ class RenderYogaLayout extends RenderBox
     return defaultHitTestChildren(result, position: position);
   }
 
+  @override
+  bool get isRepaintBoundary {
+    return _display == YogaDisplay.block;
+  }
+
   void _resetMarginsRecursive(RenderYogaLayout renderLayout) {
     RenderBox? child = renderLayout.firstChild;
     while (child != null) {
@@ -2494,5 +2504,305 @@ class RenderYogaLayout extends RenderBox
     }
 
     return Alignment(x, y);
+  }
+
+  double? _resolveDimension(YogaValue? value, double parentSize) {
+    if (value == null) return null;
+    switch (value.unit) {
+      case YogaUnit.point:
+        return value.value;
+      case YogaUnit.percent:
+        return value.value * parentSize / 100.0;
+      case YogaUnit.auto:
+      case YogaUnit.undefined:
+      case YogaUnit.maxContent:
+      case YogaUnit.minContent:
+      case YogaUnit.fitContent:
+        return null;
+    }
+  }
+
+  void _performCSSBlockLayout() {
+    // Resolve Padding & Border
+    final double paddingLeft = _resolveValue(
+      _padding?.left ?? YogaValue.zero,
+      constraints.maxWidth,
+    );
+    final double paddingTop = _resolveValue(
+      _padding?.top ?? YogaValue.zero,
+      constraints.maxHeight,
+    );
+    final double paddingRight = _resolveValue(
+      _padding?.right ?? YogaValue.zero,
+      constraints.maxWidth,
+    );
+    final double paddingBottom = _resolveValue(
+      _padding?.bottom ?? YogaValue.zero,
+      constraints.maxHeight,
+    );
+
+    final EdgeInsets border =
+        _border?.resolve(TextDirection.ltr).toFlutterBorder().dimensions
+            as EdgeInsets? ??
+        _borderWidth;
+
+    final double contentLeft = paddingLeft + border.left;
+    final double contentTop = paddingTop + border.top;
+    final double contentRight = paddingRight + border.right;
+    final double contentBottom = paddingBottom + border.bottom;
+
+    // Resolve explicit size if set
+    double? resolvedParentWidth = _resolveDimension(
+      _width,
+      constraints.maxWidth,
+    );
+    double? resolvedParentHeight = _resolveDimension(
+      _height,
+      constraints.maxHeight,
+    );
+
+    double availableWidth =
+        (resolvedParentWidth ?? constraints.maxWidth) -
+        contentLeft -
+        contentRight;
+    if (availableWidth < 0) availableWidth = 0;
+
+    double availableHeight =
+        (resolvedParentHeight ?? constraints.maxHeight) -
+        contentTop -
+        contentBottom;
+    if (availableHeight < 0) availableHeight = 0;
+
+    double cursorX = 0;
+    double cursorY = 0;
+    double previousBottomMargin = 0;
+    double currentLineHeight = 0;
+
+    // Track baselines for the current line
+    double maxAscent = 0;
+
+    RenderBox? child = firstChild;
+    List<RenderBox> currentLineChildren = [];
+
+    void flushLine() {
+      if (currentLineChildren.isEmpty) return;
+
+      // If we are flushing a line, it starts AFTER the previous block's bottom margin.
+      cursorY += previousBottomMargin;
+      previousBottomMargin = 0;
+
+      for (final lineChild in currentLineChildren) {
+        final pd = lineChild.parentData as YogaLayoutParentData;
+        final childMargin = _getEffectiveMargin(pd);
+
+        double childY = cursorY;
+
+        if (_alignItems == YGAlign.baseline) {
+          final double distanceToBaseline =
+              lineChild.getDistanceToBaseline(TextBaseline.alphabetic) ??
+              lineChild.size.height;
+          childY += (maxAscent - distanceToBaseline);
+          childY += childMargin.top;
+        } else {
+          childY += childMargin.top;
+        }
+
+        pd.offset = Offset(contentLeft + pd.offset.dx, contentTop + childY);
+      }
+
+      cursorY += currentLineHeight;
+      cursorX = 0;
+      currentLineHeight = 0;
+      maxAscent = 0;
+      currentLineChildren.clear();
+    }
+
+    while (child != null) {
+      final childParentData = child.parentData as YogaLayoutParentData;
+
+      // Resolve effective properties
+      YogaValue? width = childParentData.width;
+      YogaValue? height = childParentData.height;
+      YogaValue? minWidth = childParentData.minWidth;
+      YogaValue? maxWidth = childParentData.maxWidth;
+      YogaValue? minHeight = childParentData.minHeight;
+      YogaValue? maxHeight = childParentData.maxHeight;
+      YogaDisplay? display = childParentData.display;
+
+      if (child is RenderYogaLayout) {
+        width ??= child._width;
+        height ??= child._height;
+        minWidth ??= child._minWidth;
+        maxWidth ??= child._maxWidth;
+        minHeight ??= child._minHeight;
+        maxHeight ??= child._maxHeight;
+        display ??= child._display;
+      }
+
+      if (display == YogaDisplay.none) {
+        child = childParentData.nextSibling;
+        continue;
+      }
+
+      final EdgeInsets childMargin = _getEffectiveMargin(childParentData);
+
+      bool isBlock =
+          display == YogaDisplay.block || display == YogaDisplay.flex;
+      if (display == null) {
+        // In CSS Block Layout, children default to block-level (stacking vertically)
+        // unless explicitly set to inline.
+        isBlock = true;
+      }
+
+      BoxConstraints childConstraints;
+
+      double? resolvedWidth = _resolveDimension(width, availableWidth);
+      double? resolvedHeight = _resolveDimension(height, availableHeight);
+      double? resolvedMinWidth = _resolveDimension(minWidth, availableWidth);
+      double? resolvedMaxWidth = _resolveDimension(maxWidth, availableWidth);
+      double? resolvedMinHeight = _resolveDimension(minHeight, availableHeight);
+      double? resolvedMaxHeight = _resolveDimension(maxHeight, availableHeight);
+
+      if (isBlock) {
+        double childAvailableWidth =
+            availableWidth - childMargin.left - childMargin.right;
+        if (childAvailableWidth < 0) childAvailableWidth = 0;
+
+        double targetWidth = resolvedWidth ?? childAvailableWidth;
+
+        if (resolvedMinWidth != null && targetWidth < resolvedMinWidth) {
+          targetWidth = resolvedMinWidth;
+        }
+        if (resolvedMaxWidth != null && targetWidth > resolvedMaxWidth) {
+          targetWidth = resolvedMaxWidth;
+        }
+
+        double minH = resolvedMinHeight ?? 0;
+        double maxH = resolvedMaxHeight ?? availableHeight;
+        if (resolvedHeight != null) {
+          minH = resolvedHeight;
+          maxH = resolvedHeight;
+        }
+
+        // Sanity check to prevent infinite minHeight which crashes Flutter
+        if (minH.isInfinite) {
+          minH = 0;
+        }
+
+        childConstraints = BoxConstraints(
+          minWidth: targetWidth,
+          maxWidth: targetWidth,
+          minHeight: minH,
+          maxHeight: maxH,
+        );
+      } else {
+        double minW = resolvedMinWidth ?? 0;
+        double maxW = resolvedMaxWidth ?? availableWidth;
+
+        if (resolvedWidth != null) {
+          minW = resolvedWidth;
+          maxW = resolvedWidth;
+        }
+
+        double minH = resolvedMinHeight ?? 0;
+        double maxH = resolvedMaxHeight ?? availableHeight;
+        if (resolvedHeight != null) {
+          minH = resolvedHeight;
+          maxH = resolvedHeight;
+        }
+
+        // Sanity check to prevent infinite minHeight which crashes Flutter
+        if (minH.isInfinite) {
+          minH = 0;
+        }
+
+        childConstraints = BoxConstraints(
+          minWidth: minW,
+          maxWidth: maxW,
+          minHeight: minH,
+          maxHeight: maxH,
+        );
+      }
+
+      child.layout(childConstraints, parentUsesSize: true);
+
+      final double childW = child.size.width;
+      final double childH = child.size.height;
+      final double totalChildW = childW + childMargin.left + childMargin.right;
+      final double totalChildH = childH + childMargin.top + childMargin.bottom;
+
+      if (isBlock) {
+        flushLine();
+
+        // Sibling Margin Collapsing
+        double marginTop = childMargin.top;
+        double marginBottom = childMargin.bottom;
+
+        // Collapse with previous bottom margin
+        double effectiveSpacing;
+        if (_enableMarginCollapsing) {
+          effectiveSpacing = _collapse(previousBottomMargin, marginTop);
+        } else {
+          effectiveSpacing = previousBottomMargin + marginTop;
+        }
+
+        // Position child
+        // cursorY is at the bottom of the previous element's border box.
+        double childY = cursorY + effectiveSpacing;
+
+        childParentData.offset = Offset(
+          contentLeft + childMargin.left,
+          contentTop + childY,
+        );
+
+        cursorY = childY + childH;
+        previousBottomMargin = marginBottom;
+      } else {
+        if (cursorX + totalChildW > availableWidth && cursorX > 0) {
+          flushLine();
+        }
+
+        childParentData.offset = Offset(cursorX + childMargin.left, 0);
+        currentLineChildren.add(child);
+
+        cursorX += totalChildW;
+
+        if (totalChildH > currentLineHeight) {
+          currentLineHeight = totalChildH;
+        }
+
+        if (_alignItems == YGAlign.baseline) {
+          final double distanceToBaseline =
+              child.getDistanceToBaseline(TextBaseline.alphabetic) ?? childH;
+          final double ascent = distanceToBaseline + childMargin.top;
+          if (ascent > maxAscent) {
+            maxAscent = ascent;
+          }
+        }
+      }
+
+      child = childParentData.nextSibling;
+    }
+
+    flushLine();
+
+    // Add remaining bottom margin to height
+    cursorY += previousBottomMargin;
+
+    double finalWidth = constraints.hasTightWidth
+        ? constraints.maxWidth
+        : (constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : cursorX + contentLeft + contentRight);
+    if (constraints.hasBoundedWidth) finalWidth = constraints.maxWidth;
+
+    double finalHeight = cursorY + contentTop + contentBottom;
+    if (resolvedParentHeight != null) {
+      finalHeight = resolvedParentHeight;
+    } else if (constraints.hasTightHeight) {
+      finalHeight = constraints.maxHeight;
+    }
+
+    size = constraints.constrain(Size(finalWidth, finalHeight));
   }
 }

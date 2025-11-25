@@ -73,7 +73,6 @@ class _MarginPageState extends State<MarginPage> {
             child: Text(
               '说明:\n'
               '在 Flexbox (Yoga) 中，垂直方向的 Margin 默认不会发生折叠 (Collapse)。\n'
-              '但是，通过开启 "Enable Margin Collapsing"，我们可以模拟 Web Block 布局的行为。\n'
               '\n'
               '当前状态: ${_enableMarginCollapsing ? "开启 (折叠)" : "关闭 (累加)"}\n'
               '\n'
@@ -88,11 +87,9 @@ class _MarginPageState extends State<MarginPage> {
             width: double.infinity,
             height: 200,
             child: YogaLayout(
-              useWebDefaults: _useWebDefaults,
               enableMarginCollapsing: _enableMarginCollapsing,
               flexDirection: YGFlexDirection.column,
               alignItems: YGAlign.center,
-              justifyContent: YGJustify.center,
               children: [
                 YogaItem(
                   width: YogaValue.pt(100),
