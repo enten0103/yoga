@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import '../rendering/yoga_layout.dart';
 import '../yoga_ffi.dart';
@@ -530,6 +532,29 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
         node.setMargin(edge, 0);
         break;
     }
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DoubleProperty('flexGrow', flexGrow));
+    properties.add(DoubleProperty('flexShrink', flexShrink));
+    properties.add(DoubleProperty('flexBasis', flexBasis));
+    properties.add(EnumProperty<YogaDisplay>('display', display));
+    properties.add(DiagnosticsProperty<YogaValue>('width', width));
+    properties.add(DiagnosticsProperty<YogaValue>('height', height));
+    properties.add(DiagnosticsProperty<YogaValue>('minWidth', minWidth));
+    properties.add(DiagnosticsProperty<YogaValue>('maxWidth', maxWidth));
+    properties.add(DiagnosticsProperty<YogaValue>('minHeight', minHeight));
+    properties.add(DiagnosticsProperty<YogaValue>('maxHeight', maxHeight));
+    properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', margin));
+    properties.add(DiagnosticsProperty<YogaBorder>('border', border));
+    properties.add(IntProperty('alignSelf', alignSelf));
+    properties.add(DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', boxShadow));
+    properties.add(EnumProperty<YogaBoxSizing>('boxSizing', boxSizing));
+    properties.add(EnumProperty<YogaOverflow>('overflow', overflow));
+    properties.add(TransformProperty('transform', transform));
+    properties.add(DiagnosticsProperty<AlignmentGeometry>('transformOrigin', transformOrigin));
   }
 
   @override

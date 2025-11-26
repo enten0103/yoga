@@ -1058,15 +1058,30 @@ class RenderYogaLayout extends RenderBox
     properties.add(IntProperty('flexDirection', _flexDirection));
     properties.add(IntProperty('justifyContent', _justifyContent));
     properties.add(IntProperty('alignItems', _alignItems));
-    // properties.add(IntProperty('alignContent', _rootNode.alignContent)); // Getter missing in YogaNode
-    // properties.add(IntProperty('flexWrap', _rootNode.flexWrap)); // Getter missing in YogaNode
+    properties.add(IntProperty('alignSelf', _alignSelf));
+    properties.add(DoubleProperty('flexGrow', _flexGrow));
+    properties.add(DoubleProperty('flexShrink', _flexShrink));
+    properties.add(DoubleProperty('flexBasis', _flexBasis));
+    
     properties.add(DiagnosticsProperty<YogaValue>('width', _width));
     properties.add(DiagnosticsProperty<YogaValue>('height', _height));
+    properties.add(DiagnosticsProperty<YogaValue>('minWidth', _minWidth));
+    properties.add(DiagnosticsProperty<YogaValue>('maxWidth', _maxWidth));
+    properties.add(DiagnosticsProperty<YogaValue>('minHeight', _minHeight));
+    properties.add(DiagnosticsProperty<YogaValue>('maxHeight', _maxHeight));
+
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('padding', _padding));
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', _margin));
+    properties.add(DiagnosticsProperty<YogaBorder>('border', _border));
+    
     properties.add(
       DiagnosticsProperty<YogaBackground>('background', _background),
     );
+    properties.add(DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', _boxShadow));
+    properties.add(EnumProperty<YogaBoxSizing>('boxSizing', _boxSizing));
+    properties.add(EnumProperty<YogaOverflow>('overflow', _overflow));
+    properties.add(TransformProperty('transform', _transform));
+    properties.add(DiagnosticsProperty<AlignmentGeometry>('transformOrigin', _transformOrigin));
   }
 
   void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
