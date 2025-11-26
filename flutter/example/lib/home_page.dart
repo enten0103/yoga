@@ -49,7 +49,11 @@ class HomePage extends StatelessWidget {
             '/display_interaction',
           ),
           _buildListTile(context, 'Fit Content (Block)', '/fit_content'),
-          _buildListTile(context, 'TOC Example (Text Align Center)', '/toc_example'),
+          _buildListTile(
+            context,
+            'TOC Example (Text Align Center)',
+            '/toc_example',
+          ),
         ],
       ),
     );

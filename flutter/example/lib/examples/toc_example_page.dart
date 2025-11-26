@@ -104,10 +104,7 @@ class TocExamplePage extends StatelessWidget {
 
     return YogaItem(
       margin: YogaEdgeInsets.only(bottom: YogaValue.point(10)),
-      child: Text(
-        "$number",
-        style: TextStyle(fontSize: 16, color: color),
-      ),
+      child: Text("$number", style: TextStyle(fontSize: 16, color: color)),
     );
   }
 
