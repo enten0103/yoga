@@ -31,19 +31,52 @@ add_library(${PLUGIN_NAME} SHARED
 )
 
 # Add Yoga
-include(FetchContent)
-FetchContent_Declare(
-  yoga
-  GIT_REPOSITORY https://github.com/facebook/yoga.git
-  GIT_TAG main
-)
-FetchContent_GetProperties(yoga)
-if(NOT yoga_POPULATED)
-  FetchContent_Populate(yoga)
-  add_subdirectory(${yoga_SOURCE_DIR}/yoga ${yoga_BINARY_DIR}/yoga)
-  if(MSVC)
-    target_compile_options(yogacore PRIVATE /WX- /wd4819 /wd4251)
-  endif()
+# include(FetchContent)
+# FetchContent_Declare(
+#   yoga
+#   GIT_REPOSITORY https://github.com/facebook/yoga.git
+#   GIT_TAG main
+# )
+# FetchContent_GetProperties(yoga)
+# if(NOT yoga_POPULATED)
+#   FetchContent_Populate(yoga)
+#   add_subdirectory(${yoga_SOURCE_DIR}/yoga ${yoga_BINARY_DIR}/yoga)
+#   if(MSVC)
+#     target_compile_options(yogacore PRIVATE /WX- /wd4819 /wd4251)
+#   endif()
+# endif()
+
+# Use local Yoga source
+# Try to find yoga source relative to the current file (resolving symlinks if possible)
+get_filename_component(CURRENT_FILE_DIR "${CMAKE_CURRENT_LIST_FILE}" DIRECTORY)
+get_filename_component(YOGA_SOURCE_DIR "${CURRENT_FILE_DIR}/../../yoga" ABSOLUTE)
+
+if(NOT EXISTS "${YOGA_SOURCE_DIR}/CMakeLists.txt")
+    # Fallback: Search up the directory tree from CMAKE_CURRENT_SOURCE_DIR
+    set(SEARCH_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
+    foreach(i RANGE 10)
+        if(EXISTS "${SEARCH_DIR}/yoga/CMakeLists.txt")
+            set(YOGA_SOURCE_DIR "${SEARCH_DIR}/yoga")
+            break()
+        endif()
+        get_filename_component(PARENT_DIR "${SEARCH_DIR}" DIRECTORY)
+        if("${PARENT_DIR}" STREQUAL "${SEARCH_DIR}")
+            break()
+        endif()
+        set(SEARCH_DIR "${PARENT_DIR}")
+    endforeach()
+endif()
+
+# Verify the path exists
+if(NOT EXISTS "${YOGA_SOURCE_DIR}/CMakeLists.txt")
+    message(FATAL_ERROR "Yoga source not found at ${YOGA_SOURCE_DIR}. Please check the path.")
+endif()
+
+# Add the yoga directory
+add_subdirectory("${YOGA_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/yoga_local_build")
+
+if(MSVC)
+  target_compile_options(yogacore PRIVATE /WX- /wd4819 /wd4251)
 endif()
 
 target_compile_definitions(yogacore PUBLIC _WINDLL)

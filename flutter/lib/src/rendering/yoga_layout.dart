@@ -92,6 +92,9 @@ class RenderYogaLayout extends RenderBox
   Matrix4? _transform;
   AlignmentGeometry? _transformOrigin;
 
+  // Cached properties to avoid FFI calls in debugFillProperties
+  int _flexDirection = YGFlexDirection.column; // Default Yoga value
+
   RenderYogaLayout() {
     _config = YogaConfig();
     _rootNode = YogaNode(_config);
@@ -239,7 +242,8 @@ class RenderYogaLayout extends RenderBox
   }
 
   set flexDirection(int value) {
-    if (_rootNode.flexDirection != value) {
+    if (_flexDirection != value) {
+      _flexDirection = value;
       _rootNode.flexDirection = value;
       _applyLayoutProperties();
       markNeedsLayout();
@@ -462,8 +466,9 @@ class RenderYogaLayout extends RenderBox
   @override
   void detach() {
     _disposeBackgroundImage();
-    _rootNode.dispose(recursive: false);
-    _config.dispose();
+    // We should not dispose _rootNode here because the RenderObject might be re-attached.
+    // _rootNode is managed by Finalizer, so it will be freed when this object is GC'd.
+    // Also, _config is static and shared, so we MUST NOT dispose it here.
     super.detach();
   }
 
@@ -1047,51 +1052,21 @@ class RenderYogaLayout extends RenderBox
   }
 
   @override
-  void paint(PaintingContext context, Offset offset) {
-    // Check if we need to paint our own decoration
-    // If parent is RenderYogaLayout, it paints our decoration (border, shadow, transform)
-    // based on our parentData.
-    bool parentHandlesDecoration = parent is RenderYogaLayout;
-
-    if (parentHandlesDecoration) {
-      // Even if parent handles decoration (border, shadow, transform),
-      // we are still responsible for painting our own background.
-      // The parent paints shadow BEFORE calling us, and border AFTER calling us.
-      // So we just need to paint background and then children.
-      if (_background != null) {
-        _paintBackground(context, offset, size, _background!);
-      }
-      _paintChildren(context, offset);
-    } else {
-      // We are root (or not inside YogaLayout), so we paint our own decoration
-      if (_transform != null) {
-        final Matrix4 transform = _transform!;
-        final AlignmentGeometry originAlignment =
-            _transformOrigin ?? Alignment.center;
-        final Offset originOffset = originAlignment
-            .resolve(TextDirection.ltr)
-            .alongSize(size);
-        final Matrix4 effectiveTransform =
-            Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
-              ..multiply(transform)
-              ..multiply(
-                Matrix4.translationValues(
-                  -originOffset.dx,
-                  -originOffset.dy,
-                  0.0,
-                ),
-              );
-
-        context.pushTransform(needsCompositing, offset, effectiveTransform, (
-          context,
-          offset,
-        ) {
-          _paintSelfWithDecoration(context, offset);
-        });
-      } else {
-        _paintSelfWithDecoration(context, offset);
-      }
-    }
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(EnumProperty<YogaDisplay>('display', _display));
+    properties.add(IntProperty('flexDirection', _flexDirection));
+    properties.add(IntProperty('justifyContent', _justifyContent));
+    properties.add(IntProperty('alignItems', _alignItems));
+    // properties.add(IntProperty('alignContent', _rootNode.alignContent)); // Getter missing in YogaNode
+    // properties.add(IntProperty('flexWrap', _rootNode.flexWrap)); // Getter missing in YogaNode
+    properties.add(DiagnosticsProperty<YogaValue>('width', _width));
+    properties.add(DiagnosticsProperty<YogaValue>('height', _height));
+    properties.add(DiagnosticsProperty<YogaEdgeInsets>('padding', _padding));
+    properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', _margin));
+    properties.add(
+      DiagnosticsProperty<YogaBackground>('background', _background),
+    );
   }
 
   void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
@@ -2899,5 +2874,53 @@ class RenderYogaLayout extends RenderBox
     }
 
     size = constraints.constrain(Size(finalWidth, finalHeight));
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    // Check if we need to paint our own decoration
+    // If parent is RenderYogaLayout, it paints our decoration (border, shadow, transform)
+    // based on our parentData.
+    bool parentHandlesDecoration = parent is RenderYogaLayout;
+
+    if (parentHandlesDecoration) {
+      // Even if parent handles decoration (border, shadow, transform),
+      // we are still responsible for painting our own background.
+      // The parent paints shadow BEFORE calling us, and border AFTER calling us.
+      // So we just need to paint background and then children.
+      if (_background != null) {
+        _paintBackground(context, offset, size, _background!);
+      }
+      _paintChildren(context, offset);
+    } else {
+      // We are root (or not inside YogaLayout), so we paint our own decoration
+      if (_transform != null) {
+        final Matrix4 transform = _transform!;
+        final AlignmentGeometry originAlignment =
+            _transformOrigin ?? Alignment.center;
+        final Offset originOffset = originAlignment
+            .resolve(TextDirection.ltr)
+            .alongSize(size);
+        final Matrix4 effectiveTransform =
+            Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
+              ..multiply(transform)
+              ..multiply(
+                Matrix4.translationValues(
+                  -originOffset.dx,
+                  -originOffset.dy,
+                  0.0,
+                ),
+              );
+
+        context.pushTransform(needsCompositing, offset, effectiveTransform, (
+          context,
+          offset,
+        ) {
+          _paintSelfWithDecoration(context, offset);
+        });
+      } else {
+        _paintSelfWithDecoration(context, offset);
+      }
+    }
   }
 }

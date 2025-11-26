@@ -534,16 +534,16 @@ class YG_EXPORT Style {
         numbersEqual(flex_, pool_, other.flex_, other.pool_) &&
         numbersEqual(flexGrow_, pool_, other.flexGrow_, other.pool_) &&
         numbersEqual(flexShrink_, pool_, other.flexShrink_, other.pool_) &&
-        lengthsEqual(flexBasis_, pool_, other.flexBasis_, other.pool_) &&
+        sizesEqual(flexBasis_, pool_, other.flexBasis_, other.pool_) &&
         lengthsEqual(margin_, pool_, other.margin_, other.pool_) &&
         lengthsEqual(position_, pool_, other.position_, other.pool_) &&
         lengthsEqual(padding_, pool_, other.padding_, other.pool_) &&
         lengthsEqual(border_, pool_, other.border_, other.pool_) &&
         lengthsEqual(gap_, pool_, other.gap_, other.pool_) &&
-        lengthsEqual(dimensions_, pool_, other.dimensions_, other.pool_) &&
-        lengthsEqual(
+        sizesEqual(dimensions_, pool_, other.dimensions_, other.pool_) &&
+        sizesEqual(
                minDimensions_, pool_, other.minDimensions_, other.pool_) &&
-        lengthsEqual(
+        sizesEqual(
                maxDimensions_, pool_, other.maxDimensions_, other.pool_) &&
         numbersEqual(aspectRatio_, pool_, other.aspectRatio_, other.pool_);
   }
@@ -575,6 +575,15 @@ class YG_EXPORT Style {
         (lhsPool.getLength(lhsHandle) == rhsPool.getLength(rhsHandle));
   }
 
+  static inline bool sizesEqual(
+      const StyleValueHandle& lhsHandle,
+      const StyleValuePool& lhsPool,
+      const StyleValueHandle& rhsHandle,
+      const StyleValuePool& rhsPool) {
+    return (lhsHandle.isUndefined() && rhsHandle.isUndefined()) ||
+        (lhsPool.getSize(lhsHandle) == rhsPool.getSize(rhsHandle));
+  }
+
   template <size_t N>
   static inline bool lengthsEqual(
       const std::array<StyleValueHandle, N>& lhs,
@@ -588,6 +597,22 @@ class YG_EXPORT Style {
         rhs.end(),
         [&](const auto& lhs, const auto& rhs) {
           return lengthsEqual(lhs, lhsPool, rhs, rhsPool);
+        });
+  }
+
+  template <size_t N>
+  static inline bool sizesEqual(
+      const std::array<StyleValueHandle, N>& lhs,
+      const StyleValuePool& lhsPool,
+      const std::array<StyleValueHandle, N>& rhs,
+      const StyleValuePool& rhsPool) {
+    return std::equal(
+        lhs.begin(),
+        lhs.end(),
+        rhs.begin(),
+        rhs.end(),
+        [&](const auto& lhs, const auto& rhs) {
+          return sizesEqual(lhs, lhsPool, rhs, rhsPool);
         });
   }
 

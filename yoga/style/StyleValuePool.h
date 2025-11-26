@@ -70,10 +70,8 @@ class StyleValuePool {
       return StyleLength::undefined();
     } else if (handle.isAuto()) {
       return StyleLength::ofAuto();
-    } else {
-      assert(
-          handle.type() == StyleValueHandle::Type::Point ||
-          handle.type() == StyleValueHandle::Type::Percent);
+    } else if (handle.type() == StyleValueHandle::Type::Point ||
+               handle.type() == StyleValueHandle::Type::Percent) {
       float value = (handle.isValueIndexed())
           ? std::bit_cast<float>(buffer_.get32(handle.value()))
           : unpackInlineInteger(handle.value());
@@ -81,6 +79,8 @@ class StyleValuePool {
       return handle.type() == StyleValueHandle::Type::Point
           ? StyleLength::points(value)
           : StyleLength::percent(value);
+    } else {
+      return StyleLength::undefined();
     }
   }
 
@@ -158,9 +158,12 @@ class StyleValuePool {
   static constexpr bool isIntegerPackable(float f) {
     constexpr uint16_t kMaxInlineAbsValue = (1 << 11) - 1;
 
+    if (!(f >= -kMaxInlineAbsValue && f <= kMaxInlineAbsValue)) {
+      return false;
+    }
+
     auto i = static_cast<int32_t>(f);
-    return static_cast<float>(i) == f && i >= -kMaxInlineAbsValue &&
-        i <= +kMaxInlineAbsValue;
+    return static_cast<float>(i) == f;
   }
 
   static constexpr uint16_t packInlineInteger(float value) {
