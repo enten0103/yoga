@@ -2970,4 +2970,20 @@ class RenderYogaLayout extends RenderBox
       }
     }
   }
+
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) {
+    // Return the baseline of the first child that has a baseline.
+    // This is a simplified behavior but covers most cases for Flex/Flow containers.
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final double? result = child.getDistanceToActualBaseline(baseline);
+      if (result != null) {
+        final childParentData = child.parentData as YogaLayoutParentData;
+        return result + childParentData.offset.dy;
+      }
+      child = (child.parentData as YogaLayoutParentData).nextSibling;
+    }
+    return super.computeDistanceToActualBaseline(baseline);
+  }
 }

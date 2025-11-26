@@ -90,22 +90,24 @@ class _DisplayInteractionPageState extends State<DisplayInteractionPage> {
                           style: TextStyle(fontSize: 20),
                         ),
                       ),
-                      YogaItem(
+                      YogaLayout(
                         display: YogaDisplay.inline,
                         margin: YogaEdgeInsets.symmetric(
                           horizontal: YogaValue.point(5),
                         ),
-                        child: Container(
-                          color: Colors.amber,
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: const Text(
-                            "21dw",
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                        children: [
+                          Container(
+                            color: Colors.amber,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: const Text(
+                              "21dw",
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
                       YogaItem(
                         child: const Text(

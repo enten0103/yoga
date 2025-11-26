@@ -550,11 +550,18 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', margin));
     properties.add(DiagnosticsProperty<YogaBorder>('border', border));
     properties.add(IntProperty('alignSelf', alignSelf));
-    properties.add(DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', boxShadow));
+    properties.add(
+      DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', boxShadow),
+    );
     properties.add(EnumProperty<YogaBoxSizing>('boxSizing', boxSizing));
     properties.add(EnumProperty<YogaOverflow>('overflow', overflow));
     properties.add(TransformProperty('transform', transform));
-    properties.add(DiagnosticsProperty<AlignmentGeometry>('transformOrigin', transformOrigin));
+    properties.add(
+      DiagnosticsProperty<AlignmentGeometry>(
+        'transformOrigin',
+        transformOrigin,
+      ),
+    );
   }
 
   @override
