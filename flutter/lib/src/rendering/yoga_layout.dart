@@ -504,10 +504,14 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    if (_display == YogaDisplay.inline &&
+    bool isFitContent =
+        _width?.unit == YogaUnit.fitContent ||
+        _width?.unit == YogaUnit.maxContent;
+
+    if ((_display == YogaDisplay.inline || isFitContent) &&
         constraints.hasBoundedWidth &&
         !constraints.hasTightWidth) {
-      // For inline display with loose constraints, we want "shrink-to-fit" behavior.
+      // For inline display or fit-content with loose constraints, we want "shrink-to-fit" behavior.
       // First, try measuring with undefined width to get the content width.
       _rootNode.calculateLayout(
         availableWidth: double.nan,
@@ -623,6 +627,7 @@ class RenderYogaLayout extends RenderBox
       if (_display == YogaDisplay.inline) {
         _rootNode.setWidthAuto();
       } else {
+        // Default block behavior: expand to fill available width
         _rootNode.width = constraints.maxWidth;
       }
     } else {
