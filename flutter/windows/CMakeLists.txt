@@ -73,7 +73,8 @@ if(NOT EXISTS "${YOGA_SOURCE_DIR}/CMakeLists.txt")
 endif()
 
 # Add the yoga directory
-add_subdirectory("${YOGA_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/yoga_local_build")
+# Use EXCLUDE_FROM_ALL to prevent any install targets in Yoga from running and requiring admin privileges
+add_subdirectory("${YOGA_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/yoga_local_build" EXCLUDE_FROM_ALL)
 
 if(MSVC)
   target_compile_options(yogacore PRIVATE /WX- /wd4819 /wd4251)
