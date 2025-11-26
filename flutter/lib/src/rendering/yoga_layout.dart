@@ -504,10 +504,30 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    _rootNode.calculateLayout(
-      availableWidth: availableWidth,
-      availableHeight: availableHeight,
-    );
+    if (_display == YogaDisplay.inline &&
+        constraints.hasBoundedWidth &&
+        !constraints.hasTightWidth) {
+      // For inline display with loose constraints, we want "shrink-to-fit" behavior.
+      // First, try measuring with undefined width to get the content width.
+      _rootNode.calculateLayout(
+        availableWidth: double.nan,
+        availableHeight: availableHeight,
+      );
+
+      // If the content width exceeds the available width, we need to re-layout
+      // with the constraint to enforce wrapping.
+      if (_rootNode.layoutWidth > availableWidth) {
+        _rootNode.calculateLayout(
+          availableWidth: availableWidth,
+          availableHeight: availableHeight,
+        );
+      }
+    } else {
+      _rootNode.calculateLayout(
+        availableWidth: availableWidth,
+        availableHeight: availableHeight,
+      );
+    }
 
     // 4. Apply Layout to Children
     RenderBox? child = firstChild;
