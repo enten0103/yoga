@@ -599,7 +599,12 @@ class RenderYogaLayout extends RenderBox
     } else if (_width != null) {
       _applyWidth(_rootNode, _width!);
     } else if (constraints.hasBoundedWidth) {
-      _rootNode.width = constraints.maxWidth;
+      // If display is inline, we should shrink to fit (Auto), not expand to max width.
+      if (_display == YogaDisplay.inline) {
+        _rootNode.setWidthAuto();
+      } else {
+        _rootNode.width = constraints.maxWidth;
+      }
     } else {
       _rootNode.setWidthAuto();
     }
@@ -1062,7 +1067,7 @@ class RenderYogaLayout extends RenderBox
     properties.add(DoubleProperty('flexGrow', _flexGrow));
     properties.add(DoubleProperty('flexShrink', _flexShrink));
     properties.add(DoubleProperty('flexBasis', _flexBasis));
-    
+
     properties.add(DiagnosticsProperty<YogaValue>('width', _width));
     properties.add(DiagnosticsProperty<YogaValue>('height', _height));
     properties.add(DiagnosticsProperty<YogaValue>('minWidth', _minWidth));
@@ -1073,15 +1078,22 @@ class RenderYogaLayout extends RenderBox
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('padding', _padding));
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', _margin));
     properties.add(DiagnosticsProperty<YogaBorder>('border', _border));
-    
+
     properties.add(
       DiagnosticsProperty<YogaBackground>('background', _background),
     );
-    properties.add(DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', _boxShadow));
+    properties.add(
+      DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', _boxShadow),
+    );
     properties.add(EnumProperty<YogaBoxSizing>('boxSizing', _boxSizing));
     properties.add(EnumProperty<YogaOverflow>('overflow', _overflow));
     properties.add(TransformProperty('transform', _transform));
-    properties.add(DiagnosticsProperty<AlignmentGeometry>('transformOrigin', _transformOrigin));
+    properties.add(
+      DiagnosticsProperty<AlignmentGeometry>(
+        'transformOrigin',
+        _transformOrigin,
+      ),
+    );
   }
 
   void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
