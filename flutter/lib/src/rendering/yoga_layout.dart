@@ -2613,6 +2613,25 @@ class RenderYogaLayout extends RenderBox
       cursorY += previousBottomMargin;
       previousBottomMargin = 0;
 
+      // Calculate alignment offset
+      double alignmentOffset = 0;
+      if (_textAlign != null && availableWidth.isFinite) {
+        double freeSpace = availableWidth - cursorX;
+        if (freeSpace > 0) {
+          switch (_textAlign!) {
+            case TextAlign.center:
+              alignmentOffset = freeSpace / 2;
+              break;
+            case TextAlign.right:
+            case TextAlign.end:
+              alignmentOffset = freeSpace;
+              break;
+            default:
+              break;
+          }
+        }
+      }
+
       for (final lineChild in currentLineChildren) {
         final pd = lineChild.parentData as YogaLayoutParentData;
         final childMargin = _getEffectiveMargin(pd);
@@ -2629,7 +2648,10 @@ class RenderYogaLayout extends RenderBox
           childY += childMargin.top;
         }
 
-        pd.offset = Offset(contentLeft + pd.offset.dx, contentTop + childY);
+        pd.offset = Offset(
+          contentLeft + pd.offset.dx + alignmentOffset,
+          contentTop + childY,
+        );
       }
 
       cursorY += currentLineHeight;

@@ -82,6 +82,7 @@ class _DisplayInteractionPageState extends State<DisplayInteractionPage> {
                     display: YogaDisplay.block,
                     padding: YogaEdgeInsets.all(YogaValue.point(10)),
                     border: YogaBorder.all(color: Colors.grey, width: 1),
+                    textAlign: TextAlign.end,
                     alignItems: YGAlign.baseline, // Align text to baseline
                     children: [
                       YogaItem(
