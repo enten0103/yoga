@@ -7,7 +7,7 @@ class NestedLayoutPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Nested Layout (New API)')),
+      appBar: AppBar(title: const Text('嵌套布局 (Nested Layout)')),
       body: Container(
         color: Colors.grey[200],
         child: YogaLayout(
@@ -40,7 +40,7 @@ class NestedLayoutPage extends StatelessWidget {
               children: [
                 YogaItem(
                   child: const Text(
-                    "Header (Fixed Height)",
+                    "页眉 (固定高度)",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),

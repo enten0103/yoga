@@ -16,7 +16,7 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Flex Properties')),
+      appBar: AppBar(title: const Text('Flex 属性 (Flex Properties)')),
       body: Column(
         children: [
           _buildControls(),
@@ -35,7 +35,7 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
                     height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.red,
-                      child: const Center(child: Text("Fixed\n80px")),
+                      child: const Center(child: Text("固定\n80px")),
                     ),
                   ),
                   // Dynamic Item
@@ -51,7 +51,7 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
                       color: Colors.blue,
                       child: Center(
                         child: Text(
-                          "Target\nGrow: ${_flexGrow.toStringAsFixed(1)}\nShrink: ${_flexShrink.toStringAsFixed(1)}\nBasis: ${_flexBasis.toInt()}",
+                          "目标\nGrow: ${_flexGrow.toStringAsFixed(1)}\nShrink: ${_flexShrink.toStringAsFixed(1)}\nBasis: ${_flexBasis.toInt()}",
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -67,7 +67,7 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
                     height: YogaValue.pt(80),
                     child: Container(
                       color: Colors.green,
-                      child: const Center(child: Text("Fixed\n80px")),
+                      child: const Center(child: Text("固定\n80px")),
                     ),
                   ),
                 ],
@@ -85,21 +85,21 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
       child: Column(
         children: [
           _buildSlider(
-            "Flex Grow",
+            "放大比例 (Flex Grow)",
             _flexGrow,
             0,
             5,
             (val) => setState(() => _flexGrow = val),
           ),
           _buildSlider(
-            "Flex Shrink",
+            "缩小比例 (Flex Shrink)",
             _flexShrink,
             0,
             5,
             (val) => setState(() => _flexShrink = val),
           ),
           _buildSlider(
-            "Flex Basis",
+            "基准值 (Flex Basis)",
             _flexBasis,
             50,
             300,

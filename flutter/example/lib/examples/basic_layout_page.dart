@@ -16,7 +16,7 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Basic Layout')),
+      appBar: AppBar(title: const Text('基础布局 (Basic Layout)')),
       body: Column(
         children: [
           _buildControls(),
@@ -60,35 +60,35 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
       child: Column(
         children: [
           _buildDropdown<int>(
-            "Flex Direction",
+            "主轴方向 (Flex Direction)",
             _flexDirection,
             {
-              "Column": YGFlexDirection.column,
-              "Row": YGFlexDirection.row,
-              "Column Reverse": YGFlexDirection.columnReverse,
-              "Row Reverse": YGFlexDirection.rowReverse,
+              "Column (垂直)": YGFlexDirection.column,
+              "Row (水平)": YGFlexDirection.row,
+              "Column Reverse (垂直反向)": YGFlexDirection.columnReverse,
+              "Row Reverse (水平反向)": YGFlexDirection.rowReverse,
             },
             (val) => setState(() => _flexDirection = val!),
           ),
           _buildDropdown<int>(
-            "Justify Content",
+            "主轴对齐 (Justify Content)",
             _justifyContent,
             {
-              "Flex Start": YGJustify.flexStart,
-              "Center": YGJustify.center,
-              "Flex End": YGJustify.flexEnd,
-              "Space Between": YGJustify.spaceBetween,
-              "Space Around": YGJustify.spaceAround,
-              "Space Evenly": YGJustify.spaceEvenly,
+              "Flex Start (起点)": YGJustify.flexStart,
+              "Center (居中)": YGJustify.center,
+              "Flex End (终点)": YGJustify.flexEnd,
+              "Space Between (两端对齐)": YGJustify.spaceBetween,
+              "Space Around (环绕对齐)": YGJustify.spaceAround,
+              "Space Evenly (均匀对齐)": YGJustify.spaceEvenly,
             },
             (val) => setState(() => _justifyContent = val!),
           ),
-          _buildDropdown<int>("Align Items", _alignItems, {
-            "Stretch": YGAlign.stretch,
-            "Flex Start": YGAlign.flexStart,
-            "Center": YGAlign.center,
-            "Flex End": YGAlign.flexEnd,
-            "Baseline": YGAlign.baseline,
+          _buildDropdown<int>("交叉轴对齐 (Align Items)", _alignItems, {
+            "Stretch (拉伸)": YGAlign.stretch,
+            "Flex Start (起点)": YGAlign.flexStart,
+            "Center (居中)": YGAlign.center,
+            "Flex End (终点)": YGAlign.flexEnd,
+            "Baseline (基线)": YGAlign.baseline,
           }, (val) => setState(() => _alignItems = val!)),
         ],
       ),

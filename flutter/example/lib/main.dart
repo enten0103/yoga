@@ -8,7 +8,6 @@ import 'examples/nested_layout_page.dart';
 import 'examples/flex_properties_page.dart';
 import 'examples/spacing_page.dart';
 import 'examples/display_page.dart';
-import 'examples/web_defaults_page.dart';
 import 'examples/margin_page.dart';
 import 'examples/padding_page.dart';
 import 'examples/box_shadow_page.dart';
@@ -67,7 +66,6 @@ class _MyAppState extends State<MyApp> {
         '/flex_properties': (context) => const FlexPropertiesPage(),
         '/spacing': (context) => const SpacingPage(),
         '/display': (context) => const DisplayPage(),
-        '/web_defaults': (context) => const WebDefaultsPage(),
         '/margin': (context) => const MarginPage(),
         '/padding': (context) => const PaddingPage(),
         '/box_shadow': (context) => const BoxShadowPage(),
