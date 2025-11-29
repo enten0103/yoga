@@ -25,6 +25,7 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaBorder? border;
   YogaBoxSizing? boxSizing;
   int? alignSelf;
+  TextAlign? textAlign;
   List<YogaBoxShadow>? boxShadow;
   YogaOverflow? overflow;
   Matrix4? transform;
@@ -39,7 +40,8 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   ImageStreamListener? _borderImageListener;
 
   @override
-  String toString() => '${super.toString()}; yogaNode=$yogaNode';
+  String toString() =>
+      '${super.toString()}; yogaNode=$yogaNode; textAlign=$textAlign';
 
   @override
   void detach() {
@@ -49,6 +51,12 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
     _borderImageInfo = null;
     super.detach();
   }
+}
+
+class YogaLayoutResult {
+  final Size size;
+  final double? baseline;
+  YogaLayoutResult(this.size, this.baseline);
 }
 
 class RenderYogaLayout extends RenderBox
@@ -93,11 +101,13 @@ class RenderYogaLayout extends RenderBox
   AlignmentGeometry? _transformOrigin;
 
   // Cached properties to avoid FFI calls in debugFillProperties
-  int _flexDirection = YGFlexDirection.column; // Default Yoga value
+  int _flexDirection = YGFlexDirection.row; // Default to row to match CSS
 
   RenderYogaLayout() {
     _config = YogaConfig();
     _rootNode = YogaNode(_config);
+    _rootNode.flexDirection = YGFlexDirection.row;
+    _display = YogaDisplay.block; // Default to block
   }
 
   YogaNode get rootNode => _rootNode;
@@ -203,6 +213,15 @@ class RenderYogaLayout extends RenderBox
     if (_display != value) {
       _display = value;
       _updateParentData((pd) => pd.display = value);
+      // Also update root node display property for Yoga
+      if (value != null) {
+        _rootNode.display = value == YogaDisplay.none
+            ? YGDisplay.none
+            : YGDisplay.flex;
+      } else {
+        _rootNode.display = YGDisplay.flex;
+      }
+      markNeedsLayout();
     }
   }
 
@@ -475,7 +494,7 @@ class RenderYogaLayout extends RenderBox
   @override
   void performLayout() {
     if (_display == YogaDisplay.block) {
-      _performCSSBlockLayout();
+      size = _performCSSBlockLayout(constraints).size;
       return;
     }
 
@@ -506,12 +525,15 @@ class RenderYogaLayout extends RenderBox
 
     bool isFitContent =
         _width?.unit == YogaUnit.fitContent ||
-        _width?.unit == YogaUnit.maxContent;
+        _width?.unit == YogaUnit.maxContent ||
+        _width?.unit == YogaUnit.minContent ||
+        _width == null ||
+        _width?.unit == YogaUnit.auto;
 
     if ((_display == YogaDisplay.inline || isFitContent) &&
         constraints.hasBoundedWidth &&
         !constraints.hasTightWidth) {
-      // For inline display or fit-content with loose constraints, we want "shrink-to-fit" behavior.
+      // For inline display or fit-content (including auto) with loose constraints, we want "shrink-to-fit" behavior.
       // First, try measuring with undefined width to get the content width.
       _rootNode.calculateLayout(
         availableWidth: double.nan,
@@ -584,6 +606,10 @@ class RenderYogaLayout extends RenderBox
       _resetMarginsRecursive(this);
     }
 
+    if (_display == YogaDisplay.block) {
+      return _performCSSBlockLayout(constraints, dryRun: true).size;
+    }
+
     double availableWidth = double.nan;
     if (constraints.hasBoundedWidth) {
       availableWidth = constraints.maxWidth;
@@ -598,10 +624,33 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    _rootNode.calculateLayout(
-      availableWidth: availableWidth,
-      availableHeight: availableHeight,
-    );
+    bool isFitContent =
+        _width?.unit == YogaUnit.fitContent ||
+        _width?.unit == YogaUnit.maxContent ||
+        _width?.unit == YogaUnit.minContent ||
+        _width == null ||
+        _width?.unit == YogaUnit.auto;
+
+    if ((_display == YogaDisplay.inline || isFitContent) &&
+        constraints.hasBoundedWidth &&
+        !constraints.hasTightWidth) {
+      _rootNode.calculateLayout(
+        availableWidth: double.nan,
+        availableHeight: availableHeight,
+      );
+
+      if (_rootNode.layoutWidth > availableWidth) {
+        _rootNode.calculateLayout(
+          availableWidth: availableWidth,
+          availableHeight: availableHeight,
+        );
+      }
+    } else {
+      _rootNode.calculateLayout(
+        availableWidth: availableWidth,
+        availableHeight: availableHeight,
+      );
+    }
 
     final double rootW = _rootNode.layoutWidth;
     final double rootH = _rootNode.layoutHeight;
@@ -622,15 +671,10 @@ class RenderYogaLayout extends RenderBox
       _rootNode.width = constraints.maxWidth;
     } else if (_width != null) {
       _applyWidth(_rootNode, _width!);
-    } else if (constraints.hasBoundedWidth) {
-      // If display is inline, we should shrink to fit (Auto), not expand to max width.
-      if (_display == YogaDisplay.inline) {
-        _rootNode.setWidthAuto();
-      } else {
-        // Default block behavior: expand to fill available width
-        _rootNode.width = constraints.maxWidth;
-      }
     } else {
+      // For both inline and block, we default to Auto (content width) when constraints are loose.
+      // This ensures that when measured as a flex item, we report content size instead of expanding to fill available space.
+      // To get "fill width" behavior (Block-like), use width: 100% or align-self: stretch.
       _rootNode.setWidthAuto();
     }
 
@@ -714,12 +758,10 @@ class RenderYogaLayout extends RenderBox
         // But we should probably ensure it's auto if not set?
         // YogaItem sets it to auto if null.
         // Let's assume if it's null in parentData, it should be auto.
-        // However, we need to be careful about display:block behavior (width: 100%).
-        if (display == YogaDisplay.block) {
-          childNode.setWidthPercent(100);
-        } else {
-          childNode.setWidthAuto();
-        }
+        // In Flex layout (Yoga), children are flex items.
+        // Flex items default to auto width (content size), NOT 100% width,
+        // even if they are block-level elements.
+        childNode.setWidthAuto();
       }
 
       if (height != null) {
@@ -773,67 +815,8 @@ class RenderYogaLayout extends RenderBox
 
       if (alignSelf != null) {
         childNode.alignSelf = alignSelf;
-
-        // If user explicitly set stretch, but also set width: fit-content.
-        // CSS says width wins. So we should change alignSelf to flexStart?
-        bool preventStretchWidth =
-            width?.unit == YogaUnit.fitContent ||
-            width?.unit == YogaUnit.maxContent ||
-            width?.unit == YogaUnit.minContent;
-        bool preventStretchHeight =
-            height?.unit == YogaUnit.fitContent ||
-            height?.unit == YogaUnit.maxContent ||
-            height?.unit == YogaUnit.minContent;
-
-        int parentFlexDirection = _rootNode.flexDirection;
-        bool isCrossAxisWidth =
-            parentFlexDirection == YGFlexDirection.column ||
-            parentFlexDirection == YGFlexDirection.columnReverse;
-
-        if (isCrossAxisWidth &&
-            preventStretchWidth &&
-            alignSelf == YGAlign.stretch) {
-          childNode.alignSelf = YGAlign.flexStart;
-        }
-        if (!isCrossAxisWidth &&
-            preventStretchHeight &&
-            alignSelf == YGAlign.stretch) {
-          childNode.alignSelf = YGAlign.flexStart;
-        }
       } else {
-        // alignSelf is Auto.
-        // If parent aligns to stretch, we need to override.
-        bool preventStretchWidth =
-            width?.unit == YogaUnit.fitContent ||
-            width?.unit == YogaUnit.maxContent ||
-            width?.unit == YogaUnit.minContent;
-        bool preventStretchHeight =
-            height?.unit == YogaUnit.fitContent ||
-            height?.unit == YogaUnit.maxContent ||
-            height?.unit == YogaUnit.minContent;
-
-        int parentFlexDirection = _rootNode.flexDirection;
-        bool isCrossAxisWidth =
-            parentFlexDirection == YGFlexDirection.column ||
-            parentFlexDirection == YGFlexDirection.columnReverse;
-
-        int effectiveAlignItems = _alignItems ?? YGAlign.stretch;
-
-        if (isCrossAxisWidth && preventStretchWidth) {
-          if (effectiveAlignItems == YGAlign.stretch) {
-            childNode.alignSelf = YGAlign.flexStart;
-          } else {
-            childNode.alignSelf = YGAlign.auto;
-          }
-        } else if (!isCrossAxisWidth && preventStretchHeight) {
-          if (effectiveAlignItems == YGAlign.stretch) {
-            childNode.alignSelf = YGAlign.flexStart;
-          } else {
-            childNode.alignSelf = YGAlign.auto;
-          }
-        } else {
-          childNode.alignSelf = YGAlign.auto;
-        }
+        childNode.alignSelf = YGAlign.auto;
       }
 
       if (display != null) {
@@ -926,7 +909,21 @@ class RenderYogaLayout extends RenderBox
                 minWidth = width.isNaN ? 0.0 : width;
                 maxWidth = width.isNaN ? 0.0 : width;
               } else if (widthMode == YGMeasureMode.atMost) {
-                maxWidth = width.isNaN ? double.infinity : width;
+                // If the child is auto width (flex item), we treat AtMost as Undefined (Infinite)
+                // to allow it to report its max-content size.
+                // This prevents premature wrapping when Yoga tries to measure with available space.
+                bool isAutoWidth = false;
+                if (currentChild.parentData is YogaLayoutParentData) {
+                  final pd = currentChild.parentData as YogaLayoutParentData;
+                  isAutoWidth =
+                      pd.width == null || pd.width!.unit == YogaUnit.auto;
+                }
+
+                if (isAutoWidth) {
+                  maxWidth = double.infinity;
+                } else {
+                  maxWidth = width.isNaN ? double.infinity : width;
+                }
               }
 
               double minHeight = 0.0;
@@ -971,6 +968,79 @@ class RenderYogaLayout extends RenderBox
 
       child = childParentData.nextSibling;
     }
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) {
+    return computeDryLayout(
+      BoxConstraints(
+        minWidth: 0,
+        maxWidth: 0,
+        minHeight: height,
+        maxHeight: height,
+      ),
+    ).width;
+  }
+
+  @override
+  double computeMaxIntrinsicWidth(double height) {
+    if (_display == YogaDisplay.block) {
+      double contentW = _computeBlockMaxContentWidth();
+
+      double paddingHorizontal = 0;
+      if (_padding != null) {
+        if (_padding!.left.unit == YogaUnit.point) {
+          paddingHorizontal += _padding!.left.value;
+        }
+        if (_padding!.right.unit == YogaUnit.point) {
+          paddingHorizontal += _padding!.right.value;
+        }
+      }
+
+      double borderHorizontal = _borderWidth.horizontal;
+      if (_border != null) {
+        borderHorizontal = _border!
+            .resolve(TextDirection.ltr)
+            .toFlutterBorder()
+            .dimensions
+            .horizontal;
+      }
+
+      return contentW + paddingHorizontal + borderHorizontal;
+    }
+
+    return computeDryLayout(
+      BoxConstraints(
+        minWidth: 0,
+        maxWidth: double.infinity,
+        minHeight: height,
+        maxHeight: height,
+      ),
+    ).width;
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) {
+    return computeDryLayout(
+      BoxConstraints(
+        minWidth: width,
+        maxWidth: width,
+        minHeight: 0,
+        maxHeight: 0,
+      ),
+    ).height;
+  }
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    return computeDryLayout(
+      BoxConstraints(
+        minWidth: width,
+        maxWidth: width,
+        minHeight: 0,
+        maxHeight: double.infinity,
+      ),
+    ).height;
   }
 
   void _applyWidth(YogaNode node, YogaValue width) {
@@ -1088,6 +1158,7 @@ class RenderYogaLayout extends RenderBox
     properties.add(IntProperty('flexDirection', _flexDirection));
     properties.add(IntProperty('justifyContent', _justifyContent));
     properties.add(IntProperty('alignItems', _alignItems));
+    properties.add(EnumProperty<TextAlign>('textAlign', _textAlign));
     properties.add(IntProperty('alignSelf', _alignSelf));
     properties.add(DoubleProperty('flexGrow', _flexGrow));
     properties.add(DoubleProperty('flexShrink', _flexShrink));
@@ -2549,7 +2620,85 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  void _performCSSBlockLayout() {
+  double _computeBlockMaxContentWidth() {
+    double maxContentW = 0;
+    double currentLineW = 0;
+    RenderBox? tempChild = firstChild;
+
+    while (tempChild != null) {
+      final tempPd = tempChild.parentData as YogaLayoutParentData;
+      double childIntrinsicWidth = tempChild.getMaxIntrinsicWidth(
+        double.infinity,
+      );
+
+      // Add margins (only fixed points, auto is 0)
+      EdgeInsets tempMargin = _getEffectiveMargin(tempPd);
+      double totalChildW =
+          childIntrinsicWidth + tempMargin.left + tempMargin.right;
+
+      // Check if child is inline
+      bool isInline = false;
+      if (tempPd.display == YogaDisplay.inline ||
+          tempPd.display == YogaDisplay.inlineBlock) {
+        isInline = true;
+      } else if (tempPd.display == null) {
+        // Default to inline if not specified (e.g. Text widgets)
+        // But wait, RenderYogaLayout defaults to block if not specified?
+        // No, in _performCSSBlockLayout we default to inline for non-explicit block.
+        // Let's match that logic.
+        if (tempChild is RenderYogaLayout) {
+          // Nested YogaLayout defaults to block if display is null
+          isInline = false;
+        } else {
+          // Other widgets (Text, Image) default to inline
+          isInline = true;
+        }
+      }
+
+      if (isInline) {
+        currentLineW += totalChildW;
+      } else {
+        // Block element breaks the line
+        if (currentLineW > maxContentW) {
+          maxContentW = currentLineW;
+        }
+        currentLineW = 0;
+
+        if (totalChildW > maxContentW) {
+          maxContentW = totalChildW;
+        }
+      }
+
+      tempChild = tempPd.nextSibling;
+    }
+
+    // Check last line
+    if (currentLineW > maxContentW) {
+      maxContentW = currentLineW;
+    }
+
+    // Add a small epsilon to prevent sub-pixel wrapping issues
+    return maxContentW + 0.5;
+  }
+
+  @override
+  double? computeDryBaseline(
+    BoxConstraints constraints,
+    TextBaseline baseline,
+  ) {
+    if (_display == YogaDisplay.block) {
+      return _performCSSBlockLayout(constraints, dryRun: true).baseline;
+    }
+    // For Flex layout, we can't easily compute dry baseline without full layout
+    // unless we replicate Yoga's logic.
+    // For now, return null which is default behavior.
+    return null;
+  }
+
+  YogaLayoutResult _performCSSBlockLayout(
+    BoxConstraints constraints, {
+    bool dryRun = false,
+  }) {
     // Resolve Padding & Border
     final double paddingLeft = _resolveValue(
       _padding?.left ?? YogaValue.zero,
@@ -2600,6 +2749,28 @@ class RenderYogaLayout extends RenderBox
         contentBottom;
     if (availableHeight < 0) availableHeight = 0;
 
+    // Check if we are a flex item (child of a Flex container)
+    bool isFlexItem = false;
+    if (parent is RenderYogaLayout) {
+      isFlexItem = (parent as RenderYogaLayout)._display == YogaDisplay.flex;
+    }
+
+    // Pre-pass: If we are fit-content, calculate intrinsic width from children
+    bool isSelfFitContent =
+        _width?.unit == YogaUnit.fitContent ||
+        _width?.unit == YogaUnit.maxContent ||
+        _width?.unit == YogaUnit.minContent ||
+        (isFlexItem && (_width == null || _width?.unit == YogaUnit.auto));
+
+    if (isSelfFitContent && !constraints.hasTightWidth) {
+      double maxContentW = _computeBlockMaxContentWidth();
+
+      // Shrink availableWidth to fit content, but respect constraints
+      if (availableWidth > maxContentW) {
+        availableWidth = maxContentW;
+      }
+    }
+
     double cursorX = 0;
     double cursorY = 0;
     double previousBottomMargin = 0;
@@ -2608,11 +2779,21 @@ class RenderYogaLayout extends RenderBox
     // Track baselines for the current line
     double maxAscent = 0;
 
+    // Track max content width for fit-content/auto width
+    double maxContentWidth = 0;
+
     RenderBox? child = firstChild;
     List<RenderBox> currentLineChildren = [];
+    Map<RenderBox, Size> childSizes = {};
+    Map<RenderBox, double?> childBaselines = {};
 
     void flushLine() {
       if (currentLineChildren.isEmpty) return;
+
+      // Update maxContentWidth with the current line width
+      if (cursorX > maxContentWidth) {
+        maxContentWidth = cursorX;
+      }
 
       // If we are flushing a line, it starts AFTER the previous block's bottom margin.
       cursorY += previousBottomMargin;
@@ -2640,23 +2821,25 @@ class RenderYogaLayout extends RenderBox
       for (final lineChild in currentLineChildren) {
         final pd = lineChild.parentData as YogaLayoutParentData;
         final childMargin = _getEffectiveMargin(pd);
+        final Size childSize = childSizes[lineChild]!;
 
         double childY = cursorY;
 
         if (_alignItems == YGAlign.baseline) {
           final double distanceToBaseline =
-              lineChild.getDistanceToBaseline(TextBaseline.alphabetic) ??
-              lineChild.size.height;
+              childBaselines[lineChild] ?? childSize.height;
           childY += (maxAscent - distanceToBaseline);
           childY += childMargin.top;
         } else {
           childY += childMargin.top;
         }
 
-        pd.offset = Offset(
-          contentLeft + pd.offset.dx + alignmentOffset,
-          contentTop + childY,
-        );
+        if (!dryRun) {
+          pd.offset = Offset(
+            contentLeft + pd.offset.dx + alignmentOffset,
+            contentTop + childY,
+          );
+        }
       }
 
       cursorY += currentLineHeight;
@@ -2677,6 +2860,7 @@ class RenderYogaLayout extends RenderBox
       YogaValue? minHeight = childParentData.minHeight;
       YogaValue? maxHeight = childParentData.maxHeight;
       YogaDisplay? display = childParentData.display;
+      YogaEdgeInsets? margin = childParentData.margin;
 
       if (child is RenderYogaLayout) {
         width ??= child._width;
@@ -2686,6 +2870,7 @@ class RenderYogaLayout extends RenderBox
         minHeight ??= child._minHeight;
         maxHeight ??= child._maxHeight;
         display ??= child._display;
+        margin ??= child._margin;
       }
 
       if (display == YogaDisplay.none) {
@@ -2693,7 +2878,25 @@ class RenderYogaLayout extends RenderBox
         continue;
       }
 
-      final EdgeInsets childMargin = _getEffectiveMargin(childParentData);
+      EdgeInsets childMargin;
+      if (childParentData.effectiveMargin != null) {
+        childMargin = childParentData.effectiveMargin!;
+      } else {
+        childMargin = margin == null
+            ? EdgeInsets.zero
+            : EdgeInsets.only(
+                left: margin.left.unit == YogaUnit.point
+                    ? margin.left.value
+                    : 0,
+                top: margin.top.unit == YogaUnit.point ? margin.top.value : 0,
+                right: margin.right.unit == YogaUnit.point
+                    ? margin.right.value
+                    : 0,
+                bottom: margin.bottom.unit == YogaUnit.point
+                    ? margin.bottom.value
+                    : 0,
+              );
+      }
 
       bool isBlock =
           display == YogaDisplay.block || display == YogaDisplay.flex;
@@ -2701,6 +2904,13 @@ class RenderYogaLayout extends RenderBox
         // In CSS Block Layout, we default to inline to support text flow naturally.
         // Explicit block elements (like nested YogaLayouts) will have display: block set.
         isBlock = false;
+      }
+
+      // Force block behavior for nested RenderYogaLayouts if they are not explicitly inline
+      if (child is RenderYogaLayout &&
+          display != YogaDisplay.inline &&
+          display != YogaDisplay.inlineBlock) {
+        isBlock = true;
       }
 
       BoxConstraints childConstraints;
@@ -2844,10 +3054,19 @@ class RenderYogaLayout extends RenderBox
         );
       }
 
-      child.layout(childConstraints, parentUsesSize: true);
+      if (dryRun) {
+        child.getDryLayout(childConstraints);
+      } else {
+        child.layout(childConstraints, parentUsesSize: true);
+      }
 
-      final double childW = child.size.width;
-      final double childH = child.size.height;
+      final Size childSize = dryRun
+          ? child.getDryLayout(childConstraints)
+          : child.size;
+      childSizes[child] = childSize;
+
+      final double childW = childSize.width;
+      final double childH = childSize.height;
       final double totalChildW = childW + childMargin.left + childMargin.right;
       final double totalChildH = childH + childMargin.top + childMargin.bottom;
 
@@ -2857,12 +3076,38 @@ class RenderYogaLayout extends RenderBox
         // Horizontal Margin Auto Resolution
         double marginLeft = childMargin.left;
 
-        bool isMarginLeftAuto =
-            childParentData.margin?.left.unit == YogaUnit.auto;
-        bool isMarginRightAuto =
-            childParentData.margin?.right.unit == YogaUnit.auto;
+        bool isMarginLeftAuto = margin?.left.unit == YogaUnit.auto;
+        bool isMarginRightAuto = margin?.right.unit == YogaUnit.auto;
 
-        if ((isMarginLeftAuto || isMarginRightAuto) &&
+        // Check for textAlign on the item (overrides margin auto for alignment purposes if we treat it as such)
+        // Or works alongside it.
+        // If textAlign is set, we use it to align the block.
+        TextAlign? itemTextAlign = childParentData.textAlign;
+        // If child is RenderYogaLayout, we might have synced textAlign in _syncChildren, but that was for YogaNode.
+        // Here we are in layout loop. We should check if we need to sync again or if childParentData has it.
+        // childParentData.textAlign is what we set in YogaItem.
+        // If child is RenderYogaLayout, we might want to use its _textAlign if not set in ParentData?
+        if (itemTextAlign == null && child is RenderYogaLayout) {
+          itemTextAlign = child._textAlign;
+        }
+
+        if (itemTextAlign != null && availableWidth.isFinite) {
+          double availableSpace =
+              availableWidth - childW - childMargin.left - childMargin.right;
+          if (availableSpace > 0) {
+            switch (itemTextAlign) {
+              case TextAlign.center:
+                marginLeft += availableSpace / 2;
+                break;
+              case TextAlign.right:
+              case TextAlign.end:
+                marginLeft += availableSpace;
+                break;
+              default:
+                break;
+            }
+          }
+        } else if ((isMarginLeftAuto || isMarginRightAuto) &&
             availableWidth.isFinite) {
           // childMargin has 0 for auto, so we just subtract the fixed parts (if any) and child width
           double availableSpace =
@@ -2894,10 +3139,18 @@ class RenderYogaLayout extends RenderBox
         // cursorY is at the bottom of the previous element's border box.
         double childY = cursorY + effectiveSpacing;
 
-        childParentData.offset = Offset(
-          contentLeft + marginLeft,
-          contentTop + childY,
-        );
+        if (!dryRun) {
+          childParentData.offset = Offset(
+            contentLeft + marginLeft,
+            contentTop + childY,
+          );
+        }
+
+        // Track width for block elements
+        double totalChildW = childW + childMargin.left + childMargin.right;
+        if (totalChildW > maxContentWidth) {
+          maxContentWidth = totalChildW;
+        }
 
         cursorY = childY + childH;
         previousBottomMargin = marginBottom;
@@ -2906,7 +3159,11 @@ class RenderYogaLayout extends RenderBox
           flushLine();
         }
 
-        childParentData.offset = Offset(cursorX + childMargin.left, 0);
+        if (!dryRun) {
+          if (!dryRun) {
+            childParentData.offset = Offset(cursorX + childMargin.left, 0);
+          }
+        }
         currentLineChildren.add(child);
 
         cursorX += totalChildW;
@@ -2916,8 +3173,24 @@ class RenderYogaLayout extends RenderBox
         }
 
         if (_alignItems == YGAlign.baseline) {
-          final double distanceToBaseline =
-              child.getDistanceToBaseline(TextBaseline.alphabetic) ?? childH;
+          double? distanceToBaseline;
+          if (dryRun) {
+            try {
+              distanceToBaseline = child.getDryBaseline(
+                childConstraints,
+                TextBaseline.alphabetic,
+              );
+            } catch (e) {
+              // Ignore if getDryBaseline is not supported or fails
+            }
+          } else {
+            distanceToBaseline = child.getDistanceToBaseline(
+              TextBaseline.alphabetic,
+            );
+          }
+          distanceToBaseline ??= childH;
+          childBaselines[child] = distanceToBaseline;
+
           final double ascent = distanceToBaseline + childMargin.top;
           if (ascent > maxAscent) {
             maxAscent = ascent;
@@ -2933,12 +3206,26 @@ class RenderYogaLayout extends RenderBox
     // Add remaining bottom margin to height
     cursorY += previousBottomMargin;
 
-    double finalWidth = constraints.hasTightWidth
-        ? constraints.maxWidth
-        : (constraints.hasBoundedWidth
-              ? constraints.maxWidth
-              : cursorX + contentLeft + contentRight);
-    if (constraints.hasBoundedWidth) finalWidth = constraints.maxWidth;
+    double contentWidth = maxContentWidth + contentLeft + contentRight;
+
+    double finalWidth;
+    bool isFitContent =
+        _width?.unit == YogaUnit.fitContent ||
+        _width?.unit == YogaUnit.maxContent ||
+        _width?.unit == YogaUnit.minContent;
+
+    if (constraints.hasTightWidth) {
+      finalWidth = constraints.maxWidth;
+    } else if (isFitContent) {
+      finalWidth = contentWidth;
+      if (constraints.hasBoundedWidth && finalWidth > constraints.maxWidth) {
+        finalWidth = constraints.maxWidth;
+      }
+    } else if (constraints.hasBoundedWidth) {
+      finalWidth = constraints.maxWidth;
+    } else {
+      finalWidth = contentWidth;
+    }
 
     double finalHeight = cursorY + contentTop + contentBottom;
     if (resolvedParentHeight != null) {
@@ -2947,7 +3234,11 @@ class RenderYogaLayout extends RenderBox
       finalHeight = constraints.maxHeight;
     }
 
-    size = constraints.constrain(Size(finalWidth, finalHeight));
+    final Size finalSize = constraints.constrain(Size(finalWidth, finalHeight));
+    if (!dryRun) {
+      size = finalSize;
+    }
+    return YogaLayoutResult(finalSize, maxAscent > 0 ? maxAscent : null);
   }
 
   @override
@@ -2967,34 +3258,7 @@ class RenderYogaLayout extends RenderBox
       }
       _paintChildren(context, offset);
     } else {
-      // We are root (or not inside YogaLayout), so we paint our own decoration
-      if (_transform != null) {
-        final Matrix4 transform = _transform!;
-        final AlignmentGeometry originAlignment =
-            _transformOrigin ?? Alignment.center;
-        final Offset originOffset = originAlignment
-            .resolve(TextDirection.ltr)
-            .alongSize(size);
-        final Matrix4 effectiveTransform =
-            Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
-              ..multiply(transform)
-              ..multiply(
-                Matrix4.translationValues(
-                  -originOffset.dx,
-                  -originOffset.dy,
-                  0.0,
-                ),
-              );
-
-        context.pushTransform(needsCompositing, offset, effectiveTransform, (
-          context,
-          offset,
-        ) {
-          _paintSelfWithDecoration(context, offset);
-        });
-      } else {
-        _paintSelfWithDecoration(context, offset);
-      }
+      _paintSelfWithDecoration(context, offset);
     }
   }
 

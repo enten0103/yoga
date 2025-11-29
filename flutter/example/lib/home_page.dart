@@ -54,6 +54,11 @@ class HomePage extends StatelessWidget {
             'TOC Example (Text Align Center)',
             '/toc_example',
           ),
+          _buildListTile(
+            context,
+            'Layout Behavior (Block vs Flex)',
+            '/layout_behavior',
+          ),
         ],
       ),
     );

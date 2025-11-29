@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import '../rendering/yoga_layout.dart';
@@ -51,7 +50,7 @@ class YogaLayout extends MultiChildRenderObjectWidget {
     this.justifyContent,
     this.alignItems = YGAlign.baseline,
     this.alignContent = YGAlign.flexStart,
-    this.flexWrap = YGWrap.wrap,
+    this.flexWrap = YGWrap.noWrap,
     this.textAlign,
     this.width,
     this.height,
@@ -169,6 +168,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
   final YogaEdgeInsets? margin;
   final YogaBorder? border;
   final int? alignSelf;
+  final TextAlign? textAlign;
   final List<YogaBoxShadow>? boxShadow;
   final YogaBoxSizing? boxSizing;
   final YogaOverflow? overflow;
@@ -190,6 +190,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     this.margin,
     this.border,
     this.alignSelf,
+    this.textAlign,
     this.boxShadow,
     this.boxSizing,
     this.overflow,
@@ -210,6 +211,11 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     }
 
     final node = parentData.yogaNode!;
+
+    if (parentData.textAlign != textAlign) {
+      parentData.textAlign = textAlign;
+      needsLayout = true;
+    }
 
     if (parentData.transform != transform) {
       parentData.transform = transform;
@@ -550,6 +556,7 @@ class YogaItem extends ParentDataWidget<YogaLayoutParentData> {
     properties.add(DiagnosticsProperty<YogaEdgeInsets>('margin', margin));
     properties.add(DiagnosticsProperty<YogaBorder>('border', border));
     properties.add(IntProperty('alignSelf', alignSelf));
+    properties.add(EnumProperty<TextAlign>('textAlign', textAlign));
     properties.add(
       DiagnosticsProperty<List<YogaBoxShadow>>('boxShadow', boxShadow),
     );
