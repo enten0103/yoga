@@ -18,7 +18,8 @@ class TocExamplePage extends StatelessWidget {
             width: YogaValue.percent(100),
             children: [
               YogaLayout(
-                width: YogaValue.fitContent(),
+                width: YogaValue.point(200),
+                textAlign: TextAlign.justify,
                 margin: YogaEdgeInsets.only(
                   left: YogaValue.auto(),
                   right: YogaValue.auto(),

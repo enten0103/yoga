@@ -10,7 +10,7 @@ import '../yoga_background.dart';
 class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   YogaNode? yogaNode;
 
-  // Cache for diffing
+  // 用于差异比较的缓存
   double? flexGrow;
   double? flexShrink;
   double? flexBasis;
@@ -31,10 +31,10 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   Matrix4? transform;
   AlignmentGeometry? transformOrigin;
 
-  // Effective margin after collapsing (runtime only, not set by user)
+  // 合并后的有效外边距（仅运行时，非用户设置）
   EdgeInsets? effectiveMargin;
 
-  // Border Image Runtime Data
+  // 边框图片运行时数据
   ImageStream? _borderImageStream;
   ImageInfo? _borderImageInfo;
   ImageStreamListener? _borderImageListener;
@@ -75,7 +75,7 @@ class RenderYogaLayout extends RenderBox
   YogaBackground? _background;
   YogaValue? _width;
 
-  // Background Image Runtime Data
+  // 背景图片运行时数据
   ImageStream? _backgroundImageStream;
   ImageInfo? _backgroundImageInfo;
   ImageStreamListener? _backgroundImageListener;
@@ -86,7 +86,7 @@ class RenderYogaLayout extends RenderBox
   YogaValue? _minHeight;
   YogaValue? _maxHeight;
 
-  // YogaItem properties
+  // YogaItem 属性
   double? _flexGrow;
   double? _flexShrink;
   double? _flexBasis;
@@ -100,14 +100,14 @@ class RenderYogaLayout extends RenderBox
   Matrix4? _transform;
   AlignmentGeometry? _transformOrigin;
 
-  // Cached properties to avoid FFI calls in debugFillProperties
-  int _flexDirection = YGFlexDirection.row; // Default to row to match CSS
+  // 缓存属性以避免在 debugFillProperties 中调用 FFI
+  int _flexDirection = YGFlexDirection.row; // 默认为 row 以匹配 CSS
 
   RenderYogaLayout() {
     _config = YogaConfig();
     _rootNode = YogaNode(_config);
     _rootNode.flexDirection = YGFlexDirection.row;
-    _display = YogaDisplay.block; // Default to block
+    _display = YogaDisplay.block; // 默认为 block
   }
 
   YogaNode get rootNode => _rootNode;
@@ -133,10 +133,10 @@ class RenderYogaLayout extends RenderBox
 
     // debugPrint('YogaLayout: Resolving background image: $imageProvider');
 
-    // Note: size might be zero here if called before layout.
-    // Ideally we should resolve in paint or layout if size is needed for configuration.
-    // But ImageProvider usually needs configuration.
-    // We can re-resolve in paint if size changes.
+    // 注意：如果在布局之前调用，此处尺寸可能为零。
+    // 如果配置需要尺寸，理想情况下我们应该在绘制或布局中解析。
+    // 但是 ImageProvider 通常需要配置。
+    // 如果尺寸发生变化，我们可以在绘制中重新解析。
     final ImageConfiguration config = ImageConfiguration(
       size: hasSize ? size : Size.zero,
       textDirection: TextDirection.ltr,
@@ -213,7 +213,7 @@ class RenderYogaLayout extends RenderBox
     if (_display != value) {
       _display = value;
       _updateParentData((pd) => pd.display = value);
-      // Also update root node display property for Yoga
+      // 同时更新 Yoga 的根节点 display 属性
       if (value != null) {
         _rootNode.display = value == YogaDisplay.none
             ? YGDisplay.none
@@ -237,7 +237,7 @@ class RenderYogaLayout extends RenderBox
       _border = value;
       _updateParentData((pd) => pd.border = value);
 
-      // Apply border widths to root node so content is inset correctly
+      // 将边框宽度应用于根节点，以便正确缩进内容
       if (value != null) {
         final resolved = value.resolve(TextDirection.ltr);
         final fb = resolved.toFlutterBorder();
@@ -246,7 +246,7 @@ class RenderYogaLayout extends RenderBox
         _rootNode.setBorder(YGEdge.bottom, fb.bottom.width);
         _rootNode.setBorder(YGEdge.left, fb.left.width);
       } else {
-        // Fallback to borderWidth if border is null, or 0
+        // 如果 border 为 null 或 0，则回退到 borderWidth
         if (_borderWidth != EdgeInsets.zero) {
           _rootNode.setBorder(YGEdge.top, _borderWidth.top);
           _rootNode.setBorder(YGEdge.right, _borderWidth.right);
@@ -379,7 +379,7 @@ class RenderYogaLayout extends RenderBox
   @override
   void attach(PipelineOwner owner) {
     super.attach(owner);
-    // Re-resolve background image if needed (e.g. after detach/attach)
+    // 如果需要（例如在 detach/attach 之后），重新解析背景图片
     if (_background?.image != null && _backgroundImageInfo == null) {
       _resolveBackgroundImage();
     }
@@ -428,7 +428,7 @@ class RenderYogaLayout extends RenderBox
 
   set borderWidth(EdgeInsets? value) {
     _borderWidth = value ?? EdgeInsets.zero;
-    // Only apply if _border is null. If _border is set, it takes precedence.
+    // 仅当 _border 为 null 时应用。如果设置了 _border，则以其为准。
     if (_border == null) {
       if (value != null) {
         _rootNode.setBorder(YGEdge.left, value.left);
@@ -454,9 +454,9 @@ class RenderYogaLayout extends RenderBox
     super.insert(child, after: after);
     final childParentData = child.parentData as YogaLayoutParentData;
 
-    // Always create a new node for the child in this layout context.
-    // Even if the child is a RenderYogaLayout, we treat it as a black box (leaf node)
-    // in this layout tree, and measure it via callback.
+    // 始终在此布局上下文中为子级创建一个新节点。
+    // 即使子级是 RenderYogaLayout，我们也将其视为黑盒（叶节点）
+    // 在此布局树中，并通过回调对其进行测量。
     if (childParentData.yogaNode != null) {
       childParentData.yogaNode!.dispose();
     }
@@ -485,9 +485,9 @@ class RenderYogaLayout extends RenderBox
   @override
   void detach() {
     _disposeBackgroundImage();
-    // We should not dispose _rootNode here because the RenderObject might be re-attached.
-    // _rootNode is managed by Finalizer, so it will be freed when this object is GC'd.
-    // Also, _config is static and shared, so we MUST NOT dispose it here.
+    // 我们不应该在这里销毁 _rootNode，因为 RenderObject 可能会被重新附加。
+    // _rootNode 由 Finalizer 管理，因此当此对象被 GC 时，它将被释放。
+    // 此外，_config 是静态且共享的，因此我们绝不能在这里销毁它。
     super.detach();
   }
 
@@ -504,11 +504,11 @@ class RenderYogaLayout extends RenderBox
     if (_enableMarginCollapsing) {
       _collapseMarginsRecursive(this);
     } else {
-      // Ensure margins are reset if collapsing is disabled
+      // 如果禁用了合并，请确保重置外边距
       _resetMarginsRecursive(this);
     }
 
-    // 3. Calculate Layout
+    // 3. 计算布局
     double availableWidth = double.nan;
     if (constraints.hasBoundedWidth) {
       availableWidth = constraints.maxWidth;
@@ -533,15 +533,15 @@ class RenderYogaLayout extends RenderBox
     if ((_display == YogaDisplay.inline || isFitContent) &&
         constraints.hasBoundedWidth &&
         !constraints.hasTightWidth) {
-      // For inline display or fit-content (including auto) with loose constraints, we want "shrink-to-fit" behavior.
-      // First, try measuring with undefined width to get the content width.
+      // 对于具有宽松约束的 inline display 或 fit-content（包括 auto），我们需要“收缩以适应”的行为。
+      // 首先，尝试使用未定义的宽度进行测量以获取内容宽度。
       _rootNode.calculateLayout(
         availableWidth: double.nan,
         availableHeight: availableHeight,
       );
 
-      // If the content width exceeds the available width, we need to re-layout
-      // with the constraint to enforce wrapping.
+      // 如果内容宽度超过可用宽度，我们需要重新布局
+      // 使用强制换行的约束。
       if (_rootNode.layoutWidth > availableWidth) {
         _rootNode.calculateLayout(
           availableWidth: availableWidth,
@@ -555,7 +555,7 @@ class RenderYogaLayout extends RenderBox
       );
     }
 
-    // 4. Apply Layout to Children
+    // 4. 将布局应用于子级
     RenderBox? child = firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
@@ -566,12 +566,12 @@ class RenderYogaLayout extends RenderBox
       final double w = childNode.layoutWidth;
       final double h = childNode.layoutHeight;
 
-      // Yoga might return NaN if something went wrong or if dimensions are undefined.
-      // We must ensure we pass valid constraints to Flutter.
+      // 如果出现问题或尺寸未定义，Yoga 可能会返回 NaN。
+      // 我们必须确保向 Flutter 传递有效的约束。
       final double safeW = w.isNaN ? 0.0 : w;
       final double safeH = h.isNaN ? 0.0 : h;
 
-      // We must layout the child with exact constraints given by Yoga
+      // 我们必须使用 Yoga 给出的精确约束对子级进行布局
       child.layout(
         BoxConstraints.tightFor(width: safeW, height: safeH),
         parentUsesSize: true,
@@ -594,12 +594,12 @@ class RenderYogaLayout extends RenderBox
     _syncRootConstraints(constraints);
     _syncChildren(dryRun: true);
 
-    // Note: Margin collapsing is stateful on the nodes (modifies margins).
-    // We should probably run it for dry layout too to get accurate size,
-    // but we must be careful not to leave the nodes in a bad state if performLayout expects clean state.
-    // However, performLayout resets margins via _resetMarginsRecursive if collapsing is disabled,
-    // or re-runs collapsing.
-    // So it should be fine to run it here.
+    // 注意：外边距合并在节点上是有状态的（修改外边距）。
+    // 我们可能也应该为 dry layout 运行它以获得准确的尺寸，
+    // 但如果 performLayout 期望干净的状态，我们必须小心不要让节点处于不良状态。
+    // 但是，如果禁用了合并，performLayout 会通过 _resetMarginsRecursive 重置外边距，
+    // 或者重新运行合并。
+    // 所以在这里运行它应该是没问题的。
     if (_enableMarginCollapsing) {
       _collapseMarginsRecursive(this);
     } else {
@@ -661,20 +661,20 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _syncRootConstraints(BoxConstraints constraints) {
-    // If constraints are tight, we MUST be that size.
-    // This overrides any user-specified width/height (especially percentages),
-    // because the parent has already resolved those percentages to this tight constraint.
-    // If we don't do this, calculateLayout might resolve the percentage again against the constraint,
-    // leading to double-scaling (e.g. 50% of 50% = 25%).
+    // 如果约束是紧密的，我们必须是那个尺寸。
+    // 这会覆盖任何用户指定的宽度/高度（尤其是百分比），
+    // 因为父级已经将这些百分比解析为此紧密约束。
+    // 如果我们不这样做，calculateLayout 可能会再次针对约束解析百分比，
+    // 导致双重缩放（例如 50% 的 50% = 25%）。
 
     if (constraints.hasTightWidth) {
       _rootNode.width = constraints.maxWidth;
     } else if (_width != null) {
       _applyWidth(_rootNode, _width!);
     } else {
-      // For both inline and block, we default to Auto (content width) when constraints are loose.
-      // This ensures that when measured as a flex item, we report content size instead of expanding to fill available space.
-      // To get "fill width" behavior (Block-like), use width: 100% or align-self: stretch.
+      // 对于 inline 和 block，当约束宽松时，我们默认为 Auto（内容宽度）。
+      // 这确保了当作为 flex 项目进行测量时，我们报告内容大小而不是扩展以填充可用空间。
+      // 要获得“填充宽度”行为（类似 Block），请使用 width: 100% 或 align-self: stretch。
       _rootNode.setWidthAuto();
     }
 
@@ -717,7 +717,7 @@ class RenderYogaLayout extends RenderBox
       final childParentData = child.parentData as YogaLayoutParentData;
       final childNode = childParentData.yogaNode!;
 
-      // Resolve effective properties (ParentData > Child RenderObject properties)
+      // 解析有效属性（ParentData > 子 RenderObject 属性）
       YogaValue? width = childParentData.width;
       YogaValue? height = childParentData.height;
       YogaValue? minWidth = childParentData.minWidth;
@@ -750,17 +750,17 @@ class RenderYogaLayout extends RenderBox
         boxSizing ??= child._boxSizing;
       }
 
-      // 1. Sync Basic Layout Properties
+      // 1. 同步基本布局属性
       if (width != null) {
         _applyWidth(childNode, width);
       } else {
-        // If width is null, we don't reset it here because it might be auto/undefined
-        // But we should probably ensure it's auto if not set?
-        // YogaItem sets it to auto if null.
-        // Let's assume if it's null in parentData, it should be auto.
-        // In Flex layout (Yoga), children are flex items.
-        // Flex items default to auto width (content size), NOT 100% width,
-        // even if they are block-level elements.
+        // 如果 width 为 null，我们不会在这里重置它，因为它可能是 auto/undefined
+        // 但是如果未设置，我们可能应该确保它是 auto？
+        // 如果为 null，YogaItem 会将其设置为 auto。
+        // 让我们假设如果 parentData 中为 null，它应该是 auto。
+        // 在 Flex 布局 (Yoga) 中，子级是 flex 项目。
+        // Flex 项目默认为 auto 宽度（内容大小），而不是 100% 宽度，
+        // 即使它们是块级元素。
         childNode.setWidthAuto();
       }
 
@@ -797,13 +797,13 @@ class RenderYogaLayout extends RenderBox
       if (flexGrow != null) {
         childNode.flexGrow = flexGrow;
       } else {
-        childNode.flexGrow = 0; // Default
+        childNode.flexGrow = 0; // 默认
       }
 
       if (flexShrink != null) {
         childNode.flexShrink = flexShrink;
       } else {
-        // Default (Yoga default is 0, Web is 1)
+        // 默认（Yoga 默认为 0，Web 为 1）
         childNode.flexShrink = _useWebDefaults ? 1 : 0;
       }
 
@@ -827,13 +827,13 @@ class RenderYogaLayout extends RenderBox
         childNode.display = YGDisplay.flex;
       }
 
-      // 2. Sync Margins
+      // 2. 同步外边距
       _setMarginEdge(childNode, YGEdge.left, margin?.left);
       _setMarginEdge(childNode, YGEdge.top, margin?.top);
       _setMarginEdge(childNode, YGEdge.right, margin?.right);
       _setMarginEdge(childNode, YGEdge.bottom, margin?.bottom);
 
-      // 3. Apply Border Widths to YogaNode
+      // 3. 将边框宽度应用于 YogaNode
       double borderTop = 0;
       double borderRight = 0;
       double borderBottom = 0;
@@ -856,7 +856,7 @@ class RenderYogaLayout extends RenderBox
         childNode.setBorder(YGEdge.all, 0);
       }
 
-      // 4. Apply Box Sizing (Content-Box adjustment)
+      // 4. 应用盒模型（Content-Box 调整）
       if (boxSizing == YogaBoxSizing.contentBox) {
         if (width != null && width.unit == YogaUnit.point) {
           childNode.width = width.value + borderLeft + borderRight;
@@ -865,7 +865,7 @@ class RenderYogaLayout extends RenderBox
           childNode.height = height.value + borderTop + borderBottom;
         }
       } else {
-        // Re-apply width/height to ensure it's not stale from previous content-box calculation
+        // 重新应用宽度/高度以确保它不是来自先前 content-box 计算的陈旧值
         if (width != null && width.unit == YogaUnit.point) {
           childNode.width = width.value;
         }
@@ -874,7 +874,7 @@ class RenderYogaLayout extends RenderBox
         }
       }
 
-      // 5. Measure child if needed
+      // 5. 如果需要，测量子级
       bool widthIsSet =
           width != null &&
           width.unit != YogaUnit.auto &&
@@ -909,9 +909,9 @@ class RenderYogaLayout extends RenderBox
                 minWidth = width.isNaN ? 0.0 : width;
                 maxWidth = width.isNaN ? 0.0 : width;
               } else if (widthMode == YGMeasureMode.atMost) {
-                // If the child is auto width (flex item), we treat AtMost as Undefined (Infinite)
-                // to allow it to report its max-content size.
-                // This prevents premature wrapping when Yoga tries to measure with available space.
+                // 如果子级是 auto 宽度（flex 项目），我们将 AtMost 视为 Undefined (Infinite)
+                // 以允许它报告其 max-content 大小。
+                // 这可以防止 Yoga 尝试使用可用空间进行测量时过早换行。
                 bool isAutoWidth = false;
                 if (currentChild.parentData is YogaLayoutParentData) {
                   final pd = currentChild.parentData as YogaLayoutParentData;
@@ -945,7 +945,7 @@ class RenderYogaLayout extends RenderBox
 
               return currentChild.getDryLayout(constraints);
             } catch (e) {
-              // Fallback to intrinsics if dry layout fails
+              // 如果 dry layout 失败，则回退到固有特性
               try {
                 final w = currentChild.getMinIntrinsicWidth(double.infinity);
                 final h = currentChild.getMinIntrinsicHeight(w);
@@ -956,8 +956,8 @@ class RenderYogaLayout extends RenderBox
             }
           });
 
-          // If the child needs layout (e.g. image loaded, text changed), we must mark the Yoga node as dirty
-          // so that Yoga calls the measure function again.
+          // 如果子级需要布局（例如图片已加载、文本已更改），我们必须将 Yoga 节点标记为脏
+          // 以便 Yoga 再次调用测量函数。
           if (currentChild.debugNeedsLayout) {
             childNode.markDirty();
           }
@@ -1193,17 +1193,17 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _paintSelfWithDecoration(PaintingContext context, Offset offset) {
-    // 0. Background
+    // 0. 背景
     if (_background != null) {
       _paintBackground(context, offset, size, _background!);
     }
 
-    // 1. Shadow
+    // 1. 阴影
     if (_boxShadow != null) {
       _paintShadows(context, offset, size, _boxShadow!);
     }
 
-    // 2. Clip (Overflow) & Children
+    // 2. 裁剪（溢出）和子级
     if (_overflow == YogaOverflow.hidden) {
       ResolvedYogaBorder? resolvedBorder;
       if (_border != null) {
@@ -1231,9 +1231,9 @@ class RenderYogaLayout extends RenderBox
       _paintChildren(context, offset);
     }
 
-    // 3. Border
+    // 3. 边框
     if (_border != null) {
-      // We don't support border image on root for now (no ImageInfo stored in RenderObject)
+      // 我们目前不支持根节点上的边框图片（RenderObject 中未存储 ImageInfo）
       _paintBorder(context, offset, size, _border!, null);
     }
   }
@@ -1267,10 +1267,10 @@ class RenderYogaLayout extends RenderBox
         .resolve(TextDirection.ltr)
         .alongSize(child.size);
 
-    // Create the effective transform matrix
-    // We want to transform around the origin.
-    // The matrix passed in `transform` is usually just the rotation/scale.
-    // We need to: Translate(origin) -> Transform -> Translate(-origin)
+    // 创建有效的变换矩阵
+    // 我们想要围绕原点进行变换。
+    // 传入 transform 的矩阵通常只是旋转/缩放。
+    // 我们需要：Translate(origin) -> Transform -> Translate(-origin)
 
     final Matrix4 effectiveTransform =
         Matrix4.translationValues(originOffset.dx, originOffset.dy, 0.0)
@@ -1293,7 +1293,7 @@ class RenderYogaLayout extends RenderBox
     YogaLayoutParentData childParentData,
     Offset paintOffset,
   ) {
-    // Paint shadow
+    // 绘制阴影
     if (childParentData.boxShadow != null) {
       _paintShadows(
         context,
@@ -1303,7 +1303,7 @@ class RenderYogaLayout extends RenderBox
       );
     }
 
-    // Paint child
+    // 绘制子级
     ResolvedYogaBorder? resolvedBorder;
     if (childParentData.border != null) {
       resolvedBorder = childParentData.border!.resolve(TextDirection.ltr);
@@ -1336,9 +1336,9 @@ class RenderYogaLayout extends RenderBox
       context.paintChild(child, paintOffset);
     }
 
-    // Paint border
+    // 绘制边框
     if (childParentData.border != null) {
-      // Resolve border image if present (now that child has been laid out)
+      // 如果存在边框图片，则解析它（现在子级已布局）
       if (childParentData.border!.image != null) {
         _resolveBorderImage(child, childParentData);
       }
@@ -1360,16 +1360,16 @@ class RenderYogaLayout extends RenderBox
     YogaBorder border,
     ImageInfo? borderImageInfo,
   ) {
-    // Resolve border (assuming LTR for now, ideally pass TextDirection)
+    // 解析边框（目前假设为 LTR，理想情况下应传递 TextDirection）
     final resolvedBorder = border.resolve(TextDirection.ltr);
 
-    // Paint border image if available
+    // 如果可用，绘制边框图片
     if (border.image != null && borderImageInfo != null) {
       _paintBorderImage(context, offset, size, border.image!, borderImageInfo);
-      return; // If border image is painted, do we paint standard border? CSS says border-image replaces border-style.
+      return; // 如果绘制了边框图片，我们是否绘制标准边框？CSS 规定 border-image 替换 border-style。
     }
 
-    // Check if we need custom painting (dotted/dashed)
+    // 检查是否需要自定义绘制（点线/虚线）
     bool hasCustomStyle =
         resolvedBorder.top.style == YogaBorderStyle.dotted ||
         resolvedBorder.top.style == YogaBorderStyle.dashed ||
@@ -1388,7 +1388,7 @@ class RenderYogaLayout extends RenderBox
         _paintCustomBorder(context, offset, size, resolvedBorder);
       }
     } else {
-      // Use Flutter's optimized border painting for solid/none
+      // 对 solid/none 使用 Flutter 的优化边框绘制
       final flutterBorder = resolvedBorder.toFlutterBorder();
       final borderRadius = resolvedBorder.borderRadius.toFlutterBorderRadius(
         size,
@@ -1415,7 +1415,7 @@ class RenderYogaLayout extends RenderBox
     final Canvas canvas = context.canvas;
     final Rect rect = offset & size;
 
-    // Helper to paint a single side
+    // 绘制单边的辅助函数
     void paintSide(
       YogaBorderSide side,
       Offset p1,
@@ -1443,12 +1443,12 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    // We paint sides as lines.
-    // To avoid overlap issues at corners for translucent colors, we might need more complex logic.
-    // But for dashed/dotted, simple lines are usually acceptable approximation for "CSS-like" behavior in Flutter
-    // without implementing full trapezoid path clipping for every dash.
+    // 我们将边绘制为线。
+    // 为了避免半透明颜色在角落处的重叠问题，我们可能需要更复杂的逻辑。
+    // 但对于虚线/点线，简单的线条通常是 Flutter 中“类 CSS”行为的可接受近似值
+    // 而无需为每个虚线实现完整的梯形路径裁剪。
 
-    // Top
+    // 上
     if (border.top.width != null && border.top.width! > 0) {
       paintSide(
         border.top,
@@ -1458,7 +1458,7 @@ class RenderYogaLayout extends RenderBox
       );
     }
 
-    // Right
+    // 右
     if (border.right.width != null && border.right.width! > 0) {
       paintSide(
         border.right,
@@ -1468,7 +1468,7 @@ class RenderYogaLayout extends RenderBox
       );
     }
 
-    // Bottom
+    // 下
     if (border.bottom.width != null && border.bottom.width! > 0) {
       paintSide(
         border.bottom,
@@ -1478,7 +1478,7 @@ class RenderYogaLayout extends RenderBox
       );
     }
 
-    // Left
+    // 左
     if (border.left.width != null && border.left.width! > 0) {
       paintSide(
         border.left,
@@ -1501,7 +1501,7 @@ class RenderYogaLayout extends RenderBox
         .toFlutterBorderRadius(size)
         .toRRect(rect);
 
-    // Since it's uniform, we take top side properties
+    // 由于它是统一的，我们采用顶边属性
     final double width = border.top.width ?? 1.0;
     final Color color = border.top.color ?? const Color(0xFF000000);
     final YogaBorderStyle style = border.top.style ?? YogaBorderStyle.solid;
@@ -1511,7 +1511,7 @@ class RenderYogaLayout extends RenderBox
       ..strokeWidth = width
       ..style = PaintingStyle.stroke;
 
-    // Deflate by half width to stroke inside the border area (centered on the inset line)
+    // 缩小一半宽度以在边框区域内描边（以内嵌线为中心）
     final RRect innerRRect = rrect.deflate(width / 2);
     final Path path = Path()..addRRect(innerRRect);
 
@@ -1569,7 +1569,7 @@ class RenderYogaLayout extends RenderBox
     double width,
     Paint paint,
   ) {
-    // CSS dashed: usually 3*width dash, 3*width gap (or similar)
+    // CSS 虚线：通常是 3*width 实线，3*width 间隙（或类似）
     final double dashWidth = 3 * width;
     final double dashSpace = 3 * width;
     final double distance = (p2 - p1).distance;
@@ -1597,8 +1597,8 @@ class RenderYogaLayout extends RenderBox
     double width,
     Paint paint,
   ) {
-    // CSS dotted: circles with diameter = width, spaced by width (or less)
-    // We use round cap for dots
+    // CSS 点线：直径 = width 的圆，间隔为 width（或更小）
+    // 我们对点使用圆形笔帽
     final Paint dotPaint = Paint()
       ..color = paint.color
       ..strokeWidth = width
@@ -1609,7 +1609,7 @@ class RenderYogaLayout extends RenderBox
     final double dx = (p2.dx - p1.dx) / distance;
     final double dy = (p2.dy - p1.dy) / distance;
 
-    // Spacing: diameter (width) + gap (width) = 2*width
+    // 间距：直径 (width) + 间隙 (width) = 2*width
     final double step = 2 * width;
     double currentDistance = 0;
 
@@ -1632,13 +1632,13 @@ class RenderYogaLayout extends RenderBox
     final double imgW = imageInfo.image.width.toDouble();
     final double imgH = imageInfo.image.height.toDouble();
 
-    // 1. Resolve Slices (Source)
+    // 1. 解析切片（源）
     final double sliceL = _resolveValue(borderImage.slice.left, imgW);
     final double sliceT = _resolveValue(borderImage.slice.top, imgH);
     final double sliceR = _resolveValue(borderImage.slice.right, imgW);
     final double sliceB = _resolveValue(borderImage.slice.bottom, imgH);
 
-    // 2. Resolve Outsets
+    // 2. 解析外扩
     final double outsetL = _resolveValue(borderImage.outset.left, size.width);
     final double outsetT = _resolveValue(borderImage.outset.top, size.height);
     final double outsetR = _resolveValue(borderImage.outset.right, size.width);
@@ -1654,9 +1654,9 @@ class RenderYogaLayout extends RenderBox
       rect.bottom + outsetB,
     );
 
-    // 3. Resolve Border Widths (Destination)
-    // Use borderImage.width if available, otherwise fallback to slice size (common behavior if width not set)
-    // or 0 if we want to be strict. For this implementation, we use the provided width or slice.
+    // 3. 解析边框宽度（目标）
+    // 如果可用，使用 borderImage.width，否则回退到切片大小（如果未设置宽度，这是常见行为）
+    // 或者如果我们想要严格，则为 0。对于此实现，我们使用提供的宽度或切片。
     double borderL = _resolveValue(
       borderImage.width?.left ?? YogaValue.point(sliceL),
       destRect.width,
@@ -1674,7 +1674,7 @@ class RenderYogaLayout extends RenderBox
       destRect.height,
     );
 
-    // Source Rects
+    // 源矩形
     final Rect srcTL = Rect.fromLTWH(0, 0, sliceL, sliceT);
     final Rect srcTR = Rect.fromLTWH(imgW - sliceR, 0, sliceR, sliceT);
     final Rect srcBL = Rect.fromLTWH(0, imgH - sliceB, sliceL, sliceB);
@@ -1717,7 +1717,7 @@ class RenderYogaLayout extends RenderBox
       imgH - sliceT - sliceB,
     );
 
-    // Destination Rects
+    // 目标矩形
     final Rect dstTL = Rect.fromLTWH(
       destRect.left,
       destRect.top,
@@ -1778,7 +1778,7 @@ class RenderYogaLayout extends RenderBox
     final Paint paint = Paint();
     final Canvas canvas = context.canvas;
 
-    // Draw Corners (Always stretch/scale to fit corner box)
+    // 绘制角落（始终拉伸/缩放以适应角落框）
     if (!dstTL.isEmpty && !srcTL.isEmpty) {
       canvas.drawImageRect(imageInfo.image, srcTL, dstTL, paint);
     }
@@ -1792,7 +1792,7 @@ class RenderYogaLayout extends RenderBox
       canvas.drawImageRect(imageInfo.image, srcBR, dstBR, paint);
     }
 
-    // Draw Edges
+    // 绘制边缘
     _drawTile(
       canvas,
       imageInfo.image,
@@ -1826,12 +1826,12 @@ class RenderYogaLayout extends RenderBox
       isHorizontal: false,
     );
 
-    // Draw Center
+    // 绘制中心
     if (borderImage.fill) {
-      // For center, we should ideally tile in both directions.
-      // For now, let's just stretch or simple tile.
-      // Implementing full 2D tiling for center is complex and rarely used with complex repeats.
-      // Let's use stretch for center for now as a simplification, or use paintImage.
+      // 对于中心，理想情况下我们应该在两个方向上平铺。
+      // 目前，我们只是拉伸或简单平铺。
+      // 实现中心的完整 2D 平铺很复杂，并且很少用于复杂的重复。
+      // 让我们暂时使用拉伸作为简化，或者使用 paintImage。
       if (!dstCenter.isEmpty && !srcCenter.isEmpty) {
         canvas.drawImageRect(imageInfo.image, srcCenter, dstCenter, paint);
       }
@@ -1888,10 +1888,10 @@ class RenderYogaLayout extends RenderBox
         }
       }
     } else if (repeat == YogaBorderImageRepeat.repeat) {
-      // Centered tiling
+      // 居中平铺
       if (isHorizontal) {
         double x = dst.center.dx - srcW / 2;
-        // Draw center one
+        // 绘制中心一个
         canvas.drawImageRect(
           image,
           src,
@@ -1899,7 +1899,7 @@ class RenderYogaLayout extends RenderBox
           Paint(),
         );
 
-        // Draw left
+        // 绘制左侧
         double currX = x - srcW;
         while (currX + srcW > dst.left) {
           canvas.drawImageRect(
@@ -1911,7 +1911,7 @@ class RenderYogaLayout extends RenderBox
           currX -= srcW;
         }
 
-        // Draw right
+        // 绘制右侧
         currX = x + srcW;
         while (currX < dst.right) {
           canvas.drawImageRect(
@@ -1923,7 +1923,7 @@ class RenderYogaLayout extends RenderBox
           currX += srcW;
         }
       } else {
-        // Vertical centered tiling
+        // 垂直居中平铺
         double y = dst.center.dy - srcH / 2;
         canvas.drawImageRect(
           image,
@@ -1932,7 +1932,7 @@ class RenderYogaLayout extends RenderBox
           Paint(),
         );
 
-        // Draw up
+        // 向上绘制
         double currY = y - srcH;
         while (currY + srcH > dst.top) {
           canvas.drawImageRect(
@@ -1944,7 +1944,7 @@ class RenderYogaLayout extends RenderBox
           currY -= srcH;
         }
 
-        // Draw down
+        // 向下绘制
         currY = y + srcH;
         while (currY < dst.bottom) {
           canvas.drawImageRect(
@@ -1957,7 +1957,7 @@ class RenderYogaLayout extends RenderBox
         }
       }
     } else {
-      // Space or others, fallback to stretch
+      // Space 或其他，回退到拉伸
       canvas.drawImageRect(image, src, dst, Paint());
     }
 
@@ -2025,8 +2025,8 @@ class RenderYogaLayout extends RenderBox
 
       final Rect rect = (offset & size).inflate(spread).shift(Offset(dx, dy));
 
-      // We assume rectangular shadow for now as YogaItem doesn't know about borderRadius.
-      // If we want rounded shadows, we need to add borderRadius to YogaItem.
+      // 我们目前假设为矩形阴影，因为 YogaItem 不知道 borderRadius。
+      // 如果我们需要圆形阴影，我们需要将 borderRadius 添加到 YogaItem。
       context.canvas.drawRect(rect, paint);
     }
   }
@@ -2060,7 +2060,7 @@ class RenderYogaLayout extends RenderBox
     RenderBox? child = renderLayout.firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
-      // Reset effective margin
+      // 重置有效外边距
       childParentData.effectiveMargin = null;
 
       if (childParentData.yogaNode != null) {
@@ -2106,12 +2106,12 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _collapseMarginsRecursive(RenderYogaLayout renderLayout) {
-    // 1. Recurse first (Post-order traversal)
+    // 1. 首先递归（后序遍历）
     RenderBox? child = renderLayout.firstChild;
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
 
-      // Reset margins for this child
+      // 重置此子级的外边距
       childParentData.effectiveMargin = null;
       if (childParentData.yogaNode != null) {
         _resetMargins(childParentData.yogaNode!, childParentData.margin);
@@ -2123,23 +2123,23 @@ class RenderYogaLayout extends RenderBox
       child = childParentData.nextSibling;
     }
 
-    // 2. Apply Sibling Collapsing (My children)
+    // 2. 应用兄弟合并（我的子级）
     renderLayout._applySiblingCollapsing();
 
-    // 3. Apply Parent-Child Collapsing (Me and my children)
+    // 3. 应用父子合并（我和我的子级）
     renderLayout._applyParentChildCollapsing();
   }
 
   EdgeInsets _getEffectiveMargin(YogaLayoutParentData pd) {
-    // Convert YogaEdgeInsets to EdgeInsets for calculation if possible
-    // Note: We can only collapse point values in Dart.
-    // If margin is percent, we can't easily collapse it here without knowing parent width.
-    // So we fallback to 0 or whatever is safe.
+    // 如果可能，将 YogaEdgeInsets 转换为 EdgeInsets 以进行计算
+    // 注意：我们只能在 Dart 中合并点值。
+    // 如果外边距是百分比，我们在不知道父级宽度的情况下无法轻松地在此处合并它。
+    // 所以我们回退到 0 或任何安全的值。
 
-    // If effectiveMargin is set, use it.
+    // 如果设置了 effectiveMargin，请使用它。
     if (pd.effectiveMargin != null) return pd.effectiveMargin!;
 
-    // Otherwise convert pd.margin
+    // 否则转换 pd.margin
     final margin = pd.margin;
     if (margin == null) return EdgeInsets.zero;
 
@@ -2161,7 +2161,7 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _applySiblingCollapsing() {
-    // Margin collapsing only applies to vertical flow (column/column-reverse)
+    // 外边距合并仅适用于垂直流（column/column-reverse）
     final flexDirection = _rootNode.flexDirection;
     if (flexDirection != YGFlexDirection.column) {
       return;
@@ -2178,21 +2178,21 @@ class RenderYogaLayout extends RenderBox
         final childNode = childParentData.yogaNode!;
         final nextNode = nextParentData.yogaNode!;
 
-        // Skip collapsing if either margin is percentage-based
+        // 如果任一外边距基于百分比，则跳过合并
         if ((childParentData.margin?.bottom.unit == YogaUnit.percent) ||
             (nextParentData.margin?.top.unit == YogaUnit.percent)) {
           child = nextChild;
           continue;
         }
 
-        // Get effective margins
+        // 获取有效外边距
         final marginBottom = _getEffectiveMargin(childParentData).bottom;
         final marginTop = _getEffectiveMargin(nextParentData).top;
 
-        // Calculate collapsed margin
+        // 计算合并后的外边距
         final collapsedMargin = _collapse(marginBottom, marginTop);
 
-        // Apply to nodes and update effective margins
+        // 应用于节点并更新有效外边距
         childNode.setMargin(YGEdge.bottom, collapsedMargin);
         _updateEffectiveMargin(childParentData, YGEdge.bottom, collapsedMargin);
 
@@ -2210,18 +2210,18 @@ class RenderYogaLayout extends RenderBox
       return;
     }
 
-    // Top Collapsing
+    // 顶部合并
     if (_isZero(_padding?.top) && _borderWidth.top == 0) {
       final firstChild = this.firstChild;
       if (firstChild != null) {
         final childParentData = firstChild.parentData as YogaLayoutParentData;
         final childNode = childParentData.yogaNode!;
 
-        // Skip if child has percentage top margin
+        // 如果子级具有百分比顶部外边距，则跳过
         if (childParentData.margin?.top.unit == YogaUnit.percent) {
-          // Do nothing
+          // 什么也不做
         } else {
-          // My top margin
+          // 我的顶部外边距
           double myMarginTop = 0.0;
           bool myMarginIsPercent = false;
           if (parentData is YogaLayoutParentData) {
@@ -2253,7 +2253,7 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    // Bottom Collapsing
+    // 底部合并
     bool isHeightBounded;
     if (parent is RenderYogaLayout) {
       isHeightBounded =
@@ -2272,9 +2272,9 @@ class RenderYogaLayout extends RenderBox
         final childParentData = lastChild.parentData as YogaLayoutParentData;
         final childNode = childParentData.yogaNode!;
 
-        // Skip if child has percentage bottom margin
+        // 如果子级具有百分比底部外边距，则跳过
         if (childParentData.margin?.bottom.unit == YogaUnit.percent) {
-          // Do nothing
+          // 什么也不做
         } else {
           double myMarginBottom = 0.0;
           bool myMarginIsPercent = false;
@@ -2331,7 +2331,7 @@ class RenderYogaLayout extends RenderBox
         break;
       case YogaUnit.auto:
         //
-        // Yoga doesn't have setPaddingAuto.
+        // Yoga 没有 setPaddingAuto。
         node.setPadding(edge, 0);
         break;
       case YogaUnit.undefined:
@@ -2352,13 +2352,13 @@ class RenderYogaLayout extends RenderBox
 
   double _collapse(double m1, double m2) {
     if (m1 >= 0 && m2 >= 0) {
-      // Both positive: max
+      // 两者都为正：取最大值
       return math.max(m1, m2);
     } else if (m1 < 0 && m2 < 0) {
-      // Both negative: min (most negative)
+      // 两者都为负：取最小值（最负）
       return math.min(m1, m2);
     } else {
-      // One positive, one negative: sum
+      // 一正一负：求和
       return m1 + m2;
     }
   }
@@ -2373,7 +2373,7 @@ class RenderYogaLayout extends RenderBox
           _rootNode.flexDirection == YGFlexDirection.rowReverse;
 
       if (isRow) {
-        // In Row, textAlign maps to justifyContent
+        // 在 Row 中，textAlign 映射到 justifyContent
         if (_justifyContent == null) {
           switch (_textAlign!) {
             case TextAlign.left:
@@ -2393,7 +2393,7 @@ class RenderYogaLayout extends RenderBox
           }
         }
       } else {
-        // In Column, textAlign maps to alignItems
+        // 在 Column 中，textAlign 映射到 alignItems
         if (_alignItems == null) {
           switch (_textAlign!) {
             case TextAlign.left:
@@ -2428,7 +2428,7 @@ class RenderYogaLayout extends RenderBox
     final Canvas canvas = context.canvas;
     final Rect rect = offset & size;
 
-    // 1. Background Color
+    // 1. 背景颜色
     if (background.color != null) {
       RRect? rrect;
       if (_border != null) {
@@ -2448,7 +2448,7 @@ class RenderYogaLayout extends RenderBox
       }
     }
 
-    // 2. Background Image
+    // 2. 背景图片
     if (background.image != null && _backgroundImageInfo != null) {
       _paintBackgroundImage(
         context,
@@ -2469,7 +2469,7 @@ class RenderYogaLayout extends RenderBox
   ) {
     Rect positioningArea = offset & size;
 
-    // Adjust for origin
+    // 调整原点
     EdgeInsets border = EdgeInsets.zero;
     if (_border != null) {
       final resolved = _border!.resolve(TextDirection.ltr);
@@ -2497,7 +2497,7 @@ class RenderYogaLayout extends RenderBox
       positioningArea = border.deflateRect(positioningArea);
     }
 
-    // Clip to border radius
+    // 裁剪到边框半径
     RRect? clipRRect;
     if (_border != null) {
       final resolvedBorder = _border!.resolve(TextDirection.ltr);
@@ -2522,11 +2522,11 @@ class RenderYogaLayout extends RenderBox
     );
 
     if (background.size.mode == YogaBackgroundSizeMode.explicit) {
-      // If explicit size, we calculate the target rect size
+      // 如果是显式尺寸，我们计算目标矩形尺寸
       double w = _resolveValue(background.size.width, positioningArea.width);
       double h = _resolveValue(background.size.height, positioningArea.height);
 
-      // If auto, use image size
+      // 如果是 auto，使用图片尺寸
       if (background.size.width.unit == YogaUnit.auto) {
         w = imageInfo.image.width.toDouble();
       }
@@ -2534,16 +2534,16 @@ class RenderYogaLayout extends RenderBox
         h = imageInfo.image.height.toDouble();
       }
 
-      // If no-repeat, we can simulate explicit size by adjusting drawingRect
+      // 如果是 no-repeat，我们可以通过调整 drawingRect 来模拟显式尺寸
       if (background.repeat == ImageRepeat.noRepeat) {
-        // Align the smaller rect within positioningArea
+        // 在 positioningArea 内对齐较小的矩形
         drawingRect = alignment.inscribe(Size(w, h), positioningArea);
         fit = BoxFit.fill;
-        alignment = Alignment.center; // Already aligned by inscribe
+        alignment = Alignment.center; // 已通过 inscribe 对齐
       } else {
-        // If repeat, paintImage ignores fit/size.
-        // We can't easily support explicit size with repeat using paintImage.
-        // Fallback to auto/none.
+        // 如果是 repeat，paintImage 会忽略 fit/size。
+        // 我们无法使用 paintImage 轻松支持带有 repeat 的显式尺寸。
+        // 回退到 auto/none。
         fit = BoxFit.none;
       }
     } else {
@@ -2556,14 +2556,14 @@ class RenderYogaLayout extends RenderBox
           break;
         case YogaBackgroundSizeMode.auto:
         default:
-          // Use scaleDown to ensure image is visible even if larger than container,
-          // and behaves like none (original size) if smaller.
+          // 使用 scaleDown 确保图片即使比容器大也可见，
+          // 如果较小，则表现得像 none（原始尺寸）。
           fit = BoxFit.scaleDown;
           break;
       }
     }
 
-    // Debug print
+    // 调试打印
     // debugPrint(
     //   'Painting background: mode=${background.size.mode}, fit=$fit, repeat=${background.repeat}, rect=$drawingRect, image=${imageInfo.image.width}x${imageInfo.image.height}',
     // );
@@ -2587,11 +2587,11 @@ class RenderYogaLayout extends RenderBox
     if (pos.x.unit == YogaUnit.percent) {
       x = (pos.x.value * 2 / 100) - 1.0;
     } else if (pos.x.unit == YogaUnit.point) {
-      // Alignment doesn't support points easily without knowing size.
-      // But paintImage uses Alignment to position within rect.
-      // If we have points, we can't map to -1..1 without size.
-      // But we can approximate or default to center/start.
-      // Let's assume 0 if point.
+      // 在不知道尺寸的情况下，Alignment 不容易支持点。
+      // 但是 paintImage 使用 Alignment 在 rect 内定位。
+      // 如果我们有点，在没有尺寸的情况下无法映射到 -1..1。
+      // 但我们可以近似或默认为 center/start。
+      // 如果是点，让我们假设为 0。
       x = -1.0;
     }
 
@@ -2631,26 +2631,26 @@ class RenderYogaLayout extends RenderBox
         double.infinity,
       );
 
-      // Add margins (only fixed points, auto is 0)
+      // 添加外边距（仅固定点，auto 为 0）
       EdgeInsets tempMargin = _getEffectiveMargin(tempPd);
       double totalChildW =
           childIntrinsicWidth + tempMargin.left + tempMargin.right;
 
-      // Check if child is inline
+      // 检查子级是否为 inline
       bool isInline = false;
       if (tempPd.display == YogaDisplay.inline ||
           tempPd.display == YogaDisplay.inlineBlock) {
         isInline = true;
       } else if (tempPd.display == null) {
-        // Default to inline if not specified (e.g. Text widgets)
-        // But wait, RenderYogaLayout defaults to block if not specified?
-        // No, in _performCSSBlockLayout we default to inline for non-explicit block.
-        // Let's match that logic.
+        // 如果未指定，则默认为 inline（例如 Text 组件）
+        // 但是等等，RenderYogaLayout 如果未指定则默认为 block？
+        // 不，在 _performCSSBlockLayout 中，对于非显式 block，我们默认为 inline。
+        // 让我们匹配那个逻辑。
         if (tempChild is RenderYogaLayout) {
-          // Nested YogaLayout defaults to block if display is null
+          // 如果 display 为 null，嵌套的 YogaLayout 默认为 block
           isInline = false;
         } else {
-          // Other widgets (Text, Image) default to inline
+          // 其他组件（Text, Image）默认为 inline
           isInline = true;
         }
       }
@@ -2658,7 +2658,7 @@ class RenderYogaLayout extends RenderBox
       if (isInline) {
         currentLineW += totalChildW;
       } else {
-        // Block element breaks the line
+        // 块级元素换行
         if (currentLineW > maxContentW) {
           maxContentW = currentLineW;
         }
@@ -2672,12 +2672,12 @@ class RenderYogaLayout extends RenderBox
       tempChild = tempPd.nextSibling;
     }
 
-    // Check last line
+    // 检查最后一行
     if (currentLineW > maxContentW) {
       maxContentW = currentLineW;
     }
 
-    // Add a small epsilon to prevent sub-pixel wrapping issues
+    // 添加一个小的 epsilon 以防止亚像素换行问题
     return maxContentW + 0.5;
   }
 
@@ -2689,9 +2689,9 @@ class RenderYogaLayout extends RenderBox
     if (_display == YogaDisplay.block) {
       return _performCSSBlockLayout(constraints, dryRun: true).baseline;
     }
-    // For Flex layout, we can't easily compute dry baseline without full layout
-    // unless we replicate Yoga's logic.
-    // For now, return null which is default behavior.
+    // 对于 Flex 布局，如果不进行完整布局，我们无法轻松计算 dry baseline
+    // 除非我们复制 Yoga 的逻辑。
+    // 目前，返回 null，这是默认行为。
     return null;
   }
 
@@ -2699,7 +2699,7 @@ class RenderYogaLayout extends RenderBox
     BoxConstraints constraints, {
     bool dryRun = false,
   }) {
-    // Resolve Padding & Border
+    // 解析内边距和边框
     final double paddingLeft = _resolveValue(
       _padding?.left ?? YogaValue.zero,
       constraints.maxWidth,
@@ -2727,7 +2727,7 @@ class RenderYogaLayout extends RenderBox
     final double contentRight = paddingRight + border.right;
     final double contentBottom = paddingBottom + border.bottom;
 
-    // Resolve explicit size if set
+    // 如果设置，解析显式尺寸
     double? resolvedParentWidth = _resolveDimension(
       _width,
       constraints.maxWidth,
@@ -2749,13 +2749,13 @@ class RenderYogaLayout extends RenderBox
         contentBottom;
     if (availableHeight < 0) availableHeight = 0;
 
-    // Check if we are a flex item (child of a Flex container)
+    // 检查我们是否为 flex 项目（Flex 容器的子级）
     bool isFlexItem = false;
     if (parent is RenderYogaLayout) {
       isFlexItem = (parent as RenderYogaLayout)._display == YogaDisplay.flex;
     }
 
-    // Pre-pass: If we are fit-content, calculate intrinsic width from children
+    // 预处理：如果我们是 fit-content，则从子级计算固有宽度
     bool isSelfFitContent =
         _width?.unit == YogaUnit.fitContent ||
         _width?.unit == YogaUnit.maxContent ||
@@ -2765,7 +2765,7 @@ class RenderYogaLayout extends RenderBox
     if (isSelfFitContent && !constraints.hasTightWidth) {
       double maxContentW = _computeBlockMaxContentWidth();
 
-      // Shrink availableWidth to fit content, but respect constraints
+      // 收缩 availableWidth 以适应内容，但遵守约束
       if (availableWidth > maxContentW) {
         availableWidth = maxContentW;
       }
@@ -2776,10 +2776,10 @@ class RenderYogaLayout extends RenderBox
     double previousBottomMargin = 0;
     double currentLineHeight = 0;
 
-    // Track baselines for the current line
+    // 跟踪当前行的基线
     double maxAscent = 0;
 
-    // Track max content width for fit-content/auto width
+    // 跟踪 fit-content/auto 宽度的最大内容宽度
     double maxContentWidth = 0;
 
     RenderBox? child = firstChild;
@@ -2790,16 +2790,23 @@ class RenderYogaLayout extends RenderBox
     void flushLine() {
       if (currentLineChildren.isEmpty) return;
 
-      // Update maxContentWidth with the current line width
+      // 使用当前行宽更新 maxContentWidth
       if (cursorX > maxContentWidth) {
         maxContentWidth = cursorX;
       }
 
-      // If we are flushing a line, it starts AFTER the previous block's bottom margin.
+      // 如果我们正在刷新一行，它从上一个块的底部外边距之后开始。
       cursorY += previousBottomMargin;
       previousBottomMargin = 0;
 
-      // Calculate alignment offset
+      // 计算对齐偏移
+      // 注意：text-align 应该只影响行内内容（inline flow）。
+      // 如果这一行包含 Block 元素，通常不应该应用 text-align（除非它是 inline-block）。
+      // 但在这里，我们把所有非 Block 的东西都视为行内流的一部分。
+      // 如果 currentLineChildren 中有 Block 元素，flushLine 会在它之前被调用，
+      // 所以 currentLineChildren 应该只包含 inline/inline-block 元素。
+      // 唯一的例外是如果 Block 元素本身是 inline-block。
+
       double alignmentOffset = 0;
       if (_textAlign != null && availableWidth.isFinite) {
         double freeSpace = availableWidth - cursorX;
@@ -2852,7 +2859,7 @@ class RenderYogaLayout extends RenderBox
     while (child != null) {
       final childParentData = child.parentData as YogaLayoutParentData;
 
-      // Resolve effective properties
+      // 解析有效属性
       YogaValue? width = childParentData.width;
       YogaValue? height = childParentData.height;
       YogaValue? minWidth = childParentData.minWidth;
@@ -2901,12 +2908,12 @@ class RenderYogaLayout extends RenderBox
       bool isBlock =
           display == YogaDisplay.block || display == YogaDisplay.flex;
       if (display == null) {
-        // In CSS Block Layout, we default to inline to support text flow naturally.
-        // Explicit block elements (like nested YogaLayouts) will have display: block set.
+        // 在 CSS 块级布局中，我们默认为 inline 以支持文本自然流动。
+        // 显式块级元素（如嵌套的 YogaLayouts）将设置 display: block。
         isBlock = false;
       }
 
-      // Force block behavior for nested RenderYogaLayouts if they are not explicitly inline
+      // 如果嵌套的 RenderYogaLayouts 未显式设置为 inline，则强制其为 block 行为
       if (child is RenderYogaLayout &&
           display != YogaDisplay.inline &&
           display != YogaDisplay.inlineBlock) {
@@ -2944,7 +2951,7 @@ class RenderYogaLayout extends RenderBox
             minW = minIntrinsic;
             maxW = double.infinity;
           } else {
-            // fit-content
+            // fit-content (适应内容)
             minW = minIntrinsic;
             maxW = math.max(childAvailableWidth, minIntrinsic);
           }
@@ -2979,7 +2986,7 @@ class RenderYogaLayout extends RenderBox
           maxH = resolvedHeight;
         }
 
-        // Sanity check to prevent infinite minHeight which crashes Flutter
+        // 健全性检查以防止导致 Flutter 崩溃的无限 minHeight
         if (minH.isInfinite) {
           minH = 0;
         }
@@ -2991,7 +2998,7 @@ class RenderYogaLayout extends RenderBox
           maxHeight: maxH,
         );
       } else {
-        // Inline elements
+        // 行内元素
         bool isFitContent = width?.unit == YogaUnit.fitContent;
         bool isMaxContent = width?.unit == YogaUnit.maxContent;
         bool isMinContent = width?.unit == YogaUnit.minContent;
@@ -3009,7 +3016,7 @@ class RenderYogaLayout extends RenderBox
             minW = minIntrinsic;
             maxW = double.infinity;
           } else {
-            // fit-content
+            // fit-content (适应内容)
             minW = minIntrinsic;
             maxW = math.max(availableWidth, minIntrinsic);
           }
@@ -3041,7 +3048,7 @@ class RenderYogaLayout extends RenderBox
           maxH = resolvedHeight;
         }
 
-        // Sanity check to prevent infinite minHeight which crashes Flutter
+        // 健全性检查以防止导致 Flutter 崩溃的无限 minHeight
         if (minH.isInfinite) {
           minH = 0;
         }
@@ -3073,43 +3080,23 @@ class RenderYogaLayout extends RenderBox
       if (isBlock) {
         flushLine();
 
-        // Horizontal Margin Auto Resolution
+        // 水平外边距自动解析
         double marginLeft = childMargin.left;
 
         bool isMarginLeftAuto = margin?.left.unit == YogaUnit.auto;
         bool isMarginRightAuto = margin?.right.unit == YogaUnit.auto;
 
-        // Check for textAlign on the item (overrides margin auto for alignment purposes if we treat it as such)
-        // Or works alongside it.
-        // If textAlign is set, we use it to align the block.
-        TextAlign? itemTextAlign = childParentData.textAlign;
-        // If child is RenderYogaLayout, we might have synced textAlign in _syncChildren, but that was for YogaNode.
-        // Here we are in layout loop. We should check if we need to sync again or if childParentData has it.
-        // childParentData.textAlign is what we set in YogaItem.
-        // If child is RenderYogaLayout, we might want to use its _textAlign if not set in ParentData?
-        if (itemTextAlign == null && child is RenderYogaLayout) {
-          itemTextAlign = child._textAlign;
-        }
+        // 检查项目上的 textAlign（如果我们将它视为对齐方式，则覆盖 margin auto）
+        // 或者与它一起工作。
+        // 如果设置了 textAlign，我们使用它来对齐块。
+        // TextAlign? itemTextAlign = childParentData.textAlign;
 
-        if (itemTextAlign != null && availableWidth.isFinite) {
-          double availableSpace =
-              availableWidth - childW - childMargin.left - childMargin.right;
-          if (availableSpace > 0) {
-            switch (itemTextAlign) {
-              case TextAlign.center:
-                marginLeft += availableSpace / 2;
-                break;
-              case TextAlign.right:
-              case TextAlign.end:
-                marginLeft += availableSpace;
-                break;
-              default:
-                break;
-            }
-          }
-        } else if ((isMarginLeftAuto || isMarginRightAuto) &&
+        // 修正：完全移除基于 textAlign 调整 Block 元素位置的逻辑。
+        // Block 元素的位置只受 margin (auto) 影响。
+
+        if ((isMarginLeftAuto || isMarginRightAuto) &&
             availableWidth.isFinite) {
-          // childMargin has 0 for auto, so we just subtract the fixed parts (if any) and child width
+          // childMargin 对于 auto 为 0，所以我们只减去固定部分（如果有）和子项宽度
           double availableSpace =
               availableWidth - childW - childMargin.left - childMargin.right;
 
@@ -3119,15 +3106,15 @@ class RenderYogaLayout extends RenderBox
             } else if (isMarginLeftAuto) {
               marginLeft += availableSpace;
             }
-            // If only right is auto, marginLeft remains as is (aligned left), which is correct.
+            // 如果只有右边是 auto，marginLeft 保持原样（左对齐），这是正确的。
           }
         }
 
-        // Sibling Margin Collapsing
+        // 兄弟外边距折叠
         double marginTop = childMargin.top;
         double marginBottom = childMargin.bottom;
 
-        // Collapse with previous bottom margin
+        // 与前一个底部外边距折叠
         double effectiveSpacing;
         if (_enableMarginCollapsing) {
           effectiveSpacing = _collapse(previousBottomMargin, marginTop);
@@ -3135,8 +3122,8 @@ class RenderYogaLayout extends RenderBox
           effectiveSpacing = previousBottomMargin + marginTop;
         }
 
-        // Position child
-        // cursorY is at the bottom of the previous element's border box.
+        // 定位子项
+        // cursorY 位于前一个元素边框盒的底部。
         double childY = cursorY + effectiveSpacing;
 
         if (!dryRun) {
@@ -3146,7 +3133,7 @@ class RenderYogaLayout extends RenderBox
           );
         }
 
-        // Track width for block elements
+        // 跟踪块级元素的宽度
         double totalChildW = childW + childMargin.left + childMargin.right;
         if (totalChildW > maxContentWidth) {
           maxContentWidth = totalChildW;
@@ -3181,7 +3168,7 @@ class RenderYogaLayout extends RenderBox
                 TextBaseline.alphabetic,
               );
             } catch (e) {
-              // Ignore if getDryBaseline is not supported or fails
+              // 如果不支持 getDryBaseline 或失败，则忽略
             }
           } else {
             distanceToBaseline = child.getDistanceToBaseline(
@@ -3203,7 +3190,7 @@ class RenderYogaLayout extends RenderBox
 
     flushLine();
 
-    // Add remaining bottom margin to height
+    // 将剩余的底部外边距添加到高度
     cursorY += previousBottomMargin;
 
     double contentWidth = maxContentWidth + contentLeft + contentRight;
@@ -3243,16 +3230,15 @@ class RenderYogaLayout extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    // Check if we need to paint our own decoration
-    // If parent is RenderYogaLayout, it paints our decoration (border, shadow, transform)
-    // based on our parentData.
+    // 检查我们需要绘制自己的装饰
+    // 如果父级是 RenderYogaLayout，它会根据我们的 parentData 绘制我们的装饰（边框、阴影、变换）。
     bool parentHandlesDecoration = parent is RenderYogaLayout;
 
     if (parentHandlesDecoration) {
-      // Even if parent handles decoration (border, shadow, transform),
-      // we are still responsible for painting our own background.
-      // The parent paints shadow BEFORE calling us, and border AFTER calling us.
-      // So we just need to paint background and then children.
+      // 即使父级处理装饰（边框、阴影、变换），
+      // 我们仍然负责绘制自己的背景。
+      // 父级在调用我们之前绘制阴影，在调用我们之后绘制边框。
+      // 所以我们只需要绘制背景然后绘制子项。
       if (_background != null) {
         _paintBackground(context, offset, size, _background!);
       }
@@ -3264,8 +3250,8 @@ class RenderYogaLayout extends RenderBox
 
   @override
   double? computeDistanceToActualBaseline(TextBaseline baseline) {
-    // Return the baseline of the first child that has a baseline.
-    // This is a simplified behavior but covers most cases for Flex/Flow containers.
+    // 返回具有基线的第一个子项的基线。
+    // 这是一个简化的行为，但涵盖了 Flex/Flow 容器的大多数情况。
     RenderBox? child = firstChild;
     while (child != null) {
       final double? result = child.getDistanceToActualBaseline(baseline);
