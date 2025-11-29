@@ -12,6 +12,7 @@ class ScrollingPage extends StatelessWidget {
         child: Container(
           color: Colors.grey[200],
           child: YogaLayout(
+            display: YogaDisplay.flex,
             flexDirection: YGFlexDirection.column,
             alignItems: YGAlign.stretch,
             padding: const YogaEdgeInsets.all(YogaValue.point(10)),

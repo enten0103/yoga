@@ -10,6 +10,7 @@ class IntrinsicSizingPage extends StatelessWidget {
       appBar: AppBar(title: const Text('Intrinsic Sizing')),
       body: SingleChildScrollView(
         child: YogaLayout(
+          display: YogaDisplay.flex,
           width: YogaValue.percent(100),
           height: YogaValue.auto(),
           flexDirection: YGFlexDirection.column,
@@ -43,10 +44,9 @@ class IntrinsicSizingPage extends StatelessWidget {
             const SizedBox(height: 10),
             Container(
               width: 200,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-              ),
+              decoration: BoxDecoration(border: Border.all(color: Colors.grey)),
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 width: YogaValue.point(200),
                 flexDirection: YGFlexDirection.column,
                 children: [
@@ -86,7 +86,10 @@ class IntrinsicSizingPage extends StatelessWidget {
       children: [
         Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 5),
-        Text(description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Text(
+          description,
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
         const SizedBox(height: 5),
         Container(
           color: Colors.grey.shade200,
@@ -99,9 +102,7 @@ class IntrinsicSizingPage extends StatelessWidget {
                 padding: YogaEdgeInsets.all(YogaValue.point(10)),
                 background: YogaBackground(color: Colors.blue.shade200),
                 children: [
-                  Text(
-                    'This is some text content to test intrinsic sizing.',
-                  ),
+                  Text('This is some text content to test intrinsic sizing.'),
                 ],
               ),
             ],
@@ -117,10 +118,7 @@ class IntrinsicSizingPage extends StatelessWidget {
       padding: YogaEdgeInsets.all(YogaValue.point(5)),
       background: YogaBackground(color: color),
       children: [
-        Text(
-          'Content for $label',
-          style: const TextStyle(fontSize: 12),
-        ),
+        Text('Content for $label', style: const TextStyle(fontSize: 12)),
       ],
     );
   }

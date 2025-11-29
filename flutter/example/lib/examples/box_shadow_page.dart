@@ -26,6 +26,7 @@ class _BoxShadowPageState extends State<BoxShadowPage> {
               color: Colors.grey[200],
               child: Center(
                 child: YogaLayout(
+                  display: YogaDisplay.flex,
                   width: YogaValue.pct(100),
                   height: YogaValue.point(300),
                   justifyContent: YGJustify.center,

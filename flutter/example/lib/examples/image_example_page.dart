@@ -9,6 +9,7 @@ class ImageExamplePage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Image Example')),
       body: YogaLayout(
+        display: YogaDisplay.flex,
         useWebDefaults: true,
         justifyContent: YGJustify.center,
         alignItems: YGAlign.center,

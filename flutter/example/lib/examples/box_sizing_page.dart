@@ -9,6 +9,7 @@ class BoxSizingPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Box Sizing')),
       body: YogaLayout(
+        display: YogaDisplay.flex,
         flexDirection: YGFlexDirection.column,
         alignItems: YGAlign.center,
         justifyContent: YGJustify.center,

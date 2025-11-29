@@ -44,6 +44,7 @@ class MinMaxPage extends StatelessWidget {
             Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 useWebDefaults: true,
                 width: YogaValue.percent(100),
                 height: YogaValue.point(100),
@@ -70,6 +71,7 @@ class MinMaxPage extends StatelessWidget {
             Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 useWebDefaults: true,
                 width: YogaValue.percent(100),
                 height: YogaValue.point(150),
@@ -93,14 +95,14 @@ class MinMaxPage extends StatelessWidget {
                 ],
               ),
             ),
-
             _buildSectionTitle('4. Max Height (50pt)'),
             Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 useWebDefaults: true,
                 width: YogaValue.percent(100),
-                height: YogaValue.point(150),
+                height: YogaValue.point(100),
                 alignItems: YGAlign.center,
                 justifyContent: YGJustify.center,
                 children: [

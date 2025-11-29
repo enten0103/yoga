@@ -15,6 +15,7 @@ class BackgroundPage extends StatelessWidget {
             _buildSection(
               'Background Color',
               YogaLayout(
+                display: YogaDisplay.flex,
                 width: YogaValue.point(200),
                 height: YogaValue.point(100),
                 background: const YogaBackground(color: Colors.blue),
@@ -33,6 +34,7 @@ class BackgroundPage extends StatelessWidget {
             _buildSection(
               'Background Image (Cover)',
               YogaLayout(
+                display: YogaDisplay.flex,
                 width: YogaValue.point(200),
                 height: YogaValue.point(200),
                 background: const YogaBackground(
@@ -58,6 +60,7 @@ class BackgroundPage extends StatelessWidget {
             _buildSection(
               'Background Image (Contain, No Repeat)',
               YogaLayout(
+                display: YogaDisplay.flex,
                 width: YogaValue.point(200),
                 height: YogaValue.point(200),
                 background: const YogaBackground(
@@ -86,6 +89,7 @@ class BackgroundPage extends StatelessWidget {
             _buildSection(
               'Background Origin (Padding Box vs Content Box)',
               YogaLayout(
+                display: YogaDisplay.flex,
                 flexDirection: YGFlexDirection.row,
                 justifyContent: YGJustify.spaceAround,
                 width: YogaValue.percent(100),

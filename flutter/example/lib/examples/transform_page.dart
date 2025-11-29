@@ -9,6 +9,7 @@ class TransformPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Transform & Origin')),
       body: YogaLayout(
+        display: YogaDisplay.flex,
         flexDirection: YGFlexDirection.column,
         alignItems: YGAlign.center,
         justifyContent: YGJustify.center,

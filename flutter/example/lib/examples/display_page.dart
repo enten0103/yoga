@@ -26,6 +26,7 @@ class _DisplayPageState extends State<DisplayPage> {
             child: Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 flexDirection: YGFlexDirection.row,
                 alignItems: YGAlign.center,
                 justifyContent: YGJustify.spaceAround,

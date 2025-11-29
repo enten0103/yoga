@@ -27,6 +27,7 @@ class _SpacingPageState extends State<SpacingPage> {
                 child: Container(
                   color: Colors.white,
                   child: YogaLayout(
+                    display: YogaDisplay.flex,
                     width: YogaValue.pt(300),
                     height: YogaValue.pt(300),
                     flexDirection: YGFlexDirection.column,

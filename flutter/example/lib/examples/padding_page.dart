@@ -62,6 +62,7 @@ class _PaddingPageState extends State<PaddingPage> {
             color: Colors.grey[300],
             width: double.infinity,
             child: YogaLayout(
+              display: YogaDisplay.flex,
               useWebDefaults: _useWebDefaults,
               flexDirection: YGFlexDirection.row,
               padding: const YogaEdgeInsets.all(YogaValue.point(20)),
@@ -96,6 +97,7 @@ class _PaddingPageState extends State<PaddingPage> {
             color: Colors.grey[300],
             width: double.infinity,
             child: YogaLayout(
+              display: YogaDisplay.flex,
               useWebDefaults: _useWebDefaults,
               flexDirection: YGFlexDirection.column,
               padding: const YogaEdgeInsets.all(YogaValue.percent(10)),
@@ -128,6 +130,7 @@ class _PaddingPageState extends State<PaddingPage> {
             color: Colors.grey[300],
             width: double.infinity,
             child: YogaLayout(
+              display: YogaDisplay.flex,
               useWebDefaults: _useWebDefaults,
               flexDirection: YGFlexDirection.column,
               padding: const YogaEdgeInsets.symmetric(

@@ -12,6 +12,7 @@ class NestedLayoutPage extends StatelessWidget {
         color: Colors.grey[200],
         child: YogaLayout(
           // Root Layout
+          display: YogaDisplay.flex,
           useWebDefaults: true,
           enableMarginCollapsing: true,
           flexDirection: YGFlexDirection.column,
@@ -21,6 +22,7 @@ class NestedLayoutPage extends StatelessWidget {
           children: [
             // 1. Header (Nested YogaLayout with fixed height)
             YogaLayout(
+              display: YogaDisplay.flex,
               height: YogaValue.point(60),
               margin: const YogaEdgeInsets.only(bottom: YogaValue.point(20)),
               border: YogaBorder.all(
@@ -46,15 +48,17 @@ class NestedLayoutPage extends StatelessWidget {
                 ),
               ],
             ),
-
             // 2. Main Body (Nested YogaLayout with flexGrow: 1)
             YogaLayout(
+              display: YogaDisplay.flex,
               useWebDefaults: true,
               flexGrow: 1, // Fills remaining vertical space
               flexDirection: YGFlexDirection.row,
               children: [
                 // 2.1 Sidebar (Nested YogaLayout with fixed width)
                 YogaLayout(
+                  display: YogaDisplay.flex,
+                  flexDirection: YGFlexDirection.column,
                   width: YogaValue.point(100),
                   margin: const YogaEdgeInsets.only(right: YogaValue.point(20)),
                   padding: const YogaEdgeInsets.all(YogaValue.point(10)),

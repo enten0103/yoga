@@ -25,6 +25,7 @@ class _FlexPropertiesPageState extends State<FlexPropertiesPage> {
             child: Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 flexDirection: YGFlexDirection.row,
                 alignItems: YGAlign.center,
                 padding: const YogaEdgeInsets.all(YogaValue.point(10)),

@@ -87,6 +87,7 @@ class _MarginPageState extends State<MarginPage> {
             width: double.infinity,
             height: 200,
             child: YogaLayout(
+              display: YogaDisplay.flex,
               enableMarginCollapsing: _enableMarginCollapsing,
               flexDirection: YGFlexDirection.column,
               alignItems: YGAlign.center,

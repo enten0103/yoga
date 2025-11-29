@@ -24,6 +24,7 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
             child: Container(
               color: Colors.grey[200],
               child: YogaLayout(
+                display: YogaDisplay.flex,
                 flexDirection: _flexDirection,
                 justifyContent: _justifyContent,
                 alignItems: _alignItems,
@@ -83,13 +84,18 @@ class _BasicLayoutPageState extends State<BasicLayoutPage> {
             },
             (val) => setState(() => _justifyContent = val!),
           ),
-          _buildDropdown<int>("交叉轴对齐 (Align Items)", _alignItems, {
-            "Stretch (拉伸)": YGAlign.stretch,
-            "Flex Start (起点)": YGAlign.flexStart,
-            "Center (居中)": YGAlign.center,
-            "Flex End (终点)": YGAlign.flexEnd,
-            "Baseline (基线)": YGAlign.baseline,
-          }, (val) => setState(() => _alignItems = val!)),
+          _buildDropdown<int>(
+            "交叉轴对齐 (Align Items)",
+            _alignItems,
+            {
+              "Stretch (拉伸)": YGAlign.stretch,
+              "Flex Start (起点)": YGAlign.flexStart,
+              "Center (居中)": YGAlign.center,
+              "Flex End (终点)": YGAlign.flexEnd,
+              "Baseline (基线)": YGAlign.baseline,
+            },
+            (val) => setState(() => _alignItems = val!),
+          ),
         ],
       ),
     );
