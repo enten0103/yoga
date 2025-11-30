@@ -15,7 +15,7 @@ export '../yoga_background.dart';
 export 'yoga_scroll_controller.dart';
 
 class YogaLayout extends StatelessWidget {
-  final int flexDirection;
+  final int? flexDirection;
   final int? justifyContent;
   final int? alignItems;
   final int alignContent;
@@ -55,7 +55,7 @@ class YogaLayout extends StatelessWidget {
 
   const YogaLayout({
     super.key,
-    this.flexDirection = YGFlexDirection.column,
+    this.flexDirection,
     this.justifyContent,
     this.alignItems = YGAlign.baseline,
     this.alignContent = YGAlign.flexStart,
@@ -91,6 +91,12 @@ class YogaLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final int effectiveFlexDirection =
+        flexDirection ??
+        (display == YogaDisplay.flex
+            ? YGFlexDirection.row
+            : YGFlexDirection.column);
+
     if (scroll) {
       Widget sliver = _SliverYogaLayout(
         delegate: SliverChildBuilderDelegate(
@@ -100,7 +106,7 @@ class YogaLayout extends StatelessWidget {
           addRepaintBoundaries: false,
           addSemanticIndexes: false,
         ),
-        flexDirection: flexDirection,
+        flexDirection: effectiveFlexDirection,
         justifyContent: justifyContent,
         alignItems: alignItems,
         useWebDefaults: useWebDefaults,
@@ -118,6 +124,11 @@ class YogaLayout extends StatelessWidget {
       return _YogaLayoutScope(
         isSliver: true,
         child: CustomScrollView(
+          scrollDirection:
+              (effectiveFlexDirection == YGFlexDirection.row ||
+                  effectiveFlexDirection == YGFlexDirection.rowReverse)
+              ? Axis.horizontal
+              : Axis.vertical,
           controller: controller,
           slivers: [sliver],
         ),
@@ -127,7 +138,7 @@ class YogaLayout extends StatelessWidget {
     return _YogaLayoutScope(
       isSliver: false,
       child: _YogaLayoutBox(
-        flexDirection: flexDirection,
+        flexDirection: effectiveFlexDirection,
         justifyContent: justifyContent,
         alignItems: alignItems,
         alignContent: alignContent,
