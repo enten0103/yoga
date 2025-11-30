@@ -12,6 +12,7 @@ import 'package:flutter_yoga/src/rendering/yoga_sliver_layout.dart';
 export '../yoga_value.dart';
 export '../yoga_border.dart';
 export '../yoga_background.dart';
+export 'yoga_scroll_controller.dart';
 
 class YogaLayout extends StatelessWidget {
   final int flexDirection;
@@ -54,7 +55,7 @@ class YogaLayout extends StatelessWidget {
 
   const YogaLayout({
     super.key,
-    this.flexDirection = YGFlexDirection.row,
+    this.flexDirection = YGFlexDirection.column,
     this.justifyContent,
     this.alignItems = YGAlign.baseline,
     this.alignContent = YGAlign.flexStart,
@@ -109,6 +110,7 @@ class YogaLayout extends StatelessWidget {
               alignItems: alignItems,
               useWebDefaults: useWebDefaults,
               enableMarginCollapsing: enableMarginCollapsing,
+              controller: controller,
             ),
           ],
         ),
@@ -159,6 +161,7 @@ class _SliverYogaLayout extends SliverMultiBoxAdaptorWidget {
   final int? alignItems;
   final bool useWebDefaults;
   final bool enableMarginCollapsing;
+  final ScrollController? controller;
 
   const _SliverYogaLayout({
     required super.delegate,
@@ -167,6 +170,7 @@ class _SliverYogaLayout extends SliverMultiBoxAdaptorWidget {
     this.alignItems,
     this.useWebDefaults = false,
     this.enableMarginCollapsing = false,
+    this.controller,
   });
 
   @override
@@ -182,6 +186,7 @@ class _SliverYogaLayout extends SliverMultiBoxAdaptorWidget {
       alignItems: alignItems ?? YGAlign.stretch,
       useWebDefaults: useWebDefaults,
       enableMarginCollapsing: enableMarginCollapsing,
+      controller: controller,
     );
   }
 
@@ -195,7 +200,8 @@ class _SliverYogaLayout extends SliverMultiBoxAdaptorWidget {
       ..justifyContent = justifyContent ?? YGJustify.flexStart
       ..alignItems = alignItems ?? YGAlign.stretch
       ..useWebDefaults = useWebDefaults
-      ..enableMarginCollapsing = enableMarginCollapsing;
+      ..enableMarginCollapsing = enableMarginCollapsing
+      ..controller = controller;
   }
 }
 
@@ -233,7 +239,7 @@ class _YogaLayoutBox extends MultiChildRenderObjectWidget {
   final AlignmentGeometry? transformOrigin;
 
   const _YogaLayoutBox({
-    this.flexDirection = YGFlexDirection.row,
+    this.flexDirection = YGFlexDirection.column,
     this.justifyContent,
     this.alignItems = YGAlign.baseline,
     this.alignContent = YGAlign.flexStart,

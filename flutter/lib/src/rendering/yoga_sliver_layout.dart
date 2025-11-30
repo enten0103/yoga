@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_yoga/src/yoga_node.dart';
 import 'package:flutter_yoga/src/yoga_value.dart';
 import 'package:flutter_yoga/src/yoga_ffi.dart'; // For enums
 import 'package:flutter_yoga/src/rendering/yoga_layout.dart';
+import 'package:flutter_yoga/src/widgets/yoga_scroll_controller.dart';
 
 class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
   RenderSliverYogaLayout({
@@ -13,17 +16,52 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
     int flexDirection = YGFlexDirection.column,
     int alignItems = YGAlign.stretch,
     int justifyContent = YGJustify.flexStart,
+    ScrollController? controller,
   }) : _useWebDefaults = useWebDefaults,
        _enableMarginCollapsing = enableMarginCollapsing,
        _flexDirection = flexDirection,
        _alignItems = alignItems,
-       _justifyContent = justifyContent;
+       _justifyContent = justifyContent {
+    this.controller = controller;
+  }
 
   bool _useWebDefaults;
   bool _enableMarginCollapsing;
   int _flexDirection;
   int _alignItems;
   int _justifyContent;
+  ScrollController? _controller;
+
+  // For scrollToIndex
+  int? _targetIndexToMeasure;
+  Completer<double>? _measureCompleter;
+
+  set controller(ScrollController? value) {
+    if (_controller == value) return;
+    if (_controller is YogaScrollController) {
+      (_controller as YogaScrollController).detachRenderSliver();
+    }
+    _controller = value;
+    if (_controller is YogaScrollController) {
+      (_controller as YogaScrollController).attachRenderSliver(this);
+    }
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    if (_controller is YogaScrollController) {
+      (_controller as YogaScrollController).attachRenderSliver(this);
+    }
+  }
+
+  @override
+  void detach() {
+    if (_controller is YogaScrollController) {
+      (_controller as YogaScrollController).detachRenderSliver();
+    }
+    super.detach();
+  }
 
   set useWebDefaults(bool value) {
     if (_useWebDefaults == value) return;
@@ -90,93 +128,147 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
       }
     }
 
-    // Ensure we start from index 0 to calculate correct offsets
-    if (firstChild != null) {
-      int firstIndex = indexOf(firstChild!);
-      while (firstIndex > 0) {
-        final RenderBox? prev = childBefore(firstChild!);
-        if (prev == null) break; // Should not happen if index > 0
-        firstIndex--;
-      }
-    }
-
     RenderBox? child = firstChild;
     double currentOffset = 0.0;
+    double previousMarginEnd = 0.0;
     int firstIndex = 0;
     int lastIndex = 0;
 
     if (child != null) {
       firstIndex = indexOf(child);
       lastIndex = firstIndex;
+
+      // Initialize currentOffset from existing layoutOffset
+      final YogaSliverLayoutParentData pd =
+          child.parentData as YogaSliverLayoutParentData;
+      if (pd.layoutOffset != null) {
+        double marginStart = _getMarginStart(child, isVertical);
+        currentOffset = pd.layoutOffset! - marginStart;
+      }
+    }
+
+    // Prepend children if needed
+    while (child != null && currentOffset > scrollOffset && firstIndex > 0) {
+      BoxConstraints placeholderConstraints;
+      if (isVertical) {
+        placeholderConstraints = BoxConstraints(maxWidth: crossAxisExtent);
+      } else {
+        placeholderConstraints = BoxConstraints(maxHeight: crossAxisExtent);
+      }
+      RenderBox? prev = insertAndLayoutLeadingChild(placeholderConstraints);
+      if (prev == null) break;
+
+      _layoutChild(prev, constraints, isVertical, crossAxisExtent);
+
+      double childLayoutOffset =
+          (child.parentData as YogaSliverLayoutParentData).layoutOffset!;
+      double childMarginStart = _getMarginStart(child, isVertical);
+
+      double prevMarginEnd = _getMarginEnd(prev, isVertical);
+      double prevMarginStart = _getMarginStart(prev, isVertical);
+      double prevMainExtent = isVertical ? prev.size.height : prev.size.width;
+
+      double prevLayoutOffset;
+      if (_enableMarginCollapsing) {
+        double collapsedMargin = (prevMarginEnd > childMarginStart)
+            ? prevMarginEnd
+            : childMarginStart;
+        prevLayoutOffset = childLayoutOffset - prevMainExtent - collapsedMargin;
+      } else {
+        prevLayoutOffset =
+            childLayoutOffset -
+            childMarginStart -
+            prevMarginEnd -
+            prevMainExtent;
+      }
+
+      final YogaSliverLayoutParentData prevPd =
+          prev.parentData as YogaSliverLayoutParentData;
+      prevPd.layoutOffset = prevLayoutOffset;
+
+      currentOffset = prevLayoutOffset - prevMarginStart;
+
+      child = prev;
+      firstIndex--;
+    }
+
+    // Collect leading garbage
+    int leadingGarbage = 0;
+    RenderBox? current = firstChild;
+    while (current != null) {
+      // We must layout the child before accessing its size to check if it's off-screen
+      _layoutChild(current, constraints, isVertical, crossAxisExtent);
+
+      final YogaSliverLayoutParentData pd =
+          current.parentData as YogaSliverLayoutParentData;
+
+      if (pd.layoutOffset == null) {
+        break;
+      }
+
+      double itemEnd =
+          pd.layoutOffset! +
+          (isVertical ? current.size.height : current.size.width) +
+          _getMarginEnd(current, isVertical);
+
+      if (itemEnd <= scrollOffset) {
+        leadingGarbage++;
+        current = childAfter(current);
+      } else {
+        break;
+      }
+    }
+
+    if (leadingGarbage > 0) {
+      collectGarbage(leadingGarbage, 0);
+      child = firstChild;
+      if (child != null) {
+        firstIndex = indexOf(child);
+      }
     }
 
     while (child != null) {
       _layoutChild(child, constraints, isVertical, crossAxisExtent);
+      lastIndex = indexOf(child);
 
-      final YogaSliverLayoutParentData pd =
-          child.parentData as YogaSliverLayoutParentData;
-
-      double marginTop = 0;
-      double marginBottom = 0;
-      double marginLeft = 0;
-      double marginRight = 0;
-
-      if (pd.margin != null) {
-        if (pd.margin!.top.unit == YogaUnit.point) {
-          marginTop = pd.margin!.top.value;
-        }
-        if (pd.margin!.bottom.unit == YogaUnit.point) {
-          marginBottom = pd.margin!.bottom.value;
-        }
-        if (pd.margin!.left.unit == YogaUnit.point) {
-          marginLeft = pd.margin!.left.value;
-        }
-        if (pd.margin!.right.unit == YogaUnit.point) {
-          marginRight = pd.margin!.right.value;
-        }
-      }
-
-      final double childMainExtent = isVertical
-          ? child.size.height
-          : child.size.width;
-      final double childCrossExtent = isVertical
-          ? child.size.width
-          : child.size.height;
-
-      double childCrossAxisAvailable =
-          crossAxisExtent -
-          (isVertical
-              ? (marginLeft + marginRight)
-              : (marginTop + marginBottom));
-      if (childCrossAxisAvailable < 0) childCrossAxisAvailable = 0;
-
-      double childMainPosition =
-          currentOffset + (isVertical ? marginTop : marginLeft);
-
-      double childCrossPosition = 0.0;
-      if (_alignItems == YGAlign.center) {
-        childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
-        childCrossPosition += isVertical ? marginLeft : marginTop;
-      } else if (_alignItems == YGAlign.flexEnd) {
-        childCrossPosition = childCrossAxisAvailable - childCrossExtent;
-        childCrossPosition += isVertical ? marginLeft : marginTop;
+      // If this is the first child after garbage collection, we trust its position
+      if (leadingGarbage > 0 && child == firstChild) {
+        final YogaSliverLayoutParentData pd =
+            child.parentData as YogaSliverLayoutParentData;
+        double childMainExtent = isVertical
+            ? child.size.height
+            : child.size.width;
+        double marginEnd = _getMarginEnd(child, isVertical);
+        currentOffset = pd.layoutOffset! + childMainExtent + marginEnd;
       } else {
-        childCrossPosition = isVertical ? marginLeft : marginTop;
+        currentOffset = _calculateChildLayoutOffset(
+          child,
+          currentOffset,
+          isVertical,
+          crossAxisExtent,
+          previousMarginEnd: previousMarginEnd,
+        );
       }
 
-      if (isVertical) {
-        pd.layoutOffset = childMainPosition;
-        pd.offset = Offset(childCrossPosition, childMainPosition);
-      } else {
-        pd.layoutOffset = childMainPosition;
-        pd.offset = Offset(childMainPosition, childCrossPosition);
+      previousMarginEnd = _getMarginEnd(child, isVertical);
+
+      // Check if we found the target index
+      if (_targetIndexToMeasure != null &&
+          indexOf(child) == _targetIndexToMeasure) {
+        final YogaSliverLayoutParentData pd =
+            child.parentData as YogaSliverLayoutParentData;
+        final double offset = pd.layoutOffset!;
+        if (_measureCompleter != null && !_measureCompleter!.isCompleted) {
+          _measureCompleter!.complete(offset);
+        }
+        _targetIndexToMeasure = null;
+        _measureCompleter = null;
       }
 
-      currentOffset += (isVertical
-          ? (marginTop + childMainExtent + marginBottom)
-          : (marginLeft + childMainExtent + marginRight));
-
-      if (currentOffset > targetEndScrollOffset) {
+      // Break if we are past the visible area AND we are not measuring a specific index
+      // OR if we are measuring but we passed the index (should be caught above, but for safety)
+      if (currentOffset > targetEndScrollOffset &&
+          _targetIndexToMeasure == null) {
         break;
       }
 
@@ -235,7 +327,11 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
           constraints,
           firstIndex: firstIndex,
           lastIndex: lastIndex,
-          leadingScrollOffset: 0.0, // We start from 0
+          leadingScrollOffset: (firstChild != null)
+              ? (firstChild!.parentData as YogaSliverLayoutParentData)
+                        .layoutOffset ??
+                    0.0
+              : 0.0,
           trailingScrollOffset: mainAxisExtent,
         );
 
@@ -442,5 +538,127 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
       return isVertical ? pd.offset!.dx : pd.offset!.dy;
     }
     return 0.0;
+  }
+
+  Future<double> measureOffsetForIndex(int index) {
+    if (_measureCompleter != null) {
+      // Cancel previous measurement? Or chain?
+      // For simplicity, we just return the new one.
+    }
+    _measureCompleter = Completer<double>();
+    _targetIndexToMeasure = index;
+    markNeedsLayout();
+    return _measureCompleter!.future;
+  }
+
+  double _getMarginEnd(RenderBox child, bool isVertical) {
+    final YogaSliverLayoutParentData pd =
+        child.parentData as YogaSliverLayoutParentData;
+    if (pd.margin == null) return 0.0;
+    if (isVertical) {
+      return (pd.margin!.bottom.unit == YogaUnit.point)
+          ? pd.margin!.bottom.value
+          : 0.0;
+    } else {
+      return (pd.margin!.right.unit == YogaUnit.point)
+          ? pd.margin!.right.value
+          : 0.0;
+    }
+  }
+
+  double _getMarginStart(RenderBox child, bool isVertical) {
+    final YogaSliverLayoutParentData pd =
+        child.parentData as YogaSliverLayoutParentData;
+    if (pd.margin == null) return 0.0;
+    if (isVertical) {
+      return (pd.margin!.top.unit == YogaUnit.point)
+          ? pd.margin!.top.value
+          : 0.0;
+    } else {
+      return (pd.margin!.left.unit == YogaUnit.point)
+          ? pd.margin!.left.value
+          : 0.0;
+    }
+  }
+
+  double _calculateChildLayoutOffset(
+    RenderBox child,
+    double currentOffset,
+    bool isVertical,
+    double crossAxisExtent, {
+    double previousMarginEnd = 0.0,
+  }) {
+    final YogaSliverLayoutParentData pd =
+        child.parentData as YogaSliverLayoutParentData;
+
+    double marginTop = 0;
+    double marginBottom = 0;
+    double marginLeft = 0;
+    double marginRight = 0;
+
+    if (pd.margin != null) {
+      if (pd.margin!.top.unit == YogaUnit.point) {
+        marginTop = pd.margin!.top.value;
+      }
+      if (pd.margin!.bottom.unit == YogaUnit.point) {
+        marginBottom = pd.margin!.bottom.value;
+      }
+      if (pd.margin!.left.unit == YogaUnit.point) {
+        marginLeft = pd.margin!.left.value;
+      }
+      if (pd.margin!.right.unit == YogaUnit.point) {
+        marginRight = pd.margin!.right.value;
+      }
+    }
+
+    final double childMainExtent = isVertical
+        ? child.size.height
+        : child.size.width;
+    final double childCrossExtent = isVertical
+        ? child.size.width
+        : child.size.height;
+
+    double childCrossAxisAvailable =
+        crossAxisExtent -
+        (isVertical ? (marginLeft + marginRight) : (marginTop + marginBottom));
+    if (childCrossAxisAvailable < 0) childCrossAxisAvailable = 0;
+
+    double marginStart = isVertical ? marginTop : marginLeft;
+    double marginEnd = isVertical ? marginBottom : marginRight;
+
+    double childMainPosition;
+
+    if (_enableMarginCollapsing) {
+      // currentOffset is the end of previous margin box.
+      // We want to position relative to previous border box.
+      double prevBorderBoxEnd = currentOffset - previousMarginEnd;
+      double collapsedMargin = (previousMarginEnd > marginStart)
+          ? previousMarginEnd
+          : marginStart;
+      childMainPosition = prevBorderBoxEnd + collapsedMargin;
+    } else {
+      childMainPosition = currentOffset + marginStart;
+    }
+
+    double childCrossPosition = 0.0;
+    if (_alignItems == YGAlign.center) {
+      childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
+      childCrossPosition += isVertical ? marginLeft : marginTop;
+    } else if (_alignItems == YGAlign.flexEnd) {
+      childCrossPosition = childCrossAxisAvailable - childCrossExtent;
+      childCrossPosition += isVertical ? marginLeft : marginTop;
+    } else {
+      childCrossPosition = isVertical ? marginLeft : marginTop;
+    }
+
+    if (isVertical) {
+      pd.layoutOffset = childMainPosition;
+      pd.offset = Offset(childCrossPosition, childMainPosition);
+    } else {
+      pd.layoutOffset = childMainPosition;
+      pd.offset = Offset(childMainPosition, childCrossPosition);
+    }
+
+    return childMainPosition + childMainExtent + marginEnd;
   }
 }
