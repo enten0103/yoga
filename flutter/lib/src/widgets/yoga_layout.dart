@@ -92,27 +92,34 @@ class YogaLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (scroll) {
+      Widget sliver = _SliverYogaLayout(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) => children[index],
+          childCount: children.length,
+          addAutomaticKeepAlives: false,
+          addRepaintBoundaries: false,
+          addSemanticIndexes: false,
+        ),
+        flexDirection: flexDirection,
+        justifyContent: justifyContent,
+        alignItems: alignItems,
+        useWebDefaults: useWebDefaults,
+        enableMarginCollapsing: enableMarginCollapsing,
+        controller: controller,
+      );
+
+      if (padding != null) {
+        sliver = SliverPadding(
+          padding: _yogaEdgeInsetsToEdgeInsets(padding!),
+          sliver: sliver,
+        );
+      }
+
       return _YogaLayoutScope(
         isSliver: true,
         child: CustomScrollView(
           controller: controller,
-          slivers: [
-            _SliverYogaLayout(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) => children[index],
-                childCount: children.length,
-                addAutomaticKeepAlives: false,
-                addRepaintBoundaries: false,
-                addSemanticIndexes: false,
-              ),
-              flexDirection: flexDirection,
-              justifyContent: justifyContent,
-              alignItems: alignItems,
-              useWebDefaults: useWebDefaults,
-              enableMarginCollapsing: enableMarginCollapsing,
-              controller: controller,
-            ),
-          ],
+          slivers: [sliver],
         ),
       );
     }
@@ -989,4 +996,26 @@ class _YogaLayoutScope extends InheritedWidget {
   bool updateShouldNotify(_YogaLayoutScope oldWidget) {
     return isSliver != oldWidget.isSliver;
   }
+}
+
+EdgeInsets _yogaEdgeInsetsToEdgeInsets(YogaEdgeInsets padding) {
+  double left = 0;
+  double top = 0;
+  double right = 0;
+  double bottom = 0;
+
+  if (padding.left.unit == YogaUnit.point) {
+    left = padding.left.value;
+  }
+  if (padding.top.unit == YogaUnit.point) {
+    top = padding.top.value;
+  }
+  if (padding.right.unit == YogaUnit.point) {
+    right = padding.right.value;
+  }
+  if (padding.bottom.unit == YogaUnit.point) {
+    bottom = padding.bottom.value;
+  }
+
+  return EdgeInsets.fromLTRB(left, top, right, bottom);
 }

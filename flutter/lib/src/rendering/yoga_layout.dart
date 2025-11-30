@@ -138,6 +138,9 @@ class RenderYogaLayout extends RenderBox
 
   YogaNode get rootNode => _rootNode;
 
+  YogaValue? get width => _width;
+  YogaValue? get height => _height;
+
   set background(YogaBackground? value) {
     if (_background == value) return;
     // debugPrint('YogaLayout: set background: $value');
@@ -393,9 +396,9 @@ class RenderYogaLayout extends RenderBox
     }
   }
 
-  void _updateParentData(void Function(YogaLayoutParentData) updater) {
-    if (parentData is YogaLayoutParentData) {
-      updater(parentData as YogaLayoutParentData);
+  void _updateParentData(void Function(YogaParentDataMixin) updater) {
+    if (parentData is YogaParentDataMixin) {
+      updater(parentData as YogaParentDataMixin);
       if (parent != null) {
         parent!.markNeedsLayout();
       }
@@ -410,8 +413,8 @@ class RenderYogaLayout extends RenderBox
       _resolveBackgroundImage();
     }
 
-    if (parentData is YogaLayoutParentData) {
-      final pd = parentData as YogaLayoutParentData;
+    if (parentData is YogaParentDataMixin) {
+      final pd = parentData as YogaParentDataMixin;
       pd.width = _width;
       pd.height = _height;
       pd.minWidth = _minWidth;
@@ -592,6 +595,11 @@ class RenderYogaLayout extends RenderBox
       final double w = childNode.layoutWidth;
       final double h = childNode.layoutHeight;
 
+      // Debug print
+      // if (w < _rootNode.layoutWidth && _rootNode.layoutWidth > 0) {
+      //   debugPrint('RenderYogaLayout Child Layout: RootW=${_rootNode.layoutWidth}, ChildW=$w, ChildWidthProp=${childParentData.width}');
+      // }
+
       // 如果出现问题或尺寸未定义，Yoga 可能会返回 NaN。
       // 我们必须确保向 Flutter 传递有效的约束。
       final double safeW = w.isNaN ? 0.0 : w;
@@ -760,20 +768,20 @@ class RenderYogaLayout extends RenderBox
       YogaBoxSizing? boxSizing = childParentData.boxSizing;
 
       if (child is RenderYogaLayout) {
-        width ??= child._width;
-        height ??= child._height;
-        minWidth ??= child._minWidth;
-        maxWidth ??= child._maxWidth;
-        minHeight ??= child._minHeight;
-        maxHeight ??= child._maxHeight;
-        flexGrow ??= child._flexGrow;
-        flexShrink ??= child._flexShrink;
-        flexBasis ??= child._flexBasis;
-        display ??= child._display;
-        margin ??= child._margin;
-        border ??= child._border;
-        alignSelf ??= child._alignSelf;
-        boxSizing ??= child._boxSizing;
+        if (child._width != null) width = child._width;
+        if (child._height != null) height = child._height;
+        if (child._minWidth != null) minWidth = child._minWidth;
+        if (child._maxWidth != null) maxWidth = child._maxWidth;
+        if (child._minHeight != null) minHeight = child._minHeight;
+        if (child._maxHeight != null) maxHeight = child._maxHeight;
+        if (child._flexGrow != null) flexGrow = child._flexGrow;
+        if (child._flexShrink != null) flexShrink = child._flexShrink;
+        if (child._flexBasis != null) flexBasis = child._flexBasis;
+        if (child._display != null) display = child._display;
+        if (child._margin != null) margin = child._margin;
+        if (child._border != null) border = child._border;
+        if (child._alignSelf != null) alignSelf = child._alignSelf;
+        if (child._boxSizing != null) boxSizing = child._boxSizing;
       }
 
       // 1. 同步基本布局属性
@@ -2808,14 +2816,19 @@ class RenderYogaLayout extends RenderBox
     final double contentBottom = paddingBottom + border.bottom;
 
     // 如果设置，解析显式尺寸
-    double? resolvedParentWidth = _resolveDimension(
-      _width,
-      constraints.maxWidth,
-    );
-    double? resolvedParentHeight = _resolveDimension(
-      _height,
-      constraints.maxHeight,
-    );
+    double? resolvedParentWidth;
+    if (constraints.hasTightWidth) {
+      resolvedParentWidth = constraints.maxWidth;
+    } else {
+      resolvedParentWidth = _resolveDimension(_width, constraints.maxWidth);
+    }
+
+    double? resolvedParentHeight;
+    if (constraints.hasTightHeight) {
+      resolvedParentHeight = constraints.maxHeight;
+    } else {
+      resolvedParentHeight = _resolveDimension(_height, constraints.maxHeight);
+    }
 
     double availableWidth =
         (resolvedParentWidth ?? constraints.maxWidth) -
@@ -2950,14 +2963,14 @@ class RenderYogaLayout extends RenderBox
       YogaEdgeInsets? margin = childParentData.margin;
 
       if (child is RenderYogaLayout) {
-        width ??= child._width;
-        height ??= child._height;
-        minWidth ??= child._minWidth;
-        maxWidth ??= child._maxWidth;
-        minHeight ??= child._minHeight;
-        maxHeight ??= child._maxHeight;
-        display ??= child._display;
-        margin ??= child._margin;
+        if (child._width != null) width = child._width;
+        if (child._height != null) height = child._height;
+        if (child._minWidth != null) minWidth = child._minWidth;
+        if (child._maxWidth != null) maxWidth = child._maxWidth;
+        if (child._minHeight != null) minHeight = child._minHeight;
+        if (child._maxHeight != null) maxHeight = child._maxHeight;
+        if (child._display != null) display = child._display;
+        if (child._margin != null) margin = child._margin;
       }
 
       if (display == YogaDisplay.none) {

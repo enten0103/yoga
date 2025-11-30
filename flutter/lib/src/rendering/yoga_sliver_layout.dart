@@ -362,6 +362,14 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
     double marginLeft = 0;
     double marginRight = 0;
 
+    YogaValue? childWidth = pd.width;
+    YogaValue? childHeight = pd.height;
+
+    if (child is RenderYogaLayout) {
+      if (child.width != null) childWidth = child.width;
+      if (child.height != null) childHeight = child.height;
+    }
+
     if (pd.margin != null) {
       if (pd.margin!.top.unit == YogaUnit.point) {
         marginTop = pd.margin!.top.value;
@@ -385,11 +393,23 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
     double? explicitWidth;
     double? explicitHeight;
 
-    if (pd.width != null && pd.width!.unit == YogaUnit.point) {
-      explicitWidth = pd.width!.value;
+    if (childWidth != null) {
+      if (childWidth.unit == YogaUnit.point) {
+        explicitWidth = childWidth.value;
+      } else if (childWidth.unit == YogaUnit.percent) {
+        explicitWidth = (childWidth.value / 100.0) * crossAxisExtent;
+      }
     }
-    if (pd.height != null && pd.height!.unit == YogaUnit.point) {
-      explicitHeight = pd.height!.value;
+    if (childHeight != null) {
+      if (childHeight.unit == YogaUnit.point) {
+        explicitHeight = childHeight.value;
+      } else if (childHeight.unit == YogaUnit.percent) {
+        // For height in vertical scroll, percent usually doesn't work unless container has height.
+        // But for horizontal scroll (cross axis), it might work.
+        if (!isVertical) {
+          explicitHeight = (childHeight.value / 100.0) * crossAxisExtent;
+        }
+      }
     }
 
     if (pd.flexBasis != null && !pd.flexBasis!.isNaN) {
