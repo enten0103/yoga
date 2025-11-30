@@ -140,6 +140,7 @@ class RenderYogaLayout extends RenderBox
 
   YogaValue? get width => _width;
   YogaValue? get height => _height;
+  YogaEdgeInsets? get margin => _margin;
 
   set background(YogaBackground? value) {
     if (_background == value) return;

@@ -574,30 +574,32 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
   double _getMarginEnd(RenderBox child, bool isVertical) {
     final YogaSliverLayoutParentData pd =
         child.parentData as YogaSliverLayoutParentData;
-    if (pd.margin == null) return 0.0;
+    YogaEdgeInsets? margin = pd.margin;
+    if (child is RenderYogaLayout && child.margin != null) {
+      margin = child.margin;
+    }
+
+    if (margin == null) return 0.0;
     if (isVertical) {
-      return (pd.margin!.bottom.unit == YogaUnit.point)
-          ? pd.margin!.bottom.value
-          : 0.0;
+      return (margin.bottom.unit == YogaUnit.point) ? margin.bottom.value : 0.0;
     } else {
-      return (pd.margin!.right.unit == YogaUnit.point)
-          ? pd.margin!.right.value
-          : 0.0;
+      return (margin.right.unit == YogaUnit.point) ? margin.right.value : 0.0;
     }
   }
 
   double _getMarginStart(RenderBox child, bool isVertical) {
     final YogaSliverLayoutParentData pd =
         child.parentData as YogaSliverLayoutParentData;
-    if (pd.margin == null) return 0.0;
+    YogaEdgeInsets? margin = pd.margin;
+    if (child is RenderYogaLayout && child.margin != null) {
+      margin = child.margin;
+    }
+
+    if (margin == null) return 0.0;
     if (isVertical) {
-      return (pd.margin!.top.unit == YogaUnit.point)
-          ? pd.margin!.top.value
-          : 0.0;
+      return (margin.top.unit == YogaUnit.point) ? margin.top.value : 0.0;
     } else {
-      return (pd.margin!.left.unit == YogaUnit.point)
-          ? pd.margin!.left.value
-          : 0.0;
+      return (margin.left.unit == YogaUnit.point) ? margin.left.value : 0.0;
     }
   }
 
@@ -611,23 +613,44 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
     final YogaSliverLayoutParentData pd =
         child.parentData as YogaSliverLayoutParentData;
 
+    YogaEdgeInsets? margin = pd.margin;
+    if (child is RenderYogaLayout && child.margin != null) {
+      margin = child.margin;
+    }
+
     double marginTop = 0;
     double marginBottom = 0;
     double marginLeft = 0;
     double marginRight = 0;
 
-    if (pd.margin != null) {
-      if (pd.margin!.top.unit == YogaUnit.point) {
-        marginTop = pd.margin!.top.value;
+    bool isMarginLeftAuto = false;
+    bool isMarginRightAuto = false;
+    bool isMarginTopAuto = false;
+    bool isMarginBottomAuto = false;
+
+    if (margin != null) {
+      if (margin.top.unit == YogaUnit.point) {
+        marginTop = margin.top.value;
+      } else if (margin.top.unit == YogaUnit.auto) {
+        isMarginTopAuto = true;
       }
-      if (pd.margin!.bottom.unit == YogaUnit.point) {
-        marginBottom = pd.margin!.bottom.value;
+
+      if (margin.bottom.unit == YogaUnit.point) {
+        marginBottom = margin.bottom.value;
+      } else if (margin.bottom.unit == YogaUnit.auto) {
+        isMarginBottomAuto = true;
       }
-      if (pd.margin!.left.unit == YogaUnit.point) {
-        marginLeft = pd.margin!.left.value;
+
+      if (margin.left.unit == YogaUnit.point) {
+        marginLeft = margin.left.value;
+      } else if (margin.left.unit == YogaUnit.auto) {
+        isMarginLeftAuto = true;
       }
-      if (pd.margin!.right.unit == YogaUnit.point) {
-        marginRight = pd.margin!.right.value;
+
+      if (margin.right.unit == YogaUnit.point) {
+        marginRight = margin.right.value;
+      } else if (margin.right.unit == YogaUnit.auto) {
+        isMarginRightAuto = true;
       }
     }
 
@@ -661,14 +684,43 @@ class RenderSliverYogaLayout extends RenderSliverMultiBoxAdaptor {
     }
 
     double childCrossPosition = 0.0;
-    if (_alignItems == YGAlign.center) {
-      childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
-      childCrossPosition += isVertical ? marginLeft : marginTop;
-    } else if (_alignItems == YGAlign.flexEnd) {
-      childCrossPosition = childCrossAxisAvailable - childCrossExtent;
-      childCrossPosition += isVertical ? marginLeft : marginTop;
+    bool handledByAutoMargin = false;
+
+    if (isVertical) {
+      if (isMarginLeftAuto && isMarginRightAuto) {
+        childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
+        handledByAutoMargin = true;
+      } else if (isMarginLeftAuto) {
+        childCrossPosition = childCrossAxisAvailable - childCrossExtent;
+        // childCrossAxisAvailable excludes marginRight (fixed), so this aligns to right margin edge.
+        handledByAutoMargin = true;
+      } else if (isMarginRightAuto) {
+        childCrossPosition = marginLeft;
+        handledByAutoMargin = true;
+      }
     } else {
-      childCrossPosition = isVertical ? marginLeft : marginTop;
+      if (isMarginTopAuto && isMarginBottomAuto) {
+        childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
+        handledByAutoMargin = true;
+      } else if (isMarginTopAuto) {
+        childCrossPosition = childCrossAxisAvailable - childCrossExtent;
+        handledByAutoMargin = true;
+      } else if (isMarginBottomAuto) {
+        childCrossPosition = marginTop;
+        handledByAutoMargin = true;
+      }
+    }
+
+    if (!handledByAutoMargin) {
+      if (_alignItems == YGAlign.center) {
+        childCrossPosition = (childCrossAxisAvailable - childCrossExtent) / 2.0;
+        childCrossPosition += isVertical ? marginLeft : marginTop;
+      } else if (_alignItems == YGAlign.flexEnd) {
+        childCrossPosition = childCrossAxisAvailable - childCrossExtent;
+        childCrossPosition += isVertical ? marginLeft : marginTop;
+      } else {
+        childCrossPosition = isVertical ? marginLeft : marginTop;
+      }
     }
 
     if (isVertical) {
