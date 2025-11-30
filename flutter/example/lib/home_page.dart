@@ -10,7 +10,12 @@ class HomePage extends StatelessWidget {
       body: ListView(
         children: [
           _buildListTile(context, 'Basic Layout', '/basic'),
-          _buildListTile(context, 'Scrolling', '/scrolling'),
+          _buildListTile(context, 'Scrolling (SingleChild)', '/scrolling'),
+          _buildListTile(
+            context,
+            'Sliver Scrolling (Lazy)',
+            '/sliver_scrolling',
+          ),
           _buildListTile(context, 'Nested Layout', '/nested'),
           _buildListTile(
             context,

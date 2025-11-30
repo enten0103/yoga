@@ -27,6 +27,7 @@ import 'examples/display_interaction_page.dart';
 import 'examples/fit_content_page.dart';
 import 'examples/toc_example_page.dart';
 import 'examples/layout_behavior_page.dart';
+import 'examples/sliver_scrolling_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -86,6 +87,7 @@ class _MyAppState extends State<MyApp> {
         '/fit_content': (context) => const FitContentPage(),
         '/toc_example': (context) => const TocExamplePage(),
         '/layout_behavior': (context) => const LayoutBehaviorPage(),
+        '/sliver_scrolling': (context) => const SliverScrollingPage(),
       },
     );
   }

@@ -7,7 +7,7 @@ import '../yoga_value.dart';
 import '../yoga_border.dart';
 import '../yoga_background.dart';
 
-class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
+mixin YogaParentDataMixin on ParentData {
   YogaNode? yogaNode;
 
   // 用于差异比较的缓存
@@ -31,6 +31,9 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   Matrix4? transform;
   AlignmentGeometry? transformOrigin;
 
+  // 用于 Sliver 布局的偏移量
+  // double? layoutOffset; // SliverLogicalParentData already has this
+
   // 合并后的有效外边距（仅运行时，非用户设置）
   EdgeInsets? effectiveMargin;
 
@@ -40,10 +43,6 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
   ImageStreamListener? _borderImageListener;
 
   @override
-  String toString() =>
-      '${super.toString()}; yogaNode=$yogaNode; textAlign=$textAlign';
-
-  @override
   void detach() {
     _borderImageStream?.removeListener(_borderImageListener!);
     _borderImageStream = null;
@@ -51,6 +50,33 @@ class YogaLayoutParentData extends ContainerBoxParentData<RenderBox> {
     _borderImageInfo = null;
     super.detach();
   }
+}
+
+class YogaLayoutParentData extends ContainerBoxParentData<RenderBox>
+    with YogaParentDataMixin {
+  @override
+  String toString() =>
+      '${super.toString()}; yogaNode=$yogaNode; textAlign=$textAlign';
+}
+
+class YogaSliverLayoutParentData extends SliverMultiBoxAdaptorParentData
+    with YogaParentDataMixin {
+  // SliverMultiBoxAdaptorParentData already has layoutOffset (from SliverLogicalParentData)
+  // and index (from SliverMultiBoxAdaptorParentData)
+
+  // We need offset for painting?
+  // SliverLogicalParentData does NOT have offset (Offset).
+  // But RenderSliverMultiBoxAdaptor children are RenderBox.
+  // Usually Slivers don't use ParentData.offset for painting children, they use geometry.
+  // But if we want to position them manually in performLayout, we might need a place to store the offset.
+  // However, RenderSliverMultiBoxAdaptor usually assumes linear layout.
+  // If we do custom layout, we can store the cross axis offset in a custom field.
+
+  Offset? offset; // Add offset for our custom layout logic
+
+  @override
+  String toString() =>
+      '${super.toString()}; yogaNode=$yogaNode; textAlign=$textAlign';
 }
 
 class YogaLayoutResult {
