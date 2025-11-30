@@ -1239,18 +1239,72 @@ class RenderYogaLayout extends RenderBox
   }
 
   void _paintChildren(PaintingContext context, Offset offset) {
+    List<RenderBox> children = [];
     RenderBox? child = firstChild;
     while (child != null) {
-      final childParentData = child.parentData as YogaLayoutParentData;
-      final Offset childOffset = childParentData.offset + offset;
+      children.add(child);
+      child = (child.parentData as YogaLayoutParentData).nextSibling;
+    }
 
-      if (childParentData.transform != null) {
-        _paintWithTransform(context, child, childParentData, childOffset);
-      } else {
-        _paintChildContent(context, child, childParentData, childOffset);
+    // 排序子级以进行绘制：
+    // 1. 非定位的块级元素 (display: block/flex)
+    // 2. 非定位的浮动元素 (Yoga 不支持 float，所以跳过)
+    // 3. 非定位的行内元素 (display: inline)
+    // 4. 定位元素 (z-index) - Yoga 不支持 z-index，但我们应该尊重 DOM 顺序。
+
+    // 简化规则：
+    // 我们将子级分为两组：Block 和 Inline。
+    // 首先绘制所有 Block，然后绘制所有 Inline。
+    // 在每个组内，保持 DOM 顺序。
+
+    // 注意：这只是一个近似值。完整的 CSS 堆叠上下文要复杂得多。
+    // 但这应该涵盖 "inline over block" 的情况。
+
+    List<RenderBox> blockChildren = [];
+    List<RenderBox> inlineChildren = [];
+
+    for (var child in children) {
+      final pd = child.parentData as YogaLayoutParentData;
+      bool isInline =
+          pd.display == YogaDisplay.inline ||
+          pd.display == YogaDisplay.inlineBlock;
+
+      // 如果未指定，我们需要推断。
+      // 类似于布局逻辑：
+      if (pd.display == null) {
+        if (child is RenderYogaLayout) {
+          isInline = false; // 嵌套布局默认为 block
+        } else {
+          isInline = true; // 其他（文本、图片）默认为 inline
+        }
       }
 
-      child = childParentData.nextSibling;
+      if (isInline) {
+        inlineChildren.add(child);
+      } else {
+        blockChildren.add(child);
+      }
+    }
+
+    // 绘制 Block
+    for (var child in blockChildren) {
+      _paintChild(context, child, offset);
+    }
+
+    // 绘制 Inline
+    for (var child in inlineChildren) {
+      _paintChild(context, child, offset);
+    }
+  }
+
+  void _paintChild(PaintingContext context, RenderBox child, Offset offset) {
+    final childParentData = child.parentData as YogaLayoutParentData;
+    final Offset childOffset = childParentData.offset + offset;
+
+    if (childParentData.transform != null) {
+      _paintWithTransform(context, child, childParentData, childOffset);
+    } else {
+      _paintChildContent(context, child, childParentData, childOffset);
     }
   }
 

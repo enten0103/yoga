@@ -474,7 +474,115 @@ class _MarginPageState extends State<MarginPage> {
               );
             },
           ),
+          const Divider(),
+          _buildSectionTitle('8. 负 Margin 覆盖顺序 (Negative Margin Z-Ordering)'),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              '说明:\n'
+              '测试不同 Display 类型在负 Margin 重叠时的覆盖关系。\n'
+              '规则 1: 后定义的 Block 覆盖先定义的 Block。\n'
+              '规则 2: Inline 元素始终覆盖 Block 元素 (无论顺序)。\n'
+              '规则 3: 后定义的 Inline 覆盖先定义的 Inline。',
+            ),
+          ),
+          _buildZOrderTestCase(
+            'Case 1: Block vs Block (DOM Order)',
+            'Red (Block) -> Green (Block). Green covers Red.',
+            [
+              _buildZBox('Block 1', Colors.red, YogaDisplay.block, -30),
+              _buildZBox('Block 2', Colors.green, YogaDisplay.block, 0),
+            ],
+          ),
+          _buildZOrderTestCase(
+            'Case 2: Block vs Inline',
+            'Red (Block) -> Blue (Inline). Blue covers Red.',
+            [
+              _buildZBox('Block', Colors.red, YogaDisplay.block, -30),
+              _buildZBox('Inline', Colors.blue, YogaDisplay.inline, 0),
+            ],
+          ),
+          _buildZOrderTestCase(
+            'Case 3: Inline vs Block',
+            'Blue (Inline) -> Red (Block). Blue covers Red (Inline > Block).',
+            [
+              _buildZBox('Inline', Colors.blue, YogaDisplay.inline, -30),
+              _buildZBox('Block', Colors.red, YogaDisplay.block, 0),
+            ],
+          ),
+          _buildZOrderTestCase(
+            'Case 4: Inline vs Inline',
+            'Blue (Inline) -> Orange (Inline). Orange covers Blue.',
+            [
+              _buildZBox('Inline 1', Colors.blue, YogaDisplay.inline, -30),
+              _buildZBox('Inline 2', Colors.orange, YogaDisplay.inline, 0),
+            ],
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildZOrderTestCase(
+    String title,
+    String desc,
+    List<Widget> children,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+          child: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 2.0),
+          child: Text(
+            desc,
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+          ),
+        ),
+        Container(
+          color: Colors.grey[300],
+          width: double.infinity,
+          height: 120,
+          margin: const EdgeInsets.only(bottom: 10),
+          child: YogaLayout(
+            display: YogaDisplay.flex,
+            useWebDefaults: _useWebDefaults,
+            flexDirection: YGFlexDirection.column,
+            alignItems: YGAlign.center,
+            justifyContent: YGJustify.center,
+            children: children,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildZBox(
+    String text,
+    Color color,
+    YogaDisplay display,
+    double marginBottom,
+  ) {
+    return YogaItem(
+      display: display,
+      width: YogaValue.pt(80),
+      height: YogaValue.pt(60),
+      margin: YogaEdgeInsets.only(bottom: YogaValue.point(marginBottom)),
+      child: Container(
+        // Use some transparency to see overlaps
+        color: color.withValues(alpha: 0.9),
+        alignment: Alignment.center,
+        child: Text(
+          text,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
