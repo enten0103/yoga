@@ -60,18 +60,54 @@ class KeywordBorderWidth extends HtmlBorderWidth {
   const KeywordBorderWidth(this.keyword);
 }
 
-class HtmlBorder {
+class HtmlBorderSide {
   final HtmlBorderWidth width;
   final HtmlBorderStyle style;
   final Color color;
-  final ImageProvider? image;
 
-  const HtmlBorder({
+  const HtmlBorderSide({
     this.width = const KeywordBorderWidth(BorderWidthKeyword.medium),
     this.style = HtmlBorderStyle.solid,
     this.color = const Color(0xFF000000),
-    this.image,
   });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderSide &&
+        other.width == width &&
+        other.style == style &&
+        other.color == color;
+  }
+
+  @override
+  int get hashCode => Object.hash(width, style, color);
+}
+
+class HtmlBorder {
+  final HtmlBorderSide top;
+  final HtmlBorderSide right;
+  final HtmlBorderSide bottom;
+  final HtmlBorderSide left;
+
+  const HtmlBorder({
+    this.top = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
+    this.right = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
+    this.bottom = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
+    this.left = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
+    D,
+  });
+
+  factory HtmlBorder.all({
+    HtmlBorderWidth width = const KeywordBorderWidth(BorderWidthKeyword.medium),
+    HtmlBorderStyle style = HtmlBorderStyle.solid,
+    Color color = const Color(0xFF000000),
+  }) {
+    final side = HtmlBorderSide(width: width, style: style, color: color);
+    return HtmlBorder(top: side, right: side, bottom: side, left: side);
+  }
+
+  bool get isUniform => top == right && right == bottom && bottom == left;
 }
 
 class HtmlDiv extends MultiChildRenderObjectWidget {
@@ -120,7 +156,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlBorder? _border;
   HtmlBoxSizing _boxSizing;
 
-  double _computedBorderWidth = 0.0;
+  EdgeInsets _computedBorderWidths = EdgeInsets.zero;
 
   RenderHtmlDiv({
     required HtmlSize width,
@@ -172,9 +208,9 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
-  double _calculateBorderWidth(double containerWidth) {
-    if (_border == null || _border!.style == HtmlBorderStyle.hidden) return 0.0;
-    final w = _border!.width;
+  double _getSideWidth(HtmlBorderSide side, double containerWidth) {
+    if (side.style == HtmlBorderStyle.hidden) return 0.0;
+    final w = side.width;
     if (w is FixedBorderWidth) return w.value;
     if (w is KeywordBorderWidth) {
       switch (w.keyword) {
@@ -192,9 +228,20 @@ class RenderHtmlDiv extends RenderBox
     return 0.0;
   }
 
+  EdgeInsets _calculateBorderWidths(double containerWidth) {
+    if (_border == null) return EdgeInsets.zero;
+    return EdgeInsets.fromLTRB(
+      _getSideWidth(_border!.left, containerWidth),
+      _getSideWidth(_border!.top, containerWidth),
+      _getSideWidth(_border!.right, containerWidth),
+      _getSideWidth(_border!.bottom, containerWidth),
+    );
+  }
+
   @override
   double computeMinIntrinsicWidth(double height) {
-    double borderW = _calculateBorderWidth(0);
+    EdgeInsets borderW = _calculateBorderWidths(0);
+    double borderHorizontal = borderW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
@@ -207,15 +254,16 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentW + 2 * borderW;
+      return contentW + borderHorizontal;
     } else {
-      return math.max(contentW, 2 * borderW);
+      return math.max(contentW, borderHorizontal);
     }
   }
 
   @override
   double computeMaxIntrinsicWidth(double height) {
-    double borderW = _calculateBorderWidth(0);
+    EdgeInsets borderW = _calculateBorderWidths(0);
+    double borderHorizontal = borderW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
@@ -228,15 +276,16 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentW + 2 * borderW;
+      return contentW + borderHorizontal;
     } else {
-      return math.max(contentW, 2 * borderW);
+      return math.max(contentW, borderHorizontal);
     }
   }
 
   @override
   double computeMinIntrinsicHeight(double width) {
-    double borderW = _calculateBorderWidth(width.isFinite ? width : 0);
+    EdgeInsets borderW = _calculateBorderWidths(width.isFinite ? width : 0);
+    double borderVertical = borderW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
@@ -249,15 +298,16 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentH + 2 * borderW;
+      return contentH + borderVertical;
     } else {
-      return math.max(contentH, 2 * borderW);
+      return math.max(contentH, borderVertical);
     }
   }
 
   @override
   double computeMaxIntrinsicHeight(double width) {
-    double borderW = _calculateBorderWidth(width.isFinite ? width : 0);
+    EdgeInsets borderW = _calculateBorderWidths(width.isFinite ? width : 0);
+    double borderVertical = borderW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
@@ -270,9 +320,9 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentH + 2 * borderW;
+      return contentH + borderVertical;
     } else {
-      return math.max(contentH, 2 * borderW);
+      return math.max(contentH, borderVertical);
     }
   }
 
@@ -281,8 +331,9 @@ class RenderHtmlDiv extends RenderBox
     double containerWidth = constraints.hasBoundedWidth
         ? constraints.maxWidth
         : 0.0;
-    _computedBorderWidth = _calculateBorderWidth(containerWidth);
-    double borderDouble = 2 * _computedBorderWidth;
+    _computedBorderWidths = _calculateBorderWidths(containerWidth);
+    double borderHorizontal = _computedBorderWidths.horizontal;
+    double borderVertical = _computedBorderWidths.vertical;
 
     double? targetWidth;
     if (_width is FixedSize) {
@@ -301,7 +352,7 @@ class RenderHtmlDiv extends RenderBox
     double contentWidth;
     if (targetWidth != null) {
       if (_boxSizing == HtmlBoxSizing.borderBox) {
-        contentWidth = math.max(0.0, targetWidth - borderDouble);
+        contentWidth = math.max(0.0, targetWidth - borderHorizontal);
       } else {
         contentWidth = targetWidth;
       }
@@ -324,9 +375,9 @@ class RenderHtmlDiv extends RenderBox
 
       double totalWidth = intrinsicWidth;
       if (_boxSizing == HtmlBoxSizing.contentBox) {
-        contentWidth = math.max(0, totalWidth - borderDouble);
+        contentWidth = math.max(0, totalWidth - borderHorizontal);
       } else {
-        contentWidth = math.max(0, totalWidth - borderDouble);
+        contentWidth = math.max(0, totalWidth - borderHorizontal);
       }
       targetWidth = totalWidth;
     }
@@ -334,15 +385,15 @@ class RenderHtmlDiv extends RenderBox
     targetWidth = constraints.constrainWidth(targetWidth);
 
     if (_boxSizing == HtmlBoxSizing.borderBox) {
-      contentWidth = math.max(0.0, targetWidth - borderDouble);
+      contentWidth = math.max(0.0, targetWidth - borderHorizontal);
     } else {
       contentWidth = targetWidth;
     }
 
     BoxConstraints childConstraints = BoxConstraints(maxWidth: contentWidth);
 
-    double yOffset = _computedBorderWidth;
-    double xOffset = _computedBorderWidth;
+    double yOffset = _computedBorderWidths.top;
+    double xOffset = _computedBorderWidths.left;
     double maxChildWidth = 0;
     double currentY = yOffset;
 
@@ -375,17 +426,17 @@ class RenderHtmlDiv extends RenderBox
       if (_boxSizing == HtmlBoxSizing.borderBox) {
         finalHeight = targetHeight;
       } else {
-        finalHeight = targetHeight + borderDouble;
+        finalHeight = targetHeight + borderVertical;
       }
     } else {
-      finalHeight = contentHeight + borderDouble;
+      finalHeight = contentHeight + borderVertical;
     }
 
     double finalWidth;
     if (_boxSizing == HtmlBoxSizing.borderBox) {
       finalWidth = targetWidth;
     } else {
-      finalWidth = targetWidth + borderDouble;
+      finalWidth = targetWidth + borderHorizontal;
     }
 
     size = constraints.constrain(Size(finalWidth, finalHeight));
@@ -393,40 +444,113 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    if (_border != null &&
-        _border!.style != HtmlBorderStyle.hidden &&
-        _computedBorderWidth > 0) {
-      final Paint paint = Paint()
-        ..color = _border!.color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = _computedBorderWidth;
-
-      final Rect borderRect = (offset & size).deflate(
-        _computedBorderWidth / 2.0,
-      );
-
-      switch (_border!.style) {
-        case HtmlBorderStyle.solid:
-          context.canvas.drawRect(borderRect, paint);
-          break;
-        case HtmlBorderStyle.double:
-          double third = _computedBorderWidth / 3.0;
-          paint.strokeWidth = third;
-          context.canvas.drawRect((offset & size).deflate(third / 2.0), paint);
-          context.canvas.drawRect(
-            (offset & size).deflate(_computedBorderWidth - third / 2.0),
-            paint,
-          );
-          break;
-        case HtmlBorderStyle.dotted:
-        case HtmlBorderStyle.dashed:
-          _drawDashedRect(context.canvas, borderRect, paint, _border!.style);
-          break;
-        default:
-          break;
+    if (_border != null) {
+      if (_border!.isUniform) {
+        _paintUniformBorder(context, offset);
+      } else {
+        _paintMixedBorder(context, offset);
       }
     }
     defaultPaint(context, offset);
+  }
+
+  void _paintUniformBorder(PaintingContext context, Offset offset) {
+    final HtmlBorderSide side = _border!.top;
+    final double width = _computedBorderWidths.top;
+
+    if (side.style == HtmlBorderStyle.hidden || width <= 0) return;
+
+    final Paint paint = Paint()
+      ..color = side.color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+
+    final Rect borderRect = (offset & size).deflate(width / 2.0);
+
+    switch (side.style) {
+      case HtmlBorderStyle.solid:
+        context.canvas.drawRect(borderRect, paint);
+        break;
+      case HtmlBorderStyle.double:
+        double third = width / 3.0;
+        paint.strokeWidth = third;
+        context.canvas.drawRect((offset & size).deflate(third / 2.0), paint);
+        context.canvas.drawRect(
+          (offset & size).deflate(width - third / 2.0),
+          paint,
+        );
+        break;
+      case HtmlBorderStyle.dotted:
+      case HtmlBorderStyle.dashed:
+        _drawDashedRect(context.canvas, borderRect, paint, side.style);
+        break;
+      default:
+        break;
+    }
+  }
+
+  void _paintMixedBorder(PaintingContext context, Offset offset) {
+    final Rect outer = offset & size;
+    final Rect inner = Rect.fromLTRB(
+      outer.left + _computedBorderWidths.left,
+      outer.top + _computedBorderWidths.top,
+      outer.right - _computedBorderWidths.right,
+      outer.bottom - _computedBorderWidths.bottom,
+    );
+
+    _paintSide(
+      context.canvas,
+      _border!.top,
+      outer.topLeft,
+      outer.topRight,
+      inner.topRight,
+      inner.topLeft,
+    );
+    _paintSide(
+      context.canvas,
+      _border!.right,
+      outer.topRight,
+      outer.bottomRight,
+      inner.bottomRight,
+      inner.topRight,
+    );
+    _paintSide(
+      context.canvas,
+      _border!.bottom,
+      outer.bottomRight,
+      outer.bottomLeft,
+      inner.bottomLeft,
+      inner.bottomRight,
+    );
+    _paintSide(
+      context.canvas,
+      _border!.left,
+      outer.bottomLeft,
+      outer.topLeft,
+      inner.topLeft,
+      inner.bottomLeft,
+    );
+  }
+
+  void _paintSide(
+    Canvas canvas,
+    HtmlBorderSide side,
+    Offset p1,
+    Offset p2,
+    Offset p3,
+    Offset p4,
+  ) {
+    if (side.style == HtmlBorderStyle.hidden) return;
+
+    final Paint paint = Paint()..color = side.color;
+    paint.style = PaintingStyle.fill;
+    final Path path = Path()
+      ..moveTo(p1.dx, p1.dy)
+      ..lineTo(p2.dx, p2.dy)
+      ..lineTo(p3.dx, p3.dy)
+      ..lineTo(p4.dx, p4.dy)
+      ..close();
+    canvas.drawPath(path, paint);
   }
 
   void _drawDashedRect(

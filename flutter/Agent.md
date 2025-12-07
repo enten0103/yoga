@@ -40,6 +40,7 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   `border` property support.
     *   Styles: `solid`, `dashed`, `dotted`, `double`, `hidden`.
     *   Widths: Fixed, Percent, Keywords (thin, medium, thick).
+    *   **Mixed Borders**: Support for individual side configuration (top, right, bottom, left).
 4.  **Box Model**:
     *   `box-sizing` support:
         *   `content-box` (default): Width/Height applies to content only.
@@ -55,17 +56,3 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
 *   Implement `border-radius`.
 *   Add support for `background` (color, image).
 
-## Git Commit Message
-
-```text
-feat: Implement border and box-sizing for HtmlDiv
-
-- Added `HtmlBorder`, `HtmlBorderWidth`, `HtmlBorderStyle` classes.
-- Added `HtmlBoxSizing` enum (content-box, border-box).
-- Updated `RenderHtmlDiv` to handle border layout and painting.
-- Implemented dashed and dotted border painting.
-- Added `test/html_div_border_test.dart` covering box models and border widths.
-- Added `example/lib/pages/border_demo_page.dart` to visualize borders.
-- Updated `example/lib/main.dart` with new demos.
-- Fixed linting issues in `yoga_ffi.dart` and example app.
-```

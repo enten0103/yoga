@@ -14,7 +14,10 @@ class BorderDemoPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('BoxSizing 对比 (100x100, 10px Border)', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                'BoxSizing 对比 (100x100, 10px Border)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -28,12 +31,16 @@ class BorderDemoPage extends StatelessWidget {
                           width: const FixedSize(100),
                           height: const FixedSize(100),
                           boxSizing: HtmlBoxSizing.contentBox,
-                          border: const HtmlBorder(
-                            width: FixedBorderWidth(10),
+                          border: HtmlBorder.all(
+                            width: const FixedBorderWidth(10),
                             style: HtmlBorderStyle.solid,
                             color: Colors.blue,
                           ),
-                          children: [Container(color: Colors.blue.withValues(alpha: 0.2))],
+                          children: [
+                            Container(
+                              color: Colors.blue.withValues(alpha: 0.2),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -47,12 +54,16 @@ class BorderDemoPage extends StatelessWidget {
                           width: const FixedSize(100),
                           height: const FixedSize(100),
                           boxSizing: HtmlBoxSizing.borderBox,
-                          border: const HtmlBorder(
-                            width: FixedBorderWidth(10),
+                          border: HtmlBorder.all(
+                            width: const FixedBorderWidth(10),
                             style: HtmlBorderStyle.solid,
                             color: Colors.green,
                           ),
-                          children: [Container(color: Colors.green.withValues(alpha: 0.2))],
+                          children: [
+                            Container(
+                              color: Colors.green.withValues(alpha: 0.2),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -60,7 +71,10 @@ class BorderDemoPage extends StatelessWidget {
                 ],
               ),
               const Divider(height: 40),
-              const Text('边框样式 (Border Styles)', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                '边框样式 (Border Styles)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               Wrap(
                 spacing: 20,
@@ -73,16 +87,25 @@ class BorderDemoPage extends StatelessWidget {
                 ],
               ),
               const Divider(height: 40),
-              const Text('边框宽度类型', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text(
+                '边框宽度类型',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 10),
               const Text('Thin / Medium / Thick'),
               Row(
                 children: [
-                  _buildWidthDemo(const KeywordBorderWidth(BorderWidthKeyword.thin)),
+                  _buildWidthDemo(
+                    const KeywordBorderWidth(BorderWidthKeyword.thin),
+                  ),
                   const SizedBox(width: 10),
-                  _buildWidthDemo(const KeywordBorderWidth(BorderWidthKeyword.medium)),
+                  _buildWidthDemo(
+                    const KeywordBorderWidth(BorderWidthKeyword.medium),
+                  ),
                   const SizedBox(width: 10),
-                  _buildWidthDemo(const KeywordBorderWidth(BorderWidthKeyword.thick)),
+                  _buildWidthDemo(
+                    const KeywordBorderWidth(BorderWidthKeyword.thick),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -94,11 +117,39 @@ class BorderDemoPage extends StatelessWidget {
                 alignment: Alignment.center,
                 child: HtmlDiv(
                   width: const FixedSize(100),
-                  height: const FixedSize(50),
-                  border: const HtmlBorder(
-                    width: PercentBorderWidth(10),
+                  height: const PercentSize(50),
+                  border: HtmlBorder.all(
+                    width: const PercentBorderWidth(10),
                     style: HtmlBorderStyle.solid,
-                    color: Colors.purple,
+                    color: Colors.black,
+                  ),
+                ),
+              ),
+              const Divider(height: 40),
+              const Text(
+                '混合边框 (Mixed Borders)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              HtmlDiv(
+                width: const FixedSize(100),
+                height: const FixedSize(100),
+                border: const HtmlBorder(
+                  top: HtmlBorderSide(
+                    width: FixedBorderWidth(10),
+                    color: Colors.red,
+                  ),
+                  right: HtmlBorderSide(
+                    width: FixedBorderWidth(5),
+                    color: Colors.blue,
+                  ),
+                  bottom: HtmlBorderSide(
+                    width: FixedBorderWidth(20),
+                    color: Colors.green,
+                  ),
+                  left: HtmlBorderSide(
+                    width: FixedBorderWidth(2),
+                    color: Colors.yellow,
                   ),
                 ),
               ),
@@ -116,7 +167,7 @@ class BorderDemoPage extends StatelessWidget {
         HtmlDiv(
           width: const FixedSize(80),
           height: const FixedSize(80),
-          border: HtmlBorder(
+          border: HtmlBorder.all(
             width: const FixedBorderWidth(5),
             style: style,
             color: Colors.orange,
@@ -130,7 +181,7 @@ class BorderDemoPage extends StatelessWidget {
     return HtmlDiv(
       width: const FixedSize(50),
       height: const FixedSize(50),
-      border: HtmlBorder(
+      border: HtmlBorder.all(
         width: width,
         style: HtmlBorderStyle.solid,
         color: Colors.teal,
