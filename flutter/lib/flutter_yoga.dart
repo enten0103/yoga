@@ -1,6 +1,6 @@
 import 'flutter_yoga_platform_interface.dart';
 
-export 'src/yoga_ffi.dart';
+export 'html_div.dart';
 
 class FlutterYoga {
   Future<String?> getPlatformVersion() {

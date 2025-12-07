@@ -379,6 +379,7 @@ class Yoga {
       try {
         _lib = DynamicLibrary.open('libyoga.so');
       } catch (e) {
+        // ignore: avoid_print
         print("Failed to load libyoga.so: $e");
         rethrow;
       }
@@ -386,6 +387,7 @@ class Yoga {
       try {
         _lib = DynamicLibrary.open('flutter_yoga_plugin.dll');
       } catch (e) {
+        // ignore: avoid_print
         print("Failed to load flutter_yoga_plugin.dll: $e");
         rethrow;
       }
@@ -695,6 +697,7 @@ class Yoga {
           )
           .asFunction();
     } catch (e) {
+      // ignore: avoid_print
       print("Failed to lookup symbols: $e");
       rethrow;
     }
