@@ -110,10 +110,56 @@ class HtmlBorder {
   bool get isUniform => top == right && right == bottom && bottom == left;
 }
 
+class HtmlBorderRadius {
+  final Radius topLeft;
+  final Radius topRight;
+  final Radius bottomLeft;
+  final Radius bottomRight;
+
+  const HtmlBorderRadius.all(Radius radius)
+      : topLeft = radius,
+        topRight = radius,
+        bottomLeft = radius,
+        bottomRight = radius;
+
+  const HtmlBorderRadius.only({
+    this.topLeft = Radius.zero,
+    this.topRight = Radius.zero,
+    this.bottomLeft = Radius.zero,
+    this.bottomRight = Radius.zero,
+  });
+
+  const HtmlBorderRadius.vertical({
+    Radius top = Radius.zero,
+    Radius bottom = Radius.zero,
+  }) : topLeft = top,
+       topRight = top,
+       bottomLeft = bottom,
+       bottomRight = bottom;
+
+  const HtmlBorderRadius.horizontal({
+    Radius left = Radius.zero,
+    Radius right = Radius.zero,
+  }) : topLeft = left,
+       topRight = right,
+       bottomLeft = left,
+       bottomRight = right;
+
+  BorderRadius toBorderRadius() {
+    return BorderRadius.only(
+      topLeft: topLeft,
+      topRight: topRight,
+      bottomLeft: bottomLeft,
+      bottomRight: bottomRight,
+    );
+  }
+}
+
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
   final HtmlBorder? border;
+  final HtmlBorderRadius? borderRadius;
   final HtmlBoxSizing boxSizing;
 
   const HtmlDiv({
@@ -121,6 +167,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.width = const AutoSize(),
     this.height = const AutoSize(),
     this.border,
+    this.borderRadius,
     this.boxSizing = HtmlBoxSizing.contentBox,
     super.children = const [],
   });
@@ -131,6 +178,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       width: width,
       height: height,
       border: border,
+      borderRadius: borderRadius,
       boxSizing: boxSizing,
     );
   }
@@ -141,6 +189,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..width = width
       ..height = height
       ..border = border
+      ..borderRadius = borderRadius
       ..boxSizing = boxSizing;
   }
 }
@@ -154,6 +203,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlSize _width;
   HtmlSize _height;
   HtmlBorder? _border;
+  HtmlBorderRadius? _borderRadius;
   HtmlBoxSizing _boxSizing;
 
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
@@ -162,10 +212,12 @@ class RenderHtmlDiv extends RenderBox
     required HtmlSize width,
     required HtmlSize height,
     HtmlBorder? border,
+    HtmlBorderRadius? borderRadius,
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
        _border = border,
+       _borderRadius = borderRadius,
        _boxSizing = boxSizing;
 
   HtmlSize get width => _width;
@@ -189,6 +241,14 @@ class RenderHtmlDiv extends RenderBox
     if (_border != value) {
       _border = value;
       markNeedsLayout();
+      markNeedsPaint();
+    }
+  }
+
+  HtmlBorderRadius? get borderRadius => _borderRadius;
+  set borderRadius(HtmlBorderRadius? value) {
+    if (_borderRadius != value) {
+      _borderRadius = value;
       markNeedsPaint();
     }
   }
@@ -466,23 +526,40 @@ class RenderHtmlDiv extends RenderBox
       ..strokeWidth = width;
 
     final Rect borderRect = (offset & size).deflate(width / 2.0);
+    RRect? borderRRect;
+    if (_borderRadius != null) {
+      borderRRect = _borderRadius!.toBorderRadius().toRRect(borderRect);
+    }
 
     switch (side.style) {
       case HtmlBorderStyle.solid:
-        context.canvas.drawRect(borderRect, paint);
+        if (borderRRect != null) {
+          context.canvas.drawRRect(borderRRect, paint);
+        } else {
+          context.canvas.drawRect(borderRect, paint);
+        }
         break;
       case HtmlBorderStyle.double:
         double third = width / 3.0;
         paint.strokeWidth = third;
-        context.canvas.drawRect((offset & size).deflate(third / 2.0), paint);
-        context.canvas.drawRect(
-          (offset & size).deflate(width - third / 2.0),
-          paint,
-        );
+        if (borderRRect != null) {
+          context.canvas.drawRRect(borderRRect.deflate(third), paint);
+          context.canvas.drawRRect(borderRRect.deflate(-third), paint);
+        } else {
+          context.canvas.drawRect((offset & size).deflate(third / 2.0), paint);
+          context.canvas.drawRect(
+            (offset & size).deflate(width - third / 2.0),
+            paint,
+          );
+        }
         break;
       case HtmlBorderStyle.dotted:
       case HtmlBorderStyle.dashed:
-        _drawDashedRect(context.canvas, borderRect, paint, side.style);
+        if (borderRRect != null) {
+          _drawDashedRRect(context.canvas, borderRRect, paint, side.style);
+        } else {
+          _drawDashedRect(context.canvas, borderRect, paint, side.style);
+        }
         break;
       default:
         break;
@@ -560,6 +637,25 @@ class RenderHtmlDiv extends RenderBox
     HtmlBorderStyle style,
   ) {
     final Path path = Path()..addRect(rect);
+    _drawDashedPath(canvas, path, paint, style);
+  }
+
+  void _drawDashedRRect(
+    Canvas canvas,
+    RRect rrect,
+    Paint paint,
+    HtmlBorderStyle style,
+  ) {
+    final Path path = Path()..addRRect(rrect);
+    _drawDashedPath(canvas, path, paint, style);
+  }
+
+  void _drawDashedPath(
+    Canvas canvas,
+    Path path,
+    Paint paint,
+    HtmlBorderStyle style,
+  ) {
     final double dashWidth = style == HtmlBorderStyle.dotted
         ? paint.strokeWidth
         : paint.strokeWidth * 3;

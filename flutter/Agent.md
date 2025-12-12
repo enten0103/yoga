@@ -41,6 +41,7 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   Styles: `solid`, `dashed`, `dotted`, `double`, `hidden`.
     *   Widths: Fixed, Percent, Keywords (thin, medium, thick).
     *   **Mixed Borders**: Support for individual side configuration (top, right, bottom, left).
+    *   **Border Radius**: Support for rounded corners (uniform and individual) with `HtmlBorderRadius`.
 4.  **Box Model**:
     *   `box-sizing` support:
         *   `content-box` (default): Width/Height applies to content only.
@@ -53,6 +54,5 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
 ### Next Steps
 *   Implement `padding` and `margin` support in `HtmlDiv`.
 *   Integrate `HtmlDiv` more deeply with Yoga FFI for complex Flexbox layouts (row/column directions, alignment).
-*   Implement `border-radius`.
 *   Add support for `background` (color, image).
 

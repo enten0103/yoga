@@ -6,6 +6,8 @@ import 'pages/auto_size_height_page.dart';
 import 'pages/nested_layout_page.dart';
 import 'pages/min_content_width_page.dart';
 import 'pages/border_demo_page.dart';
+import 'pages/content_sizing_demo_page.dart';
+import 'pages/border_radius_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -59,6 +61,14 @@ class HomePage extends StatelessWidget {
           ListTile(
             title: const Text('HtmlDiv 边框与盒模型示例'),
             onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BorderDemoPage())),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv 内容尺寸示例 (Min/Max/Fit)'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ContentSizingDemoPage())),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv 圆角边框示例'),
+            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const BorderRadiusPage())),
           ),
         ],
       ),
