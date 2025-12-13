@@ -89,22 +89,34 @@ class HtmlBorder {
   final HtmlBorderSide right;
   final HtmlBorderSide bottom;
   final HtmlBorderSide left;
+  final HtmlBorderImage? borderImage;
+  final HtmlBorderImageSides? borderImageSides;
 
   const HtmlBorder({
     this.top = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
     this.right = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
     this.bottom = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
     this.left = const HtmlBorderSide(style: HtmlBorderStyle.hidden),
-    D,
+    this.borderImage,
+    this.borderImageSides,
   });
 
   factory HtmlBorder.all({
     HtmlBorderWidth width = const KeywordBorderWidth(BorderWidthKeyword.medium),
     HtmlBorderStyle style = HtmlBorderStyle.solid,
     Color color = const Color(0xFF000000),
+    HtmlBorderImage? borderImage,
+    HtmlBorderImageSides? borderImageSides,
   }) {
     final side = HtmlBorderSide(width: width, style: style, color: color);
-    return HtmlBorder(top: side, right: side, bottom: side, left: side);
+    return HtmlBorder(
+      top: side,
+      right: side,
+      bottom: side,
+      left: side,
+      borderImage: borderImage,
+      borderImageSides: borderImageSides,
+    );
   }
 
   bool get isUniform => top == right && right == bottom && bottom == left;
@@ -117,10 +129,10 @@ class HtmlBorderRadius {
   final Radius bottomRight;
 
   const HtmlBorderRadius.all(Radius radius)
-      : topLeft = radius,
-        topRight = radius,
-        bottomLeft = radius,
-        bottomRight = radius;
+    : topLeft = radius,
+      topRight = radius,
+      bottomLeft = radius,
+      bottomRight = radius;
 
   const HtmlBorderRadius.only({
     this.topLeft = Radius.zero,
@@ -155,6 +167,246 @@ class HtmlBorderRadius {
   }
 }
 
+// Border Image (CSS-aligned model)
+//
+// Mirrors the main CSS border-image longhands:
+// - border-image-source
+// - border-image-slice
+// - border-image-width
+// - border-image-outset
+// - border-image-repeat
+
+enum HtmlBorderImageRepeat { stretch, repeat, round, space }
+
+enum HtmlBorderImageUnit { number, px, percent, auto }
+
+class HtmlBorderImageSideValue {
+  final double value;
+  final HtmlBorderImageUnit unit;
+
+  const HtmlBorderImageSideValue._(this.value, this.unit);
+
+  const HtmlBorderImageSideValue.number(double value)
+    : this._(value, HtmlBorderImageUnit.number);
+
+  const HtmlBorderImageSideValue.px(double value)
+    : this._(value, HtmlBorderImageUnit.px);
+
+  const HtmlBorderImageSideValue.percent(double value)
+    : this._(value, HtmlBorderImageUnit.percent);
+
+  const HtmlBorderImageSideValue.auto() : this._(0, HtmlBorderImageUnit.auto);
+
+  double resolve({required double borderWidth, required double reference}) {
+    switch (unit) {
+      case HtmlBorderImageUnit.number:
+        return value * borderWidth;
+      case HtmlBorderImageUnit.px:
+        return value;
+      case HtmlBorderImageUnit.percent:
+        return reference * value / 100.0;
+      case HtmlBorderImageUnit.auto:
+        return borderWidth;
+    }
+  }
+
+  double resolveOutset({
+    required double borderWidth,
+    required double reference,
+  }) {
+    switch (unit) {
+      case HtmlBorderImageUnit.number:
+        return value * borderWidth;
+      case HtmlBorderImageUnit.px:
+        return value;
+      case HtmlBorderImageUnit.percent:
+        return reference * value / 100.0;
+      case HtmlBorderImageUnit.auto:
+        // CSS doesn't define `auto` for outset; treat as 0.
+        return 0.0;
+    }
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderImageSideValue &&
+        other.value == value &&
+        other.unit == unit;
+  }
+
+  @override
+  int get hashCode => Object.hash(value, unit);
+}
+
+class HtmlBorderImageSliceValue {
+  final double value;
+  final bool isPercent;
+  const HtmlBorderImageSliceValue._(this.value, this.isPercent);
+  const HtmlBorderImageSliceValue.px(double value) : this._(value, false);
+  const HtmlBorderImageSliceValue.percent(double value) : this._(value, true);
+
+  double resolvePx({required double referencePx}) {
+    if (isPercent) return referencePx * value / 100.0;
+    return value;
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderImageSliceValue &&
+        other.value == value &&
+        other.isPercent == isPercent;
+  }
+
+  @override
+  int get hashCode => Object.hash(value, isPercent);
+}
+
+class HtmlBorderImageSlice {
+  final HtmlBorderImageSliceValue top;
+  final HtmlBorderImageSliceValue right;
+  final HtmlBorderImageSliceValue bottom;
+  final HtmlBorderImageSliceValue left;
+  final bool fill;
+
+  const HtmlBorderImageSlice({
+    required this.top,
+    required this.right,
+    required this.bottom,
+    required this.left,
+    this.fill = false,
+  });
+
+  const HtmlBorderImageSlice.all(
+    HtmlBorderImageSliceValue value, {
+    this.fill = false,
+  }) : top = value,
+       right = value,
+       bottom = value,
+       left = value;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderImageSlice &&
+        other.top == top &&
+        other.right == right &&
+        other.bottom == bottom &&
+        other.left == left &&
+        other.fill == fill;
+  }
+
+  @override
+  int get hashCode => Object.hash(top, right, bottom, left, fill);
+}
+
+class HtmlBorderImageSideValues {
+  final HtmlBorderImageSideValue top;
+  final HtmlBorderImageSideValue right;
+  final HtmlBorderImageSideValue bottom;
+  final HtmlBorderImageSideValue left;
+
+  const HtmlBorderImageSideValues({
+    required this.top,
+    required this.right,
+    required this.bottom,
+    required this.left,
+  });
+
+  const HtmlBorderImageSideValues.all(HtmlBorderImageSideValue value)
+    : top = value,
+      right = value,
+      bottom = value,
+      left = value;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderImageSideValues &&
+        other.top == top &&
+        other.right == right &&
+        other.bottom == bottom &&
+        other.left == left;
+  }
+
+  @override
+  int get hashCode => Object.hash(top, right, bottom, left);
+}
+
+class HtmlBorderImage {
+  final ImageProvider image;
+  final HtmlBorderImageSlice slice;
+  final HtmlBorderImageSideValues width;
+  final HtmlBorderImageSideValues outset;
+  final HtmlBorderImageRepeat repeatX;
+  final HtmlBorderImageRepeat repeatY;
+
+  const HtmlBorderImage({
+    required this.image,
+    this.slice = const HtmlBorderImageSlice.all(
+      HtmlBorderImageSliceValue.percent(100),
+    ),
+    this.width = const HtmlBorderImageSideValues.all(
+      HtmlBorderImageSideValue.auto(),
+    ),
+    this.outset = const HtmlBorderImageSideValues.all(
+      HtmlBorderImageSideValue.px(0),
+    ),
+    this.repeatX = HtmlBorderImageRepeat.stretch,
+    this.repeatY = HtmlBorderImageRepeat.stretch,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlBorderImage &&
+        other.image == image &&
+        other.slice == slice &&
+        other.width == width &&
+        other.outset == outset &&
+        other.repeatX == repeatX &&
+        other.repeatY == repeatY;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(image, slice, width, outset, repeatX, repeatY);
+}
+
+class HtmlBorderImageSides {
+  final HtmlBorderImage? top;
+  final HtmlBorderImage? right;
+  final HtmlBorderImage? bottom;
+  final HtmlBorderImage? left;
+
+  const HtmlBorderImageSides({this.top, this.right, this.bottom, this.left});
+}
+
+class _NineSliceSrcRects {
+  final Rect topLeft;
+  final Rect top;
+  final Rect topRight;
+  final Rect left;
+  final Rect center;
+  final Rect right;
+  final Rect bottomLeft;
+  final Rect bottom;
+  final Rect bottomRight;
+
+  const _NineSliceSrcRects({
+    required this.topLeft,
+    required this.top,
+    required this.topRight,
+    required this.left,
+    required this.center,
+    required this.right,
+    required this.bottomLeft,
+    required this.bottom,
+    required this.bottomRight,
+  });
+}
+
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
@@ -179,6 +431,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       height: height,
       border: border,
       borderRadius: borderRadius,
+      imageConfiguration: createLocalImageConfiguration(context),
       boxSizing: boxSizing,
     );
   }
@@ -190,6 +443,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..height = height
       ..border = border
       ..borderRadius = borderRadius
+      ..imageConfiguration = createLocalImageConfiguration(context)
       ..boxSizing = boxSizing;
   }
 }
@@ -204,6 +458,13 @@ class RenderHtmlDiv extends RenderBox
   HtmlSize _height;
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
+  ImageConfiguration _imageConfiguration = ImageConfiguration.empty;
+  final Map<ImageProvider, ImageStream> _borderImageStreams =
+      <ImageProvider, ImageStream>{};
+  final Map<ImageProvider, ImageInfo?> _borderImageInfos =
+      <ImageProvider, ImageInfo?>{};
+  final Map<ImageProvider, ImageStreamListener> _borderImageListeners =
+      <ImageProvider, ImageStreamListener>{};
   HtmlBoxSizing _boxSizing;
 
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
@@ -213,12 +474,32 @@ class RenderHtmlDiv extends RenderBox
     required HtmlSize height,
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
+    ImageConfiguration imageConfiguration = ImageConfiguration.empty,
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
        _border = border,
        _borderRadius = borderRadius,
+       _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    _resolveBorderImages();
+  }
+
+  @override
+  void detach() {
+    _stopListeningToBorderImages();
+    super.detach();
+  }
+
+  @override
+  void dispose() {
+    _stopListeningToBorderImages();
+    super.dispose();
+  }
 
   HtmlSize get width => _width;
   set width(HtmlSize value) {
@@ -240,6 +521,7 @@ class RenderHtmlDiv extends RenderBox
   set border(HtmlBorder? value) {
     if (_border != value) {
       _border = value;
+      _resolveBorderImages();
       markNeedsLayout();
       markNeedsPaint();
     }
@@ -253,11 +535,93 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
+  ImageConfiguration get imageConfiguration => _imageConfiguration;
+  set imageConfiguration(ImageConfiguration value) {
+    if (_imageConfiguration != value) {
+      _imageConfiguration = value;
+      _resolveBorderImages();
+      markNeedsPaint();
+    }
+  }
+
   HtmlBoxSizing get boxSizing => _boxSizing;
   set boxSizing(HtmlBoxSizing value) {
     if (_boxSizing != value) {
       _boxSizing = value;
       markNeedsLayout();
+    }
+  }
+
+  void _stopListeningToBorderImages() {
+    for (final entry in _borderImageStreams.entries) {
+      final provider = entry.key;
+      final stream = entry.value;
+      final listener = _borderImageListeners[provider];
+      if (listener != null) stream.removeListener(listener);
+    }
+    _borderImageStreams.clear();
+    _borderImageInfos.clear();
+    _borderImageListeners.clear();
+  }
+
+  Iterable<ImageProvider> _collectBorderImageProviders() sync* {
+    final HtmlBorder? b = _border;
+    final HtmlBorderImage? base = b?.borderImage;
+    if (base == null) return;
+
+    yield base.image;
+    final HtmlBorderImageSides? sides = b?.borderImageSides;
+    if (sides?.top != null) yield sides!.top!.image;
+    if (sides?.right != null) yield sides!.right!.image;
+    if (sides?.bottom != null) yield sides!.bottom!.image;
+    if (sides?.left != null) yield sides!.left!.image;
+  }
+
+  void _resolveBorderImages() {
+    if (!attached) return;
+
+    final Set<ImageProvider> required = _collectBorderImageProviders().toSet();
+
+    // Remove old listeners.
+    final List<ImageProvider> toRemove = _borderImageStreams.keys
+        .where((p) => !required.contains(p))
+        .toList(growable: false);
+    for (final provider in toRemove) {
+      final stream = _borderImageStreams.remove(provider);
+      final listener = _borderImageListeners.remove(provider);
+      if (stream != null && listener != null) stream.removeListener(listener);
+      _borderImageInfos.remove(provider);
+    }
+
+    // Add/update required.
+    for (final provider in required) {
+      final ImageStream newStream = provider.resolve(_imageConfiguration);
+      final ImageStream? oldStream = _borderImageStreams[provider];
+
+      if (oldStream?.key == newStream.key &&
+          _borderImageListeners.containsKey(provider)) {
+        continue;
+      }
+
+      final oldListener = _borderImageListeners[provider];
+      if (oldStream != null && oldListener != null) {
+        oldStream.removeListener(oldListener);
+      }
+
+      final listener = ImageStreamListener(
+        (ImageInfo image, bool synchronousCall) {
+          _borderImageInfos[provider] = image;
+          markNeedsPaint();
+        },
+        onError: (Object exception, StackTrace? stackTrace) {
+          _borderImageInfos[provider] = null;
+          markNeedsPaint();
+        },
+      );
+
+      _borderImageStreams[provider] = newStream;
+      _borderImageListeners[provider] = listener;
+      newStream.addListener(listener);
     }
   }
 
@@ -504,7 +868,8 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
-    if (_border != null) {
+    final bool paintedBorderImage = _paintBorderImageIfNeeded(context, offset);
+    if (!paintedBorderImage && _border != null) {
       if (_border!.isUniform) {
         _paintUniformBorder(context, offset);
       } else {
@@ -512,6 +877,482 @@ class RenderHtmlDiv extends RenderBox
       }
     }
     defaultPaint(context, offset);
+  }
+
+  bool _paintBorderImageIfNeeded(PaintingContext context, Offset offset) {
+    if (_border == null) return false;
+    final HtmlBorderImage? base = _border!.borderImage;
+    if (base == null) return false;
+    if (_computedBorderWidths == EdgeInsets.zero) return false;
+
+    // Per CSS: if border-style is none/hidden, border image shouldn't show.
+    if (_border!.top.style == HtmlBorderStyle.hidden &&
+        _border!.right.style == HtmlBorderStyle.hidden &&
+        _border!.bottom.style == HtmlBorderStyle.hidden &&
+        _border!.left.style == HtmlBorderStyle.hidden) {
+      return false;
+    }
+
+    ImageInfo? infoFor(HtmlBorderImage bi) => _borderImageInfos[bi.image];
+
+    final ImageInfo? baseInfo = infoFor(base);
+    if (baseInfo == null) return false;
+
+    HtmlBorderImage pickSide(HtmlBorderImage? override) {
+      if (override == null) return base;
+      return infoFor(override) == null ? base : override;
+    }
+
+    final HtmlBorderImageSides? sideOverrides = _border!.borderImageSides;
+    final HtmlBorderImage topBi = pickSide(sideOverrides?.top);
+    final HtmlBorderImage rightBi = pickSide(sideOverrides?.right);
+    final HtmlBorderImage bottomBi = pickSide(sideOverrides?.bottom);
+    final HtmlBorderImage leftBi = pickSide(sideOverrides?.left);
+
+    final ImageInfo topInfo = infoFor(topBi) ?? baseInfo;
+    final ImageInfo rightInfo = infoFor(rightBi) ?? baseInfo;
+    final ImageInfo bottomInfo = infoFor(bottomBi) ?? baseInfo;
+    final ImageInfo leftInfo = infoFor(leftBi) ?? baseInfo;
+
+    final Rect borderBox = offset & size;
+
+    final EdgeInsets borderWidths = _computedBorderWidths;
+
+    final EdgeInsets imageWidths = EdgeInsets.fromLTRB(
+      leftBi.width.left.resolve(
+        borderWidth: borderWidths.left,
+        reference: borderBox.width,
+      ),
+      topBi.width.top.resolve(
+        borderWidth: borderWidths.top,
+        reference: borderBox.height,
+      ),
+      rightBi.width.right.resolve(
+        borderWidth: borderWidths.right,
+        reference: borderBox.width,
+      ),
+      bottomBi.width.bottom.resolve(
+        borderWidth: borderWidths.bottom,
+        reference: borderBox.height,
+      ),
+    );
+
+    final EdgeInsets outset = EdgeInsets.fromLTRB(
+      leftBi.outset.left.resolveOutset(
+        borderWidth: borderWidths.left,
+        reference: borderBox.width,
+      ),
+      topBi.outset.top.resolveOutset(
+        borderWidth: borderWidths.top,
+        reference: borderBox.height,
+      ),
+      rightBi.outset.right.resolveOutset(
+        borderWidth: borderWidths.right,
+        reference: borderBox.width,
+      ),
+      bottomBi.outset.bottom.resolveOutset(
+        borderWidth: borderWidths.bottom,
+        reference: borderBox.height,
+      ),
+    );
+
+    final Rect outer = Rect.fromLTRB(
+      borderBox.left - outset.left,
+      borderBox.top - outset.top,
+      borderBox.right + outset.right,
+      borderBox.bottom + outset.bottom,
+    );
+
+    final Rect inner = Rect.fromLTRB(
+      borderBox.left + imageWidths.left,
+      borderBox.top + imageWidths.top,
+      borderBox.right - imageWidths.right,
+      borderBox.bottom - imageWidths.bottom,
+    );
+
+    if (outer.width <= 0 || outer.height <= 0) return false;
+    if (inner.left > inner.right || inner.top > inner.bottom) return false;
+
+    _NineSliceSrcRects srcFor(HtmlBorderImage bi, ui.Image image) {
+      final double imgW = image.width.toDouble();
+      final double imgH = image.height.toDouble();
+      double sliceTop = bi.slice.top
+          .resolvePx(referencePx: imgH)
+          .clamp(0.0, imgH);
+      double sliceBottom = bi.slice.bottom
+          .resolvePx(referencePx: imgH)
+          .clamp(0.0, imgH);
+      double sliceLeft = bi.slice.left
+          .resolvePx(referencePx: imgW)
+          .clamp(0.0, imgW);
+      double sliceRight = bi.slice.right
+          .resolvePx(referencePx: imgW)
+          .clamp(0.0, imgW);
+
+      if (sliceLeft + sliceRight > imgW) {
+        final double scaleFactor = imgW / (sliceLeft + sliceRight);
+        sliceLeft *= scaleFactor;
+        sliceRight *= scaleFactor;
+      }
+      if (sliceTop + sliceBottom > imgH) {
+        final double scaleFactor = imgH / (sliceTop + sliceBottom);
+        sliceTop *= scaleFactor;
+        sliceBottom *= scaleFactor;
+      }
+
+      final Rect srcTopLeft = Rect.fromLTWH(0, 0, sliceLeft, sliceTop);
+      final Rect srcTop = Rect.fromLTRB(
+        sliceLeft,
+        0,
+        imgW - sliceRight,
+        sliceTop,
+      );
+      final Rect srcTopRight = Rect.fromLTRB(
+        imgW - sliceRight,
+        0,
+        imgW,
+        sliceTop,
+      );
+
+      final Rect srcLeft = Rect.fromLTRB(
+        0,
+        sliceTop,
+        sliceLeft,
+        imgH - sliceBottom,
+      );
+      final Rect srcCenter = Rect.fromLTRB(
+        sliceLeft,
+        sliceTop,
+        imgW - sliceRight,
+        imgH - sliceBottom,
+      );
+      final Rect srcRight = Rect.fromLTRB(
+        imgW - sliceRight,
+        sliceTop,
+        imgW,
+        imgH - sliceBottom,
+      );
+
+      final Rect srcBottomLeft = Rect.fromLTRB(
+        0,
+        imgH - sliceBottom,
+        sliceLeft,
+        imgH,
+      );
+      final Rect srcBottom = Rect.fromLTRB(
+        sliceLeft,
+        imgH - sliceBottom,
+        imgW - sliceRight,
+        imgH,
+      );
+      final Rect srcBottomRight = Rect.fromLTRB(
+        imgW - sliceRight,
+        imgH - sliceBottom,
+        imgW,
+        imgH,
+      );
+
+      return _NineSliceSrcRects(
+        topLeft: srcTopLeft,
+        top: srcTop,
+        topRight: srcTopRight,
+        left: srcLeft,
+        center: srcCenter,
+        right: srcRight,
+        bottomLeft: srcBottomLeft,
+        bottom: srcBottom,
+        bottomRight: srcBottomRight,
+      );
+    }
+
+    final Rect dstTopLeft = Rect.fromLTRB(
+      outer.left,
+      outer.top,
+      inner.left,
+      inner.top,
+    );
+    final Rect dstTop = Rect.fromLTRB(
+      inner.left,
+      outer.top,
+      inner.right,
+      inner.top,
+    );
+    final Rect dstTopRight = Rect.fromLTRB(
+      inner.right,
+      outer.top,
+      outer.right,
+      inner.top,
+    );
+
+    final Rect dstLeft = Rect.fromLTRB(
+      outer.left,
+      inner.top,
+      inner.left,
+      inner.bottom,
+    );
+    final Rect dstCenter = Rect.fromLTRB(
+      inner.left,
+      inner.top,
+      inner.right,
+      inner.bottom,
+    );
+    final Rect dstRight = Rect.fromLTRB(
+      inner.right,
+      inner.top,
+      outer.right,
+      inner.bottom,
+    );
+
+    final Rect dstBottomLeft = Rect.fromLTRB(
+      outer.left,
+      inner.bottom,
+      inner.left,
+      outer.bottom,
+    );
+    final Rect dstBottom = Rect.fromLTRB(
+      inner.left,
+      inner.bottom,
+      inner.right,
+      outer.bottom,
+    );
+    final Rect dstBottomRight = Rect.fromLTRB(
+      inner.right,
+      inner.bottom,
+      outer.right,
+      outer.bottom,
+    );
+
+    final Canvas canvas = context.canvas;
+
+    // Clip to border box radius if any.
+    if (_borderRadius != null) {
+      canvas.save();
+      final RRect clipRRect = _borderRadius!.toBorderRadius().toRRect(
+        borderBox,
+      );
+      canvas.clipRRect(clipRRect);
+    }
+
+    final bool topHidden = _border!.top.style == HtmlBorderStyle.hidden;
+    final bool rightHidden = _border!.right.style == HtmlBorderStyle.hidden;
+    final bool bottomHidden = _border!.bottom.style == HtmlBorderStyle.hidden;
+    final bool leftHidden = _border!.left.style == HtmlBorderStyle.hidden;
+
+    // Corners follow vertical sides (left/right) when overrides differ.
+    if (!(topHidden && leftHidden)) {
+      final ui.Image cornerImage = leftInfo.image;
+      final _NineSliceSrcRects src = srcFor(leftBi, cornerImage);
+      _drawImageRectSafe(canvas, cornerImage, src.topLeft, dstTopLeft);
+    }
+    if (!topHidden) {
+      final ui.Image edgeImage = topInfo.image;
+      final _NineSliceSrcRects src = srcFor(topBi, edgeImage);
+      _drawEdge(
+        canvas,
+        edgeImage,
+        src.top,
+        dstTop,
+        axis: Axis.horizontal,
+        repeat: topBi.repeatX,
+        scale: topInfo.scale,
+      );
+    }
+    if (!(topHidden && rightHidden)) {
+      final ui.Image cornerImage = rightInfo.image;
+      final _NineSliceSrcRects src = srcFor(rightBi, cornerImage);
+      _drawImageRectSafe(canvas, cornerImage, src.topRight, dstTopRight);
+    }
+
+    if (!leftHidden) {
+      final ui.Image edgeImage = leftInfo.image;
+      final _NineSliceSrcRects src = srcFor(leftBi, edgeImage);
+      _drawEdge(
+        canvas,
+        edgeImage,
+        src.left,
+        dstLeft,
+        axis: Axis.vertical,
+        repeat: leftBi.repeatY,
+        scale: leftInfo.scale,
+      );
+    }
+
+    HtmlBorderImage? fillBi;
+    ImageInfo? fillInfo;
+    if (topBi.slice.fill) {
+      fillBi = topBi;
+      fillInfo = topInfo;
+    } else if (rightBi.slice.fill) {
+      fillBi = rightBi;
+      fillInfo = rightInfo;
+    } else if (bottomBi.slice.fill) {
+      fillBi = bottomBi;
+      fillInfo = bottomInfo;
+    } else if (leftBi.slice.fill) {
+      fillBi = leftBi;
+      fillInfo = leftInfo;
+    } else if (base.slice.fill) {
+      fillBi = base;
+      fillInfo = baseInfo;
+    }
+    if (fillBi != null && fillInfo != null) {
+      final ui.Image fillImage = fillInfo.image;
+      final _NineSliceSrcRects src = srcFor(fillBi, fillImage);
+      _drawImageRectSafe(canvas, fillImage, src.center, dstCenter);
+    }
+
+    if (!rightHidden) {
+      final ui.Image edgeImage = rightInfo.image;
+      final _NineSliceSrcRects src = srcFor(rightBi, edgeImage);
+      _drawEdge(
+        canvas,
+        edgeImage,
+        src.right,
+        dstRight,
+        axis: Axis.vertical,
+        repeat: rightBi.repeatY,
+        scale: rightInfo.scale,
+      );
+    }
+
+    if (!(bottomHidden && leftHidden)) {
+      final ui.Image cornerImage = leftInfo.image;
+      final _NineSliceSrcRects src = srcFor(leftBi, cornerImage);
+      _drawImageRectSafe(canvas, cornerImage, src.bottomLeft, dstBottomLeft);
+    }
+    if (!bottomHidden) {
+      final ui.Image edgeImage = bottomInfo.image;
+      final _NineSliceSrcRects src = srcFor(bottomBi, edgeImage);
+      _drawEdge(
+        canvas,
+        edgeImage,
+        src.bottom,
+        dstBottom,
+        axis: Axis.horizontal,
+        repeat: bottomBi.repeatX,
+        scale: bottomInfo.scale,
+      );
+    }
+    if (!(bottomHidden && rightHidden)) {
+      final ui.Image cornerImage = rightInfo.image;
+      final _NineSliceSrcRects src = srcFor(rightBi, cornerImage);
+      _drawImageRectSafe(canvas, cornerImage, src.bottomRight, dstBottomRight);
+    }
+
+    if (_borderRadius != null) {
+      canvas.restore();
+    }
+
+    return true;
+  }
+
+  void _drawImageRectSafe(Canvas canvas, ui.Image image, Rect src, Rect dst) {
+    if (src.width <= 0 || src.height <= 0) return;
+    if (dst.width <= 0 || dst.height <= 0) return;
+    canvas.drawImageRect(image, src, dst, Paint());
+  }
+
+  void _drawEdge(
+    Canvas canvas,
+    ui.Image image,
+    Rect src,
+    Rect dst, {
+    required Axis axis,
+    required HtmlBorderImageRepeat repeat,
+    required double scale,
+  }) {
+    if (src.width <= 0 || src.height <= 0) return;
+    if (dst.width <= 0 || dst.height <= 0) return;
+
+    if (repeat == HtmlBorderImageRepeat.stretch) {
+      _drawImageRectSafe(canvas, image, src, dst);
+      return;
+    }
+
+    final double srcMainPx = axis == Axis.horizontal ? src.width : src.height;
+    final double dstMain = axis == Axis.horizontal ? dst.width : dst.height;
+    final double dstCross = axis == Axis.horizontal ? dst.height : dst.width;
+
+    final double tileMain = srcMainPx / scale;
+    if (tileMain <= 0) {
+      _drawImageRectSafe(canvas, image, src, dst);
+      return;
+    }
+
+    int tileCount;
+    double tileMainAdjusted = tileMain;
+    double gap = 0.0;
+
+    switch (repeat) {
+      case HtmlBorderImageRepeat.repeat:
+        tileCount = math.max(1, (dstMain / tileMain).ceil());
+        break;
+      case HtmlBorderImageRepeat.round:
+        tileCount = math.max(1, (dstMain / tileMain).round());
+        tileMainAdjusted = dstMain / tileCount;
+        break;
+      case HtmlBorderImageRepeat.space:
+        tileCount = math.max(1, (dstMain / tileMain).floor());
+        if (tileCount > 1) {
+          gap = (dstMain - tileCount * tileMain) / (tileCount - 1);
+        }
+        break;
+      case HtmlBorderImageRepeat.stretch:
+        tileCount = 1;
+        break;
+    }
+
+    double cursor = 0.0;
+    for (int i = 0; i < tileCount; i++) {
+      final double remaining = dstMain - cursor;
+      if (remaining <= 0) break;
+
+      final double segmentMain = (repeat == HtmlBorderImageRepeat.round)
+          ? tileMainAdjusted
+          : math.min(tileMain, remaining);
+
+      Rect dstSegment;
+      if (axis == Axis.horizontal) {
+        dstSegment = Rect.fromLTWH(
+          dst.left + cursor,
+          dst.top,
+          segmentMain,
+          dstCross,
+        );
+      } else {
+        dstSegment = Rect.fromLTWH(
+          dst.left,
+          dst.top + cursor,
+          dstCross,
+          segmentMain,
+        );
+      }
+
+      Rect srcSegment = src;
+      if (repeat != HtmlBorderImageRepeat.round && segmentMain < tileMain) {
+        final double segmentPx = segmentMain * scale;
+        if (axis == Axis.horizontal) {
+          srcSegment = Rect.fromLTRB(
+            src.left,
+            src.top,
+            src.left + segmentPx,
+            src.bottom,
+          );
+        } else {
+          srcSegment = Rect.fromLTRB(
+            src.left,
+            src.top,
+            src.right,
+            src.top + segmentPx,
+          );
+        }
+      }
+
+      _drawImageRectSafe(canvas, image, srcSegment, dstSegment);
+      cursor += (repeat == HtmlBorderImageRepeat.round)
+          ? tileMainAdjusted
+          : (tileMain + gap);
+    }
   }
 
   void _paintUniformBorder(PaintingContext context, Offset offset) {

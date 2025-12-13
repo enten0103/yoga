@@ -11,16 +11,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_yoga_example/main.dart';
 
 void main() {
-  testWidgets('Verify Platform version', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
+  testWidgets('Home page renders and navigates to Border-Image demo', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
 
-    // Verify that platform version is retrieved.
+    expect(find.widgetWithText(AppBar, 'HtmlDiv 示例'), findsOneWidget);
+    expect(find.text('HtmlDiv Border-Image 示例'), findsOneWidget);
+
+    await tester.tap(find.text('HtmlDiv Border-Image 示例'));
+    await tester.pumpAndSettle();
+
     expect(
-      find.byWidgetPredicate(
-        (Widget widget) => widget is Text &&
-                           widget.data!.startsWith('Running on:'),
-      ),
+      find.widgetWithText(AppBar, 'HtmlDiv Border-Image 示例'),
       findsOneWidget,
     );
   });

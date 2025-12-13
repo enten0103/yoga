@@ -15,6 +15,9 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   **Painting**: Draws borders based on `HtmlBorder` definitions (styles: solid, dashed, dotted, double).
 *   **`HtmlSize`**: Abstract class defining sizing strategies.
 *   **`HtmlBorder`**: Defines border properties (width, style, color).
+*   **`HtmlBorderImage`**: CSS `border-image` 数据模型与绘制支持。
+    *   **API**: `source(image) / slice / width / outset / repeatX / repeatY`。
+    *   **Rendering**: 基于 9-slice（四角 + 四边 + 可选 fill 中心）绘制；支持 `stretch/repeat/round/space`；与 `borderRadius` clip 对齐。
 *   **Yoga Integration**: The project leverages `yoga_ffi.dart` for underlying Flexbox layout capabilities, providing a bridge to the C++ Yoga layout engine.
 
 ### Testing (`test/`)
@@ -42,6 +45,7 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   Widths: Fixed, Percent, Keywords (thin, medium, thick).
     *   **Mixed Borders**: Support for individual side configuration (top, right, bottom, left).
     *   **Border Radius**: Support for rounded corners (uniform and individual) with `HtmlBorderRadius`.
+    *   **Border Image**: 支持 CSS `border-image` 系列能力（`source/slice/width/outset/repeat`），并遵循 `border-style: hidden` 时不绘制。
 4.  **Box Model**:
     *   `box-sizing` support:
         *   `content-box` (default): Width/Height applies to content only.
@@ -50,9 +54,18 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   Comprehensive test suite added.
     *   Example app updated with Chinese localization.
     *   Linting issues resolved.
+    *   Added tests for `border-image`（布局不受影响、圆角裁剪/绘制不报错）与 example 导航用例。
+
+### Recent Work Summary (2025-12)
+*   **API Implementation**: 在 `flutter/lib/html_div.dart` 新增 `HtmlBorderImage` 与相关 value types（px/%/number/auto、fill）。
+*   **Render Integration**: `RenderHtmlDiv` 通过 `ImageProvider.resolve` 接入 `ImageStream`，按 9-slice 绘制边框图片并支持 `repeatX/repeatY`。
+*   **Example Gallery**: 新增 `Border-Image` 示例页并在首页增加入口；example `pubspec.yaml` 注册 `assets/wallhaven.png` 作为样例资源。
+*   **Tests**: 新增 `flutter/test/border_image_test.dart`；更新 example 的 `widget_test.dart` 与当前 UI 保持一致。
 
 ### Next Steps
 *   Implement `padding` and `margin` support in `HtmlDiv`.
 *   Integrate `HtmlDiv` more deeply with Yoga FFI for complex Flexbox layouts (row/column directions, alignment).
 *   Add support for `background` (color, image).
+
+*   Extend `border-image` 覆盖面：补齐更多 CSS 组合边界（极端 slice 值、非均匀 width/outset、与 mixed border 的交互）。
 
