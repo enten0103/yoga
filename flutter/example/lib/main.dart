@@ -9,6 +9,7 @@ import 'pages/border_demo_page.dart';
 import 'pages/content_sizing_demo_page.dart';
 import 'pages/border_radius_page.dart';
 import 'pages/border_image_page.dart';
+import 'pages/background_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -100,6 +101,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const BorderImagePage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv Background 示例'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const BackgroundPage()),
             ),
           ),
         ],

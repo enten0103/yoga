@@ -167,6 +167,77 @@ class HtmlBorderRadius {
   }
 }
 
+// Background (CSS-inspired model)
+//
+// Minimal support:
+// - background-color
+// - background-image (single layer)
+// - background-repeat (x/y)
+// - background-size (auto/contain/cover/explicit)
+// - background-position (alignment + px offset)
+// - background-clip (border-box/padding-box)
+
+enum HtmlBackgroundRepeat { repeat, noRepeat, round, space }
+
+enum HtmlBackgroundClip { borderBox, paddingBox }
+
+enum HtmlBackgroundSizeType { auto, contain, cover, explicit }
+
+class HtmlBackgroundSize {
+  final HtmlBackgroundSizeType type;
+  final double? width;
+  final double? height;
+
+  const HtmlBackgroundSize._(this.type, {this.width, this.height});
+
+  const HtmlBackgroundSize.auto() : this._(HtmlBackgroundSizeType.auto);
+  const HtmlBackgroundSize.contain() : this._(HtmlBackgroundSizeType.contain);
+  const HtmlBackgroundSize.cover() : this._(HtmlBackgroundSizeType.cover);
+
+  const HtmlBackgroundSize.explicit({
+    required double width,
+    required double height,
+  }) : this._(HtmlBackgroundSizeType.explicit, width: width, height: height);
+}
+
+class HtmlBackgroundPosition {
+  final Alignment alignment;
+  final Offset offset;
+
+  const HtmlBackgroundPosition({
+    this.alignment = Alignment.topLeft,
+    this.offset = Offset.zero,
+  });
+}
+
+class HtmlBackgroundImage {
+  final ImageProvider image;
+  final HtmlBackgroundRepeat repeatX;
+  final HtmlBackgroundRepeat repeatY;
+  final HtmlBackgroundSize size;
+  final HtmlBackgroundPosition position;
+
+  const HtmlBackgroundImage({
+    required this.image,
+    this.repeatX = HtmlBackgroundRepeat.repeat,
+    this.repeatY = HtmlBackgroundRepeat.repeat,
+    this.size = const HtmlBackgroundSize.auto(),
+    this.position = const HtmlBackgroundPosition(),
+  });
+}
+
+class HtmlBackground {
+  final Color? color;
+  final HtmlBackgroundImage? image;
+  final HtmlBackgroundClip clip;
+
+  const HtmlBackground({
+    this.color,
+    this.image,
+    this.clip = HtmlBackgroundClip.borderBox,
+  });
+}
+
 // Border Image (CSS-aligned model)
 //
 // Mirrors the main CSS border-image longhands:
@@ -407,12 +478,29 @@ class _NineSliceSrcRects {
   });
 }
 
+class _BackgroundAxisTile {
+  final double offset;
+  final double spacing;
+
+  /// -1 means "repeat until bounds".
+  final int count;
+  final double? overrideTileExtent;
+
+  const _BackgroundAxisTile({
+    required this.offset,
+    required this.spacing,
+    required this.count,
+    this.overrideTileExtent,
+  });
+}
+
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
   final HtmlBorder? border;
   final HtmlBorderRadius? borderRadius;
   final HtmlBoxSizing boxSizing;
+  final HtmlBackground? background;
 
   const HtmlDiv({
     super.key,
@@ -421,6 +509,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.border,
     this.borderRadius,
     this.boxSizing = HtmlBoxSizing.contentBox,
+    this.background,
     super.children = const [],
   });
 
@@ -431,6 +520,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       height: height,
       border: border,
       borderRadius: borderRadius,
+      background: background,
       imageConfiguration: createLocalImageConfiguration(context),
       boxSizing: boxSizing,
     );
@@ -443,6 +533,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..height = height
       ..border = border
       ..borderRadius = borderRadius
+      ..background = background
       ..imageConfiguration = createLocalImageConfiguration(context)
       ..boxSizing = boxSizing;
   }
@@ -458,6 +549,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlSize _height;
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
+  HtmlBackground? _background;
   ImageConfiguration _imageConfiguration = ImageConfiguration.empty;
   final Map<ImageProvider, ImageStream> _borderImageStreams =
       <ImageProvider, ImageStream>{};
@@ -465,6 +557,10 @@ class RenderHtmlDiv extends RenderBox
       <ImageProvider, ImageInfo?>{};
   final Map<ImageProvider, ImageStreamListener> _borderImageListeners =
       <ImageProvider, ImageStreamListener>{};
+  ImageStream? _backgroundImageStream;
+  ImageStreamListener? _backgroundImageListener;
+  ImageInfo? _backgroundImageInfo;
+  ImageProvider? _backgroundImageProvider;
   HtmlBoxSizing _boxSizing;
 
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
@@ -474,12 +570,14 @@ class RenderHtmlDiv extends RenderBox
     required HtmlSize height,
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
+    HtmlBackground? background,
     ImageConfiguration imageConfiguration = ImageConfiguration.empty,
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
        _border = border,
        _borderRadius = borderRadius,
+       _background = background,
        _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
 
@@ -487,17 +585,20 @@ class RenderHtmlDiv extends RenderBox
   void attach(PipelineOwner owner) {
     super.attach(owner);
     _resolveBorderImages();
+    _resolveBackgroundImage();
   }
 
   @override
   void detach() {
     _stopListeningToBorderImages();
+    _stopListeningToBackgroundImage();
     super.detach();
   }
 
   @override
   void dispose() {
     _stopListeningToBorderImages();
+    _stopListeningToBackgroundImage();
     super.dispose();
   }
 
@@ -535,11 +636,21 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
+  HtmlBackground? get background => _background;
+  set background(HtmlBackground? value) {
+    if (_background != value) {
+      _background = value;
+      _resolveBackgroundImage();
+      markNeedsPaint();
+    }
+  }
+
   ImageConfiguration get imageConfiguration => _imageConfiguration;
   set imageConfiguration(ImageConfiguration value) {
     if (_imageConfiguration != value) {
       _imageConfiguration = value;
       _resolveBorderImages();
+      _resolveBackgroundImage();
       markNeedsPaint();
     }
   }
@@ -562,6 +673,58 @@ class RenderHtmlDiv extends RenderBox
     _borderImageStreams.clear();
     _borderImageInfos.clear();
     _borderImageListeners.clear();
+  }
+
+  void _stopListeningToBackgroundImage() {
+    final ImageStream? stream = _backgroundImageStream;
+    final ImageStreamListener? listener = _backgroundImageListener;
+    if (stream != null && listener != null) {
+      stream.removeListener(listener);
+    }
+    _backgroundImageStream = null;
+    _backgroundImageListener = null;
+    _backgroundImageInfo = null;
+    _backgroundImageProvider = null;
+  }
+
+  void _resolveBackgroundImage() {
+    if (!attached) return;
+
+    final ImageProvider? provider = _background?.image?.image;
+    if (provider == null) {
+      if (_backgroundImageProvider != null) {
+        _stopListeningToBackgroundImage();
+        markNeedsPaint();
+      }
+      return;
+    }
+
+    final ImageStream newStream = provider.resolve(_imageConfiguration);
+    final ImageStream? oldStream = _backgroundImageStream;
+
+    if (_backgroundImageProvider == provider &&
+        oldStream?.key == newStream.key &&
+        _backgroundImageListener != null) {
+      return;
+    }
+
+    if (oldStream != null && _backgroundImageListener != null) {
+      oldStream.removeListener(_backgroundImageListener!);
+    }
+
+    _backgroundImageProvider = provider;
+    _backgroundImageStream = newStream;
+    _backgroundImageListener = ImageStreamListener(
+      (ImageInfo image, bool synchronousCall) {
+        _backgroundImageInfo = image;
+        markNeedsPaint();
+      },
+      onError: (Object exception, StackTrace? stackTrace) {
+        _backgroundImageInfo = null;
+        markNeedsPaint();
+      },
+    );
+    newStream.addListener(_backgroundImageListener!);
   }
 
   Iterable<ImageProvider> _collectBorderImageProviders() sync* {
@@ -868,6 +1031,7 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    _paintBackgroundIfNeeded(context, offset);
     final bool paintedBorderImage = _paintBorderImageIfNeeded(context, offset);
     if (!paintedBorderImage && _border != null) {
       if (_border!.isUniform) {
@@ -877,6 +1041,250 @@ class RenderHtmlDiv extends RenderBox
       }
     }
     defaultPaint(context, offset);
+  }
+
+  void _paintBackgroundIfNeeded(PaintingContext context, Offset offset) {
+    final HtmlBackground? bg = _background;
+    if (bg == null) return;
+
+    final Rect borderBox = offset & size;
+    final Rect clipRect;
+    if (bg.clip == HtmlBackgroundClip.borderBox) {
+      clipRect = borderBox;
+    } else {
+      final EdgeInsets bw = _computedBorderWidths;
+      clipRect = Rect.fromLTRB(
+        borderBox.left + bw.left,
+        borderBox.top + bw.top,
+        borderBox.right - bw.right,
+        borderBox.bottom - bw.bottom,
+      );
+    }
+    if (clipRect.isEmpty) return;
+
+    final Canvas canvas = context.canvas;
+    final HtmlBorderRadius? br = _borderRadius;
+    final bool needsClip =
+        br != null && br.toBorderRadius() != BorderRadius.zero;
+
+    canvas.save();
+    if (needsClip) {
+      final RRect rrect = br.toBorderRadius().toRRect(clipRect);
+      canvas.clipRRect(rrect);
+    } else {
+      canvas.clipRect(clipRect);
+    }
+
+    final Color? bgColor = bg.color;
+    if (bgColor != null) {
+      canvas.drawRect(clipRect, Paint()..color = bgColor);
+    }
+
+    final HtmlBackgroundImage? bgImage = bg.image;
+    final ImageInfo? info = _backgroundImageInfo;
+    if (bgImage != null && info != null) {
+      _paintBackgroundImage(
+        canvas: canvas,
+        rect: clipRect,
+        bg: bgImage,
+        info: info,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  Size _resolveBackgroundImageDestSize({
+    required HtmlBackgroundSize size,
+    required Size imageSize,
+    required Size dstRectSize,
+  }) {
+    switch (size.type) {
+      case HtmlBackgroundSizeType.auto:
+        return imageSize;
+      case HtmlBackgroundSizeType.contain:
+        final double sx = dstRectSize.width / imageSize.width;
+        final double sy = dstRectSize.height / imageSize.height;
+        final double s = math.min(sx, sy);
+        return Size(imageSize.width * s, imageSize.height * s);
+      case HtmlBackgroundSizeType.cover:
+        final double sx = dstRectSize.width / imageSize.width;
+        final double sy = dstRectSize.height / imageSize.height;
+        final double s = math.max(sx, sy);
+        return Size(imageSize.width * s, imageSize.height * s);
+      case HtmlBackgroundSizeType.explicit:
+        return Size(
+          size.width ?? imageSize.width,
+          size.height ?? imageSize.height,
+        );
+    }
+  }
+
+  List<_BackgroundAxisTile> _computeAxisTiles({
+    required double start,
+    required double extent,
+    required double tileExtent,
+    required HtmlBackgroundRepeat repeat,
+  }) {
+    if (tileExtent <= 0 || extent <= 0) return const <_BackgroundAxisTile>[];
+
+    switch (repeat) {
+      case HtmlBackgroundRepeat.noRepeat:
+        return <_BackgroundAxisTile>[
+          const _BackgroundAxisTile(offset: 0, spacing: 0, count: 1),
+        ];
+      case HtmlBackgroundRepeat.repeat:
+        // We'll use the raw tiling loop; spacing=0.
+        return <_BackgroundAxisTile>[
+          const _BackgroundAxisTile(offset: 0, spacing: 0, count: -1),
+        ];
+      case HtmlBackgroundRepeat.round:
+        final int count = math.max(1, (extent / tileExtent).round());
+        final double newTile = extent / count;
+        return <_BackgroundAxisTile>[
+          _BackgroundAxisTile(
+            offset: 0,
+            spacing: 0,
+            count: count,
+            overrideTileExtent: newTile,
+          ),
+        ];
+      case HtmlBackgroundRepeat.space:
+        final int count = (extent / tileExtent).floor();
+        if (count <= 1) {
+          return <_BackgroundAxisTile>[
+            const _BackgroundAxisTile(offset: 0, spacing: 0, count: 1),
+          ];
+        }
+        final double spacing = (extent - (count * tileExtent)) / (count - 1);
+        return <_BackgroundAxisTile>[
+          _BackgroundAxisTile(offset: 0, spacing: spacing, count: count),
+        ];
+    }
+  }
+
+  void _paintBackgroundImage({
+    required Canvas canvas,
+    required Rect rect,
+    required HtmlBackgroundImage bg,
+    required ImageInfo info,
+  }) {
+    final ui.Image image = info.image;
+    final double logicalW = image.width.toDouble() / info.scale;
+    final double logicalH = image.height.toDouble() / info.scale;
+    final Size imageSize = Size(logicalW, logicalH);
+
+    final Size dstSize = _resolveBackgroundImageDestSize(
+      size: bg.size,
+      imageSize: imageSize,
+      dstRectSize: rect.size,
+    );
+    if (dstSize.isEmpty) return;
+
+    final Alignment a = bg.position.alignment;
+    final double ax = (a.x + 1) / 2.0;
+    final double ay = (a.y + 1) / 2.0;
+    final double baseLeft =
+        rect.left + (rect.width - dstSize.width) * ax + bg.position.offset.dx;
+    final double baseTop =
+        rect.top + (rect.height - dstSize.height) * ay + bg.position.offset.dy;
+
+    final Rect src = Rect.fromLTWH(
+      0,
+      0,
+      image.width.toDouble(),
+      image.height.toDouble(),
+    );
+
+    // Determine tiling in X/Y.
+    final List<_BackgroundAxisTile> xTiles = _computeAxisTiles(
+      start: rect.left,
+      extent: rect.width,
+      tileExtent: dstSize.width,
+      repeat: bg.repeatX,
+    );
+    final List<_BackgroundAxisTile> yTiles = _computeAxisTiles(
+      start: rect.top,
+      extent: rect.height,
+      tileExtent: dstSize.height,
+      repeat: bg.repeatY,
+    );
+    if (xTiles.isEmpty || yTiles.isEmpty) return;
+
+    double tileW = dstSize.width;
+    double tileH = dstSize.height;
+    if (xTiles.first.overrideTileExtent != null) {
+      tileW = xTiles.first.overrideTileExtent!;
+    }
+    if (yTiles.first.overrideTileExtent != null) {
+      tileH = yTiles.first.overrideTileExtent!;
+    }
+
+    // Repeat mode uses positioning origin; round/space use rect-start for simplicity.
+    double startX;
+    if (bg.repeatX == HtmlBackgroundRepeat.repeat) {
+      startX = baseLeft;
+      while (startX > rect.left) {
+        startX -= tileW;
+      }
+    } else {
+      startX = rect.left;
+    }
+
+    double startY;
+    if (bg.repeatY == HtmlBackgroundRepeat.repeat) {
+      startY = baseTop;
+      while (startY > rect.top) {
+        startY -= tileH;
+      }
+    } else {
+      startY = rect.top;
+    }
+
+    final Paint paint = Paint()..filterQuality = FilterQuality.low;
+
+    for (final _BackgroundAxisTile xt in xTiles) {
+      for (final _BackgroundAxisTile yt in yTiles) {
+        if (xt.count == 1 &&
+            yt.count == 1 &&
+            bg.repeatX == HtmlBackgroundRepeat.noRepeat &&
+            bg.repeatY == HtmlBackgroundRepeat.noRepeat) {
+          final Rect dst = Rect.fromLTWH(baseLeft, baseTop, tileW, tileH);
+          if (dst.overlaps(rect)) canvas.drawImageRect(image, src, dst, paint);
+          continue;
+        }
+
+        final int xCount = xt.count < 0
+            ? ((rect.right - startX) / tileW).ceil() + 2
+            : xt.count;
+        final int yCount = yt.count < 0
+            ? ((rect.bottom - startY) / tileH).ceil() + 2
+            : yt.count;
+        final double xSpacing = xt.spacing;
+        final double ySpacing = yt.spacing;
+
+        for (int ix = 0; ix < xCount; ix++) {
+          final double dx = (bg.repeatX == HtmlBackgroundRepeat.repeat)
+              ? startX + ix * tileW
+              : rect.left + ix * (tileW + xSpacing);
+          if (dx >= rect.right) break;
+          if (dx + tileW <= rect.left) continue;
+
+          for (int iy = 0; iy < yCount; iy++) {
+            final double dy = (bg.repeatY == HtmlBackgroundRepeat.repeat)
+                ? startY + iy * tileH
+                : rect.top + iy * (tileH + ySpacing);
+            if (dy >= rect.bottom) break;
+            if (dy + tileH <= rect.top) continue;
+
+            final Rect dst = Rect.fromLTWH(dx, dy, tileW, tileH);
+            if (dst.overlaps(rect)) {
+              canvas.drawImageRect(image, src, dst, paint);
+            }
+          }
+        }
+      }
+    }
   }
 
   bool _paintBorderImageIfNeeded(PaintingContext context, Offset offset) {
