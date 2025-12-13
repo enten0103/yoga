@@ -238,6 +238,32 @@ class HtmlBackground {
   });
 }
 
+// Box Shadow (CSS-inspired model)
+//
+// Supports multiple shadows and `inset`.
+class HtmlBoxShadow {
+  final Color color;
+  final Offset offset;
+
+  /// Percentage offsets relative to the border-box size.
+  ///
+  /// If set, dx is treated as % of box width, dy as % of box height,
+  /// and it overrides [offset].
+  final Offset? offsetPercent;
+  final double blurRadius;
+  final double spreadRadius;
+  final bool inset;
+
+  const HtmlBoxShadow({
+    this.color = const Color(0xFF000000),
+    this.offset = Offset.zero,
+    this.offsetPercent,
+    this.blurRadius = 0.0,
+    this.spreadRadius = 0.0,
+    this.inset = false,
+  });
+}
+
 // Border Image (CSS-aligned model)
 //
 // Mirrors the main CSS border-image longhands:
@@ -501,6 +527,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlBorderRadius? borderRadius;
   final HtmlBoxSizing boxSizing;
   final HtmlBackground? background;
+  final List<HtmlBoxShadow> boxShadow;
 
   const HtmlDiv({
     super.key,
@@ -510,6 +537,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.borderRadius,
     this.boxSizing = HtmlBoxSizing.contentBox,
     this.background,
+    this.boxShadow = const <HtmlBoxShadow>[],
     super.children = const [],
   });
 
@@ -521,6 +549,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       border: border,
       borderRadius: borderRadius,
       background: background,
+      boxShadow: boxShadow,
       imageConfiguration: createLocalImageConfiguration(context),
       boxSizing: boxSizing,
     );
@@ -534,6 +563,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..border = border
       ..borderRadius = borderRadius
       ..background = background
+      ..boxShadow = boxShadow
       ..imageConfiguration = createLocalImageConfiguration(context)
       ..boxSizing = boxSizing;
   }
@@ -550,6 +580,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
   HtmlBackground? _background;
+  List<HtmlBoxShadow> _boxShadow;
   ImageConfiguration _imageConfiguration = ImageConfiguration.empty;
   final Map<ImageProvider, ImageStream> _borderImageStreams =
       <ImageProvider, ImageStream>{};
@@ -571,6 +602,7 @@ class RenderHtmlDiv extends RenderBox
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
     HtmlBackground? background,
+    List<HtmlBoxShadow> boxShadow = const <HtmlBoxShadow>[],
     ImageConfiguration imageConfiguration = ImageConfiguration.empty,
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
@@ -578,6 +610,7 @@ class RenderHtmlDiv extends RenderBox
        _border = border,
        _borderRadius = borderRadius,
        _background = background,
+       _boxShadow = boxShadow,
        _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
 
@@ -641,6 +674,14 @@ class RenderHtmlDiv extends RenderBox
     if (_background != value) {
       _background = value;
       _resolveBackgroundImage();
+      markNeedsPaint();
+    }
+  }
+
+  List<HtmlBoxShadow> get boxShadow => _boxShadow;
+  set boxShadow(List<HtmlBoxShadow> value) {
+    if (!identical(_boxShadow, value)) {
+      _boxShadow = value;
       markNeedsPaint();
     }
   }
@@ -1031,7 +1072,9 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    _paintBoxShadowIfNeeded(context, offset, inset: false);
     _paintBackgroundIfNeeded(context, offset);
+    _paintBoxShadowIfNeeded(context, offset, inset: true);
     final bool paintedBorderImage = _paintBorderImageIfNeeded(context, offset);
     if (!paintedBorderImage && _border != null) {
       if (_border!.isUniform) {
@@ -1041,6 +1084,86 @@ class RenderHtmlDiv extends RenderBox
       }
     }
     defaultPaint(context, offset);
+  }
+
+  void _paintBoxShadowIfNeeded(
+    PaintingContext context,
+    Offset offset, {
+    required bool inset,
+  }) {
+    if (_boxShadow.isEmpty) return;
+
+    final Rect borderBox = offset & size;
+    if (borderBox.isEmpty) return;
+
+    final Canvas canvas = context.canvas;
+    final HtmlBorderRadius? br = _borderRadius;
+    final bool hasRadius =
+        br != null && br.toBorderRadius() != BorderRadius.zero;
+    final RRect? baseRRect = hasRadius
+        ? br.toBorderRadius().toRRect(borderBox)
+        : null;
+
+    // CSS draws the first shadow on top.
+    for (int i = _boxShadow.length - 1; i >= 0; i--) {
+      final HtmlBoxShadow s = _boxShadow[i];
+      if (s.inset != inset) continue;
+
+      final Offset shadowOffset = s.offsetPercent == null
+          ? s.offset
+          : Offset(
+              borderBox.width * s.offsetPercent!.dx / 100.0,
+              borderBox.height * s.offsetPercent!.dy / 100.0,
+            );
+
+      final Paint paint = BoxShadow(
+        color: s.color,
+        blurRadius: s.blurRadius,
+      ).toPaint();
+
+      if (!inset) {
+        if (baseRRect != null) {
+          final RRect rr = baseRRect
+              .shift(shadowOffset)
+              .inflate(s.spreadRadius);
+          canvas.drawRRect(rr, paint);
+        } else {
+          final Rect r = borderBox.shift(shadowOffset).inflate(s.spreadRadius);
+          canvas.drawRect(r, paint);
+        }
+        continue;
+      }
+
+      // Inset shadow approximation:
+      // Draw a blurred ring (outer - shifted/deflated inner) clipped to the border box.
+      canvas.save();
+      if (baseRRect != null) {
+        canvas.clipRRect(baseRRect);
+        final Path outer = Path()..addRRect(baseRRect);
+        final Offset invOffset = Offset(-shadowOffset.dx, -shadowOffset.dy);
+        final RRect inner = baseRRect.deflate(s.spreadRadius).shift(invOffset);
+        final Path hole = Path()..addRRect(inner);
+        final Path ring = Path.combine(
+          ui.PathOperation.difference,
+          outer,
+          hole,
+        );
+        canvas.drawPath(ring, paint);
+      } else {
+        canvas.clipRect(borderBox);
+        final Path outer = Path()..addRect(borderBox);
+        final Offset invOffset = Offset(-shadowOffset.dx, -shadowOffset.dy);
+        final Rect inner = borderBox.deflate(s.spreadRadius).shift(invOffset);
+        final Path hole = Path()..addRect(inner);
+        final Path ring = Path.combine(
+          ui.PathOperation.difference,
+          outer,
+          hole,
+        );
+        canvas.drawPath(ring, paint);
+      }
+      canvas.restore();
+    }
   }
 
   void _paintBackgroundIfNeeded(PaintingContext context, Offset offset) {

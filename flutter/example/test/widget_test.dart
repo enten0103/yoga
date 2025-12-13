@@ -45,4 +45,21 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Home page navigates to Box-Shadow demo', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('HtmlDiv Box-Shadow 示例'), findsOneWidget);
+
+    await tester.tap(find.text('HtmlDiv Box-Shadow 示例'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.widgetWithText(AppBar, 'HtmlDiv Box-Shadow 示例'),
+      findsOneWidget,
+    );
+  });
 }
