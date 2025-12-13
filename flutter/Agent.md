@@ -74,11 +74,23 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
     *   **Transform**: paint-only transform + correct hit testing.
     *   **Margin**: vertical margin collapsing; horizontal `auto`.
 
+7.  **Min/Max Width/Height**:
+    *   Added `minWidth/maxWidth/minHeight/maxHeight` to `HtmlDiv` / `RenderHtmlDiv`.
+    *   Implements CSS-like clamping in layout and respects `box-sizing` (`content-box` vs `border-box`).
+    *   Supports percent min/max when the containing block is bounded.
+
 ### Recent Work Summary (2025-12)
 *   **API Implementation**: 在 `flutter/lib/html_div.dart` 新增 `HtmlBorderImage` 与相关 value types（px/%/number/auto、fill）。
 *   **Render Integration**: `RenderHtmlDiv` 通过 `ImageProvider.resolve` 接入 `ImageStream`，按 9-slice 绘制边框图片并支持 `repeatX/repeatY`。
 *   **Example Gallery**: 新增 `Border-Image` 示例页并在首页增加入口；example `pubspec.yaml` 注册 `assets/wallhaven.png` 作为样例资源。
 *   **Tests**: 新增 `flutter/test/border_image_test.dart`；更新 example 的 `widget_test.dart` 与当前 UI 保持一致。
+
+*   **Min/Max Sizes**:
+    *   Core: `HtmlDiv` 新增 `minWidth/maxWidth/minHeight/maxHeight`，并在 `RenderHtmlDiv.performLayout` 中实现 min/max clamp + `box-sizing` 交互。
+    *   Tests: 在 `flutter/test/html_div_test.dart` 增加 min/max 回归测试（包含 `content-box + border` 叠加校验）。
+    *   Example: 新增 `MinMaxSizePage`，并在首页增加入口。
+    *   HTML Baseline: 新增对照页 `example/html/pages/min_max_size_page.html`。
+    *   Example Tests: 由于首页列表变长，`widget_test.dart` 中 Border-Image 用例改为 `scrollUntilVisible` 后再点击，避免不可见导致的查找失败。
 
 *   **Unified lengths**: Migrated margin/background-size/background-position/transform-origin/box-shadow offset to `HtmlLength` / `HtmlLengthOffset`.
 *   **Percent rules**:

@@ -15,6 +15,7 @@ import 'pages/margin_page.dart';
 import 'pages/transform_page.dart';
 import 'pages/inline_page.dart';
 import 'pages/css_paint_order_page.dart';
+import 'pages/min_max_size_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -92,6 +93,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ContentSizingDemoPage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv Min/Max-Width/Height 示例'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MinMaxSizePage()),
             ),
           ),
           ListTile(

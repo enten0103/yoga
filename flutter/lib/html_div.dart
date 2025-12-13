@@ -680,6 +680,10 @@ enum HtmlTextAlign { start, center, end, justify }
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
+  final HtmlSize? minWidth;
+  final HtmlSize? maxWidth;
+  final HtmlSize? minHeight;
+  final HtmlSize? maxHeight;
   final HtmlDisplay display;
   final HtmlTextAlign textAlign;
   final HtmlLength? lineHeight;
@@ -696,6 +700,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     super.key,
     this.width = const AutoSize(),
     this.height = const AutoSize(),
+    this.minWidth,
+    this.maxWidth,
+    this.minHeight,
+    this.maxHeight,
     this.display = HtmlDisplay.block,
     this.textAlign = HtmlTextAlign.start,
     this.lineHeight,
@@ -715,6 +723,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     return RenderHtmlDiv(
       width: width,
       height: height,
+      minWidth: minWidth,
+      maxWidth: maxWidth,
+      minHeight: minHeight,
+      maxHeight: maxHeight,
       display: display,
       textAlign: textAlign,
       lineHeight: lineHeight,
@@ -735,6 +747,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     renderObject
       ..width = width
       ..height = height
+      ..minWidth = minWidth
+      ..maxWidth = maxWidth
+      ..minHeight = minHeight
+      ..maxHeight = maxHeight
       ..display = display
       ..textAlign = textAlign
       ..lineHeight = lineHeight
@@ -758,6 +774,10 @@ class RenderHtmlDiv extends RenderBox
         RenderBoxContainerDefaultsMixin<RenderBox, HtmlDivParentData> {
   HtmlSize _width;
   HtmlSize _height;
+  HtmlSize? _minWidth;
+  HtmlSize? _maxWidth;
+  HtmlSize? _minHeight;
+  HtmlSize? _maxHeight;
   HtmlDisplay _display;
   HtmlTextAlign _textAlign;
   HtmlLength? _lineHeight;
@@ -786,6 +806,10 @@ class RenderHtmlDiv extends RenderBox
   RenderHtmlDiv({
     required HtmlSize width,
     required HtmlSize height,
+    HtmlSize? minWidth,
+    HtmlSize? maxWidth,
+    HtmlSize? minHeight,
+    HtmlSize? maxHeight,
     HtmlDisplay display = HtmlDisplay.block,
     HtmlTextAlign textAlign = HtmlTextAlign.start,
     HtmlLength? lineHeight,
@@ -800,6 +824,10 @@ class RenderHtmlDiv extends RenderBox
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
+       _minWidth = minWidth,
+       _maxWidth = maxWidth,
+       _minHeight = minHeight,
+       _maxHeight = maxHeight,
        _display = display,
        _textAlign = textAlign,
        _lineHeight = lineHeight,
@@ -846,6 +874,38 @@ class RenderHtmlDiv extends RenderBox
   set height(HtmlSize value) {
     if (_height != value) {
       _height = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlSize? get minWidth => _minWidth;
+  set minWidth(HtmlSize? value) {
+    if (_minWidth != value) {
+      _minWidth = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlSize? get maxWidth => _maxWidth;
+  set maxWidth(HtmlSize? value) {
+    if (_maxWidth != value) {
+      _maxWidth = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlSize? get minHeight => _minHeight;
+  set minHeight(HtmlSize? value) {
+    if (_minHeight != value) {
+      _minHeight = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlSize? get maxHeight => _maxHeight;
+  set maxHeight(HtmlSize? value) {
+    if (_maxHeight != value) {
+      _maxHeight = value;
       markNeedsLayout();
     }
   }
@@ -1472,76 +1532,143 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void performLayout() {
-    double containerWidth = constraints.hasBoundedWidth
+    final double containerBorderBoxWidth = constraints.hasBoundedWidth
         ? constraints.maxWidth
         : 0.0;
-    _computedBorderWidths = _calculateBorderWidths(containerWidth);
-    double borderHorizontal = _computedBorderWidths.horizontal;
-    double borderVertical = _computedBorderWidths.vertical;
+    _computedBorderWidths = _calculateBorderWidths(containerBorderBoxWidth);
+    final double borderHorizontal = _computedBorderWidths.horizontal;
+    final double borderVertical = _computedBorderWidths.vertical;
 
-    double? targetWidth;
-    if (_width is FixedSize) {
-      targetWidth = (_width as FixedSize).value;
-    } else if (_width is PercentSize) {
-      if (constraints.hasBoundedWidth) {
-        targetWidth =
-            constraints.maxWidth * (_width as PercentSize).value / 100;
-      }
-    } else if (_width is AutoSize) {
-      if (constraints.hasBoundedWidth && _display == HtmlDisplay.block) {
-        targetWidth = constraints.maxWidth;
-      }
+    double availableBorderBoxWidth = constraints.hasBoundedWidth
+        ? constraints.maxWidth
+        : double.infinity;
+    double availableBorderBoxHeight = constraints.hasBoundedHeight
+        ? constraints.maxHeight
+        : double.infinity;
+
+    double availableSizingWidth;
+    if (_boxSizing == HtmlBoxSizing.borderBox) {
+      availableSizingWidth = availableBorderBoxWidth;
+    } else {
+      availableSizingWidth = availableBorderBoxWidth.isFinite
+          ? math.max(0.0, availableBorderBoxWidth - borderHorizontal)
+          : double.infinity;
     }
 
-    double contentWidth;
-    if (targetWidth != null) {
-      if (_boxSizing == HtmlBoxSizing.borderBox) {
-        contentWidth = math.max(0.0, targetWidth - borderHorizontal);
-      } else {
-        contentWidth = targetWidth;
+    double? resolveSizingLimit(HtmlSize? v, {required bool isWidthAxis}) {
+      if (v == null) return null;
+
+      final double availableBorderBox = isWidthAxis
+          ? availableBorderBoxWidth
+          : availableBorderBoxHeight;
+
+      if (v is FixedSize) return v.value;
+      if (v is PercentSize) {
+        if (availableBorderBox.isFinite) {
+          return availableBorderBox * v.value / 100.0;
+        }
+        return null;
       }
+
+      double intrinsicBorderBox;
+      if (isWidthAxis) {
+        if (v is MinContent) {
+          intrinsicBorderBox = computeMinIntrinsicWidth(double.infinity);
+        } else if (v is MaxContent) {
+          intrinsicBorderBox = computeMaxIntrinsicWidth(double.infinity);
+        } else if (v is FitContent) {
+          final double minI = computeMinIntrinsicWidth(double.infinity);
+          final double maxI = computeMaxIntrinsicWidth(double.infinity);
+          intrinsicBorderBox = math.min(
+            maxI,
+            math.max(minI, availableBorderBoxWidth),
+          );
+        } else {
+          return null;
+        }
+      } else {
+        if (v is MinContent) {
+          intrinsicBorderBox = computeMinIntrinsicHeight(double.infinity);
+        } else if (v is MaxContent) {
+          intrinsicBorderBox = computeMaxIntrinsicHeight(double.infinity);
+        } else if (v is FitContent) {
+          final double minI = computeMinIntrinsicHeight(double.infinity);
+          final double maxI = computeMaxIntrinsicHeight(double.infinity);
+          intrinsicBorderBox = math.min(
+            maxI,
+            math.max(minI, availableBorderBoxHeight),
+          );
+        } else {
+          return null;
+        }
+      }
+
+      if (_boxSizing == HtmlBoxSizing.borderBox) {
+        return intrinsicBorderBox;
+      }
+      final double border = isWidthAxis ? borderHorizontal : borderVertical;
+      return math.max(0.0, intrinsicBorderBox - border);
+    }
+
+    double? minW = resolveSizingLimit(_minWidth, isWidthAxis: true);
+    double? maxW = resolveSizingLimit(_maxWidth, isWidthAxis: true);
+    if (minW != null && maxW != null && maxW < minW) {
+      maxW = minW;
+    }
+
+    double sizingWidth;
+    if (_width is FixedSize) {
+      sizingWidth = (_width as FixedSize).value;
+    } else if (_width is PercentSize && constraints.hasBoundedWidth) {
+      sizingWidth =
+          constraints.maxWidth * (_width as PercentSize).value / 100.0;
+      if (_boxSizing == HtmlBoxSizing.contentBox) {
+        // percent width is resolved against containing block width; keep as content-box width.
+      }
+    } else if (_width is AutoSize &&
+        constraints.hasBoundedWidth &&
+        _display == HtmlDisplay.block) {
+      sizingWidth = availableSizingWidth;
     } else {
-      double intrinsicWidth;
+      // Intrinsic / shrink-to-fit cases.
+      final double intrinsicBorderBox;
       if (_width is MinContent) {
-        intrinsicWidth = computeMinIntrinsicWidth(double.infinity);
+        intrinsicBorderBox = computeMinIntrinsicWidth(double.infinity);
       } else if (_width is MaxContent) {
-        intrinsicWidth = computeMaxIntrinsicWidth(double.infinity);
+        intrinsicBorderBox = computeMaxIntrinsicWidth(double.infinity);
       } else if (_width is AutoSize && _display == HtmlDisplay.inline) {
         final double minI = computeMinIntrinsicWidth(double.infinity);
         final double maxI = computeMaxIntrinsicWidth(double.infinity);
-        final double available = constraints.hasBoundedWidth
-            ? constraints.maxWidth
-            : double.infinity;
-        intrinsicWidth = math.min(maxI, math.max(minI, available));
+        final double available = availableBorderBoxWidth;
+        intrinsicBorderBox = math.min(maxI, math.max(minI, available));
       } else if (_width is FitContent) {
-        double minI = computeMinIntrinsicWidth(double.infinity);
-        double maxI = computeMaxIntrinsicWidth(double.infinity);
-        double available = constraints.hasBoundedWidth
-            ? constraints.maxWidth
-            : double.infinity;
-        intrinsicWidth = math.min(maxI, math.max(minI, available));
+        final double minI = computeMinIntrinsicWidth(double.infinity);
+        final double maxI = computeMaxIntrinsicWidth(double.infinity);
+        final double available = availableBorderBoxWidth;
+        intrinsicBorderBox = math.min(maxI, math.max(minI, available));
       } else if (_width is AutoSize) {
-        intrinsicWidth = computeMaxIntrinsicWidth(double.infinity);
+        intrinsicBorderBox = computeMaxIntrinsicWidth(double.infinity);
       } else {
-        intrinsicWidth = 0;
+        intrinsicBorderBox = 0.0;
       }
 
-      double totalWidth = intrinsicWidth;
-      if (_boxSizing == HtmlBoxSizing.contentBox) {
-        contentWidth = math.max(0, totalWidth - borderHorizontal);
-      } else {
-        contentWidth = math.max(0, totalWidth - borderHorizontal);
-      }
-      targetWidth = totalWidth;
+      sizingWidth = _boxSizing == HtmlBoxSizing.borderBox
+          ? intrinsicBorderBox
+          : math.max(0.0, intrinsicBorderBox - borderHorizontal);
     }
 
-    targetWidth = constraints.constrainWidth(targetWidth);
+    if (minW != null) sizingWidth = math.max(sizingWidth, minW);
+    if (maxW != null) sizingWidth = math.min(sizingWidth, maxW);
 
-    if (_boxSizing == HtmlBoxSizing.borderBox) {
-      contentWidth = math.max(0.0, targetWidth - borderHorizontal);
-    } else {
-      contentWidth = targetWidth;
-    }
+    double borderBoxWidth = _boxSizing == HtmlBoxSizing.borderBox
+        ? sizingWidth
+        : sizingWidth + borderHorizontal;
+    borderBoxWidth = constraints.constrainWidth(borderBoxWidth);
+
+    final double contentWidth = math.max(
+      0.0,
+      borderBoxWidth - borderHorizontal,
+    );
 
     double yOffset = _computedBorderWidths.top;
     double xOffset = _computedBorderWidths.left;
@@ -1771,36 +1898,37 @@ class RenderHtmlDiv extends RenderBox
 
     final double contentHeight = (currentY - yOffset) + prevBottom;
 
-    double targetHeight;
+    double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
+    double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
+    if (minH != null && maxH != null && maxH < minH) {
+      maxH = minH;
+    }
+
+    double sizingHeight;
     if (_height is FixedSize) {
-      targetHeight = (_height as FixedSize).value;
+      sizingHeight = (_height as FixedSize).value;
     } else if (_height is PercentSize && constraints.hasBoundedHeight) {
-      targetHeight =
-          constraints.maxHeight * (_height as PercentSize).value / 100;
+      sizingHeight =
+          constraints.maxHeight * (_height as PercentSize).value / 100.0;
     } else {
-      targetHeight = contentHeight;
+      // auto height depends on boxSizing.
+      sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
+          ? (contentHeight + borderVertical)
+          : contentHeight;
     }
 
-    double finalHeight;
-    if (_height is FixedSize ||
-        (_height is PercentSize && constraints.hasBoundedHeight)) {
-      if (_boxSizing == HtmlBoxSizing.borderBox) {
-        finalHeight = targetHeight;
-      } else {
-        finalHeight = targetHeight + borderVertical;
-      }
-    } else {
-      finalHeight = contentHeight + borderVertical;
-    }
+    if (minH != null) sizingHeight = math.max(sizingHeight, minH);
+    if (maxH != null) sizingHeight = math.min(sizingHeight, maxH);
 
-    double finalWidth;
+    double borderBoxHeight;
     if (_boxSizing == HtmlBoxSizing.borderBox) {
-      finalWidth = targetWidth;
+      borderBoxHeight = sizingHeight;
     } else {
-      finalWidth = targetWidth + borderHorizontal;
+      borderBoxHeight = sizingHeight + borderVertical;
     }
+    borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
 
-    size = constraints.constrain(Size(finalWidth, finalHeight));
+    size = Size(borderBoxWidth, borderBoxHeight);
   }
 
   @override

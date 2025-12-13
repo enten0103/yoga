@@ -18,9 +18,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(AppBar, 'HtmlDiv 示例'), findsOneWidget);
-    expect(find.text('HtmlDiv Border-Image 示例'), findsOneWidget);
 
-    await tester.tap(find.text('HtmlDiv Border-Image 示例'));
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('HtmlDiv Border-Image 示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
+
+    await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
     expect(
