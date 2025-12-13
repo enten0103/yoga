@@ -1,10 +1,10 @@
 # Agent Status Report
 
-**Date:** 2025-12-07
+**Date:** 2025-12-13
 **Project:** Flutter HTML/CSS Layout Engine
 
 ## Project Description
-This project aims to implement a rendering model in Flutter that mimics HTML and CSS layout behaviors. The goal is to provide widgets that allow developers to build UIs using familiar web concepts like `div`, `border`, `box-sizing`, and flexible sizing units (pixels, percentages, auto).
+This project aims to implement a rendering model in Flutter that mimics HTML and CSS layout behaviors. The goal is to provide widgets that allow developers to build UIs using familiar web concepts like `div`, `border`, `box-sizing`, and flexible sizing units (pixels, percentages, auto), plus common decoration and paint-time effects.
 
 ## Architecture
 
@@ -12,13 +12,25 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
 *   **`HtmlDiv`**: The fundamental building block widget. It extends `MultiChildRenderObjectWidget` and creates a `RenderHtmlDiv` render object.
 *   **`RenderHtmlDiv`**: Handles the layout and painting logic.
     *   **Layout**: Calculates dimensions based on `HtmlSize` strategies (Fixed, Percent, Auto, Min/Max/FitContent) and `HtmlBoxSizing` rules.
-    *   **Painting**: Draws borders based on `HtmlBorder` definitions (styles: solid, dashed, dotted, double).
+    *   **Painting**: Draws borders/background/box-shadow and supports paint-only transforms.
 *   **`HtmlSize`**: Abstract class defining sizing strategies.
 *   **`HtmlBorder`**: Defines border properties (width, style, color).
 *   **`HtmlBorderImage`**: CSS `border-image` 数据模型与绘制支持。
     *   **API**: `source(image) / slice / width / outset / repeatX / repeatY`。
     *   **Rendering**: 基于 9-slice（四角 + 四边 + 可选 fill 中心）绘制；支持 `stretch/repeat/round/space`；与 `borderRadius` clip 对齐。
 *   **Yoga Integration**: The project leverages `yoga_ffi.dart` for underlying Flexbox layout capabilities, providing a bridge to the C++ Yoga layout engine.
+
+### Unified Value Types
+*   **`HtmlLength`**: Unifies length-like values across APIs.
+    *   Units: `px`, `%`, `auto`.
+    *   Resolution: `resolvePx(reference: ...)`.
+*   **`HtmlLengthOffset`**: A 2D pair of `HtmlLength` (`dx/dy`) used for offsets like background-position, box-shadow offset, and transform-origin offset.
+
+### CSS-like Models
+*   **`HtmlBackground`**: `color`, `image`, `repeatX/repeatY`, `size` (`auto/contain/cover/explicit`), `position` (alignment + `HtmlLengthOffset`), `clip` (`borderBox/paddingBox`).
+*   **`HtmlBoxShadow`**: Multi-layer shadows (supports percentage offsets via `HtmlLengthOffset`; inset is approximated).
+*   **`HtmlTransform`**: Paint-only transform (layout unaffected); hit-test uses inverse transform; origin is `originAlignment + originOffset(HtmlLengthOffset)`.
+*   **`HtmlMargin`**: Supports px/%/auto via `HtmlLength`, vertical margin collapsing, and horizontal `auto` distribution.
 
 ### Testing (`test/`)
 *   Unit and Widget tests ensure that layout calculations match CSS specifications.
@@ -53,8 +65,14 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
 5.  **Quality Assurance**:
     *   Comprehensive test suite added.
     *   Example app updated with Chinese localization.
-    *   Linting issues resolved.
+    *   `flutter analyze` 0 issues.
     *   Added tests for `border-image`（布局不受影响、圆角裁剪/绘制不报错）与 example 导航用例。
+
+6.  **Background / Box Shadow / Transform / Margin**:
+    *   **Background**: image tiling, size/position (px/%), clip and borderRadius-safe painting.
+    *   **Box-Shadow**: multiple layers; percentage offset support; inset approximation.
+    *   **Transform**: paint-only transform + correct hit testing.
+    *   **Margin**: vertical margin collapsing; horizontal `auto`.
 
 ### Recent Work Summary (2025-12)
 *   **API Implementation**: 在 `flutter/lib/html_div.dart` 新增 `HtmlBorderImage` 与相关 value types（px/%/number/auto、fill）。
@@ -62,10 +80,15 @@ This project aims to implement a rendering model in Flutter that mimics HTML and
 *   **Example Gallery**: 新增 `Border-Image` 示例页并在首页增加入口；example `pubspec.yaml` 注册 `assets/wallhaven.png` 作为样例资源。
 *   **Tests**: 新增 `flutter/test/border_image_test.dart`；更新 example 的 `widget_test.dart` 与当前 UI 保持一致。
 
-### Next Steps
-*   Implement `padding` and `margin` support in `HtmlDiv`.
-*   Integrate `HtmlDiv` more deeply with Yoga FFI for complex Flexbox layouts (row/column directions, alignment).
-*   Add support for `background` (color, image).
+*   **Unified lengths**: Migrated margin/background-size/background-position/transform-origin/box-shadow offset to `HtmlLength` / `HtmlLengthOffset`.
+*   **Percent rules**:
+    *   `margin: %` resolves against containing block width (CSS behavior).
+    *   `background-position` offset resolves against target rect width/height.
+    *   `background-size: explicit` resolves width/height against target rect width/height respectively.
+    *   `transform-origin` and `box-shadow` offsets resolve against the box size.
 
+### Next Steps
+*   Implement `padding` support in `HtmlDiv`.
+*   Integrate `HtmlDiv` more deeply with Yoga FFI for complex Flexbox layouts (row/column directions, alignment).
 *   Extend `border-image` 覆盖面：补齐更多 CSS 组合边界（极端 slice 值、非均匀 width/outset、与 mixed border 的交互）。
 
