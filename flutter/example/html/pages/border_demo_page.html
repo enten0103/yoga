@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BorderDemoPage - HtmlDiv 边框示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/border_demo_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #333;
+        }
+
+        .grey {
+            background: #eee;
+            padding: 8px;
+        }
+
+        .box {
+            width: 100px;
+            height: 100px;
+            box-sizing: border-box;
+        }
+
+        .fill {
+            width: 100%;
+            height: 100%;
+        }
+
+        .wrap {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .small {
+            width: 80px;
+            height: 80px;
+            box-sizing: border-box;
+        }
+
+        .w50 {
+            width: 50px;
+            height: 50px;
+            box-sizing: border-box;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(0, 0, 0, 0.12);
+            margin: 20px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv 边框示例（HTML/CSS 近似对照）</h1>
+
+        <h2>BoxSizing 对比 (100x100, 10px Border)</h2>
+        <div class="row">
+            <div class="col">
+                <div class="hint">ContentBox (Total 120)</div>
+                <div class="grey">
+                    <div class="box" style="box-sizing: content-box; border: 10px solid #1976d2;">
+                        <div class="fill" style="background: rgba(25,118,210,0.2);"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="hint">BorderBox (Total 100)</div>
+                <div class="grey">
+                    <div class="box" style="box-sizing: border-box; border: 10px solid #2e7d32;">
+                        <div class="fill" style="background: rgba(46,125,50,0.2);"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>边框样式 (Border Styles)</h2>
+        <div class="wrap">
+            <div class="col">
+                <div class="hint">Solid</div>
+                <div class="small" style="border: 5px solid #fb8c00;"></div>
+            </div>
+            <div class="col">
+                <div class="hint">Dashed</div>
+                <div class="small" style="border: 5px dashed #fb8c00;"></div>
+            </div>
+            <div class="col">
+                <div class="hint">Dotted</div>
+                <div class="small" style="border: 5px dotted #fb8c00;"></div>
+            </div>
+            <div class="col">
+                <div class="hint">Double</div>
+                <div class="small" style="border: 5px double #fb8c00;"></div>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>边框宽度类型</h2>
+        <div class="hint">Thin / Medium / Thick（浏览器关键字宽度由 UA 决定）</div>
+        <div class="row" style="justify-content:flex-start; gap:10px;">
+            <div class="w50" style="border-style: solid; border-color: teal; border-width: thin;"></div>
+            <div class="w50" style="border-style: solid; border-color: teal; border-width: medium;"></div>
+            <div class="w50" style="border-style: solid; border-color: teal; border-width: thick;"></div>
+        </div>
+
+        <div style="height:20px"></div>
+        <div class="hint">百分比宽度 (10% of container)（CSS 不支持 border-width 百分比，这里用 20px 近似 200 * 10%）</div>
+        <div class="grey"
+            style="width:200px; height:100px; display:flex; align-items:center; justify-content:center; background:#fafafa;">
+            <div style="width:100px; height:50px; border: 20px solid #000; box-sizing: border-box;"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <h2>混合边框 (Mixed Borders)</h2>
+        <div class="box"
+            style="width:100px;height:100px; border-top:10px solid red; border-right:5px solid blue; border-bottom:20px solid green; border-left:2px solid yellow;">
+        </div>
+
+    </div>
+</body>
+
+</html>

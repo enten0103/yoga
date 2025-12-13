@@ -35,9 +35,12 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('HtmlDiv Background 示例'), findsOneWidget);
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('HtmlDiv Background 示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
 
-    await tester.tap(find.text('HtmlDiv Background 示例'));
+    await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
     expect(
@@ -52,9 +55,12 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('HtmlDiv Box-Shadow 示例'), findsOneWidget);
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('HtmlDiv Box-Shadow 示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
 
-    await tester.tap(find.text('HtmlDiv Box-Shadow 示例'));
+    await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
     expect(
@@ -69,9 +75,12 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('HtmlDiv Transform 示例'), findsOneWidget);
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('HtmlDiv Transform 示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
 
-    await tester.tap(find.text('HtmlDiv Transform 示例'));
+    await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(AppBar, 'HtmlDiv Transform 示例'), findsOneWidget);
@@ -83,9 +92,12 @@ void main() {
     await tester.pumpWidget(const MyApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('HtmlDiv Margin 示例'), findsOneWidget);
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('HtmlDiv Margin 示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
 
-    await tester.tap(find.text('HtmlDiv Margin 示例'));
+    await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(AppBar, 'HtmlDiv Margin 示例'), findsOneWidget);

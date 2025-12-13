@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BorderImagePage - HtmlDiv Border-Image 示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/border_image_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 1080px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #333;
+            margin: 0 0 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1 1 420px;
+            min-width: 300px;
+        }
+
+        .pad {
+            background: #f5f5f5;
+            padding: 8px;
+        }
+
+        .center {
+            display: flex;
+            justify-content: center;
+        }
+
+        .bi {
+            width: 320px;
+            height: 110px;
+            box-sizing: border-box;
+            border: 12px solid transparent;
+            border-image-source: url("../../assets/wallhaven.png");
+            border-image-slice: 30%;
+            border-image-width: auto;
+            border-image-repeat: stretch;
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .h90 {
+            height: 90px;
+        }
+
+        .w320 {
+            width: 320px;
+        }
+
+        .r18 {
+            border-radius: 18px;
+        }
+
+        /* 一些浏览器对 border-image-width:auto 的实现不一致，这里不强求像素级一致。 */
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Border-Image 示例（HTML/CSS 近似对照）</h1>
+
+        <h2>基础：slice(%) + width(auto) + stretch</h2>
+        <div class="label">slice 30% / stretch</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-image-slice: 30%; border-image-width: auto; border-image-repeat: stretch;"></div>
+            </div>
+        </div>
+
+        <h2>fill：绘制中心区域</h2>
+        <div class="row">
+            <div class="col">
+                <div class="label">fill: false</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi" style="border-image-slice: 25%; border-image-repeat: stretch;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="label">fill: true</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi" style="border-image-slice: 25% fill; border-image-repeat: stretch;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2>repeat：repeat / round / space / stretch</h2>
+        <div class="label">repeatX: repeat, repeatY: repeat</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi h90" style="border-image-slice: 24; border-image-repeat: repeat;"></div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">repeatX: round, repeatY: round</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi h90" style="border-image-slice: 24; border-image-repeat: round;"></div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">repeatX: space, repeatY: space</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi h90" style="border-image-slice: 24; border-image-repeat: space;"></div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">repeatX: stretch, repeatY: stretch</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi h90" style="border-image-slice: 24; border-image-repeat: stretch;"></div>
+            </div>
+        </div>
+
+        <h2>width：number / px / percent / auto</h2>
+        <div class="label">width: number(1.0) => 1 * borderWidth</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-width:12px; border-image-slice: 20%; border-image-width: 1; border-image-repeat: repeat;">
+                </div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">width: px(20)</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-width:12px; border-image-slice: 20%; border-image-width: 20px; border-image-repeat: repeat;">
+                </div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">width: percent(15%)</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-width:12px; border-image-slice: 20%; border-image-width: 15%; border-image-repeat: repeat;">
+                </div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">width: auto => borderWidth</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-width:12px; border-image-slice: 20%; border-image-width: auto; border-image-repeat: repeat;">
+                </div>
+            </div>
+        </div>
+
+        <h2>outset：向外扩张绘制区域</h2>
+        <div class="row">
+            <div class="col">
+                <div class="label">outset: 0</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi"
+                            style="border-width:12px; border-image-slice: 25%; border-image-outset: 0; border-image-repeat: repeat;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="label">outset: px(16)</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi"
+                            style="border-width:12px; border-image-slice: 25%; border-image-outset: 16px; border-image-repeat: repeat;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2>borderRadius：对 border-image 进行裁剪</h2>
+        <div class="row">
+            <div class="col">
+                <div class="label">radius: 0</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi" style="border-image-slice: 28 fill; border-image-repeat: round;"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="label">radius: 18</div>
+                <div class="pad">
+                    <div class="center">
+                        <div class="bi r18" style="border-image-slice: 28 fill; border-image-repeat: round;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <h2>对齐 CSS：border-style hidden 时不绘制 border-image</h2>
+        <div class="label">border-style: hidden</div>
+        <div class="pad">
+            <div class="center">
+                <div class="bi"
+                    style="border-width:12px; border-style:hidden; border-image-slice: 25% fill; border-image-repeat: repeat;">
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

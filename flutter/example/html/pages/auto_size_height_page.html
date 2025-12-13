@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>auto_size_height_page</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: grid;
+            place-items: center;
+        }
+
+        .outer {
+            width: 300px;
+            background: #f4f4f4;
+        }
+
+        .box {
+            width: 100px;
+            background: #ddd;
+        }
+
+        .child {
+            width: 50px;
+        }
+
+        .c1 {
+            height: 20px;
+            background: rgba(0, 0, 0, 0.08);
+        }
+
+        .c2 {
+            height: 30px;
+            background: rgba(0, 0, 0, 0.16);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Mirrors: AutoSizeHeightPage -> fixed width 100, auto height from children 20 + 30 -->
+    <div class="outer">
+        <div class="box">
+            <div class="child c1"></div>
+            <div class="child c2"></div>
+        </div>
+    </div>
+</body>
+
+</html>

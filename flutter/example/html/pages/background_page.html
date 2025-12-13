@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BackgroundPage - HtmlDiv Background 示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/background_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .row {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .col {
+            flex: 1 1 360px;
+            min-width: 280px;
+        }
+
+        .label {
+            font-size: 12px;
+            color: #333;
+            margin: 0 0 6px;
+        }
+
+        .center {
+            display: flex;
+            justify-content: center;
+        }
+
+        .box {
+            box-sizing: border-box;
+            width: 260px;
+            height: 100px;
+            border: 10px solid #212121;
+            border-radius: 0;
+            background-color: transparent;
+            background-image: none;
+            background-repeat: repeat;
+            background-position: 0 0;
+            background-size: auto;
+            background-clip: border-box;
+        }
+
+        .h90 {
+            height: 90px;
+        }
+
+        .h110 {
+            height: 110px;
+        }
+
+        .h120 {
+            height: 120px;
+        }
+
+        .bw14 {
+            border-width: 14px;
+        }
+
+        .r18 {
+            border-radius: 18px;
+        }
+
+        .r28 {
+            border-radius: 28px;
+        }
+
+        .bg-b2dfdb {
+            background-color: #b2dfdb;
+        }
+
+        .bg-e1bee7 {
+            background-color: #e1bee7;
+        }
+
+        .bg-bbdefb {
+            background-color: #bbdefb;
+        }
+
+        .bg-tint {
+            background-color: rgba(0, 0, 0, 0.07);
+        }
+
+        .img-small {
+            background-image: url("../../assets/test1.png");
+        }
+
+        .img-large {
+            background-image: url("../../assets/wallhaven.png");
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Background 示例（HTML/CSS 近似对照）</h1>
+
+        <h2>基础：background-color</h2>
+        <div class="row">
+            <div class="col">
+                <div class="label">纯色背景 + border-box clip</div>
+                <div class="center">
+                    <div class="box bg-b2dfdb" style="background-clip: border-box;"></div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="label">padding-box clip (不涂 border 区)</div>
+                <div class="center">
+                    <div class="box bw14 bg-e1bee7" style="background-clip: padding-box;"></div>
+                </div>
+            </div>
+        </div>
+
+        <h2>小图 test1.png：repeat/no-repeat/position</h2>
+        <div class="label">repeat / auto(使用图片原始尺寸)</div>
+        <div class="center">
+            <div class="box h90 img-small"
+                style="background-repeat: repeat; background-size: auto; background-position: 0 0;"></div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">no-repeat / center + offset(8, 4)</div>
+        <div class="center">
+            <div class="box h90 img-small"
+                style="background-repeat: no-repeat; background-size: auto; background-position: calc(50% + 8px) calc(50% + 4px);">
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">repeatX: space / repeatY: round (explicit 18x18)</div>
+        <div class="center">
+            <div class="box h90 img-small"
+                style="background-repeat: space round; background-size: 18px 18px; background-position: 0 0;"></div>
+        </div>
+
+        <h2>大图 wallhaven.png：contain/cover/explicit</h2>
+        <div class="label">contain + no-repeat</div>
+        <div class="center">
+            <div class="box h120 bg-tint img-large"
+                style="background-repeat: no-repeat; background-size: contain; background-position: 50% 50%;"></div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">cover + no-repeat</div>
+        <div class="center">
+            <div class="box h120 img-large"
+                style="background-repeat: no-repeat; background-size: cover; background-position: 50% 50%;"></div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="label">explicit(160x60) + center</div>
+        <div class="center">
+            <div class="box h120 img-large"
+                style="background-repeat: no-repeat; background-size: 160px 60px; background-position: 50% 50%;"></div>
+        </div>
+
+        <h2>borderRadius：背景裁剪</h2>
+        <div class="row">
+            <div class="col">
+                <div class="label">radius 18 + repeat</div>
+                <div class="center">
+                    <div class="box h110 r18 img-small"
+                        style="background-repeat: repeat; background-size: 20px 20px; background-position: 0 0;"></div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="label">radius 28 + padding-box clip</div>
+                <div class="center">
+                    <div class="box h110 bw14 r28 bg-bbdefb img-small"
+                        style="background-clip: padding-box; background-repeat: repeat; background-size: 18px 18px; background-position: 6px 6px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

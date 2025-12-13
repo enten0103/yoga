@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>content_sizing_demo_page</title>
+    <style>
+        body {
+            margin: 16px;
+            font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+        }
+
+        .section {
+            margin-bottom: 20px;
+        }
+
+        .label {
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .stage {
+            background: #eee;
+            padding: 8px;
+            overflow: hidden;
+        }
+
+        .box {
+            border: 1px solid #999;
+            padding: 2px 4px;
+            background: white;
+        }
+
+        /* Approximations for min/max/fit content. */
+        .min-content {
+            display: inline-block;
+            width: min-content;
+        }
+
+        .max-content {
+            display: inline-block;
+            width: max-content;
+            white-space: nowrap;
+        }
+
+        .fit-content {
+            display: inline-block;
+            width: fit-content;
+        }
+
+        .border-blue {
+            border-color: #1976d2;
+        }
+
+        .border-green {
+            border-color: #2e7d32;
+        }
+
+        .border-orange {
+            border-color: #ef6c00;
+        }
+
+        .border-red {
+            border-color: #c62828;
+        }
+
+        .border-purple {
+            border-color: #6a1b9a;
+        }
+
+        .hscroll {
+            overflow-x: auto;
+        }
+
+        .w100 {
+            width: 100px;
+        }
+
+        .blk {
+            border: 1px solid #000;
+            background: #fff;
+        }
+
+        .b50 {
+            width: 50px;
+            height: 30px;
+        }
+
+        .b100 {
+            width: 100px;
+            height: 30px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Mirrors: ContentSizingDemoPage -> a scrollable list of sizing demonstrations -->
+
+    <div class="section">
+        <div class="label">1. MinContent with Text (Wraps at words)</div>
+        <div class="stage">
+            <div class="box min-content border-blue">Hello World This Is A Test</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="label">2. MaxContent with Text (No wrapping)</div>
+        <div class="stage hscroll">
+            <div class="box max-content border-green">Hello World This Is A Test</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="label">3. FitContent (Unconstrained - behaves like Max)</div>
+        <div class="stage">
+            <div class="box fit-content border-orange">Hello World This Is A Long String</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="label">4. FitContent (Constrained - shrinks)</div>
+        <div class="stage w100">
+            <div class="box fit-content border-red">Hello World This Is A Long String</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="label">5. Nested MinContent</div>
+        <div class="stage">
+            <div class="box min-content border-purple">
+                <div class="blk b50"></div>
+                <div class="blk b100"></div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

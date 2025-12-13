@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InlinePage - HtmlDiv Inline / Baseline 示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/inline_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .note {
+            font-size: 12px;
+            white-space: pre-line;
+            color: #222;
+        }
+
+        .box {
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.2);
+            background: rgba(0, 0, 0, 0.04);
+        }
+
+        .w300 {
+            width: 300px;
+        }
+
+        .w240 {
+            width: 240px;
+        }
+
+        .autoH {
+            height: auto;
+        }
+
+        .pad0 {
+            padding: 0;
+        }
+
+        .center {
+            display: flex;
+            justify-content: center;
+        }
+
+        .inline-flow {
+            font-size: 0;
+            line-height: 0;
+        }
+
+        .ib {
+            display: inline-block;
+            vertical-align: baseline;
+            box-sizing: border-box;
+        }
+
+        .baseline {
+            position: relative;
+        }
+
+        .baseline::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1px;
+            background: rgba(255, 0, 0, 0.4);
+            pointer-events: none;
+        }
+
+        .indent-marker {
+            position: relative;
+        }
+
+        .indent-marker::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: var(--marker-left);
+            width: 1px;
+            background: rgba(255, 0, 0, 0.4);
+            pointer-events: none;
+        }
+
+        .indent40 {
+            --marker-left: 40px;
+            text-indent: 40px;
+        }
+
+        .indent10p {
+            --marker-left: 10%;
+            text-indent: 10%;
+            text-align: center;
+        }
+
+        .fit-content-wrap {
+            font-size: 0;
+        }
+
+        .fit {
+            display: inline-block;
+            width: fit-content;
+            max-width: 100%;
+            border: 1px solid rgba(0, 0, 0, 0.4);
+            background: rgba(255, 0, 0, 0.08);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Inline / Baseline 示例（HTML/CSS 近似对照）</h1>
+
+        <div class="note">说明：
+            - 子元素 display=inline 会在父容器内按行内流排版并自动换行
+            - 行内元素按 baseline 对齐（这里用 inline-block baseline 近似）
+            - margin-top/bottom 对 inline-block 的行盒高度影响与 Flutter 实现可能不同</div>
+
+        <h2>基线对齐：不同高度的 inline 盒子底边对齐</h2>
+        <div class="center">
+            <div class="box w300 baseline pad0">
+                <div class="inline-flow">
+                    <span class="ib"
+                        style="width:70px;height:40px;background:#90caf9;border:1px solid rgba(0,0,0,0.2);"></span><span
+                        class="ib"
+                        style="width:110px;height:18px;background:#a5d6a7;border:1px solid rgba(0,0,0,0.2);"></span><span
+                        class="ib"
+                        style="width:90px;height:28px;background:#ffcc80;border:1px solid rgba(0,0,0,0.2);"></span>
+                </div>
+            </div>
+        </div>
+
+        <h2>换行：宽度不足时自动折行</h2>
+        <div class="center">
+            <div class="box w240 pad0">
+                <div class="inline-flow">
+                    <span class="ib" style="width:120px;height:26px;background:#b39ddb;"></span><span class="ib"
+                        style="width:120px;height:18px;background:#80deea;"></span><span class="ib"
+                        style="width:120px;height:34px;background:#ffab91;"></span>
+                </div>
+            </div>
+        </div>
+
+        <h2>text-indent：只影响第一行（支持 px/%）</h2>
+        <div class="center">
+            <div class="box w300 indent-marker indent40" style="padding:0;">
+                <div class="inline-flow" style="line-height: 0;">
+                    <span class="ib" style="width:80px;height:22px;background:#ce93d8;"></span><span class="ib"
+                        style="width:120px;height:22px;background:#90caf9;"></span><span class="ib"
+                        style="width:120px;height:22px;background:#a5d6a7;"></span>
+                </div>
+            </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="center">
+            <div class="box w300 indent-marker indent10p" style="padding:0;">
+                <div class="inline-flow">
+                    <span class="ib" style="width:90px;height:22px;background:#ffcc80;"></span><span class="ib"
+                        style="width:90px;height:22px;background:#b2dfdb;"></span>
+                </div>
+            </div>
+        </div>
+
+        <h2>inline + FitContent：受可用宽度影响（内部可换行）</h2>
+        <div class="center">
+            <div class="box w300" style="padding:0;">
+                <div class="fit-content-wrap">
+                    <span class="fit">
+                        <span class="ib" style="width:200px;height:22px;background:#90caf9;"></span><span class="ib"
+                            style="width:200px;height:22px;background:#a5d6a7;"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <h2>inline 嵌套与 inline 中嵌套 block</h2>
+        <div class="center">
+            <div class="box w300" style="padding:0;">
+                <div class="inline-flow">
+                    <span class="ib" style="border:1px solid rgba(0,0,0,0.4); background: rgba(0,0,255,0.08);">
+                        <span class="ib" style="background: transparent;">
+                            <span class="ib" style="width:60px;height:20px;background:#ffcc80;"></span><span class="ib"
+                                style="width:50px;height:20px;background:#b2dfdb;"></span>
+                        </span>
+                        <div style="display:block; width:220px; height:26px; background:#ce93d8;"></div>
+                        <span class="ib" style="width:80px;height:20px;background:#80deea;"></span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <h2>inline + margin-top/bottom（影响行盒高度）</h2>
+        <div class="center">
+            <div class="box w300" style="padding:0;">
+                <div class="inline-flow" style="line-height: normal; font-size: 0;">
+                    <span class="ib"
+                        style="width:90px;height:22px;margin-top:10px;margin-bottom:6px;background:#fff59d;"></span><span
+                        class="ib" style="width:140px;height:22px;background:#b2dfdb;"></span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</body>
+
+</html>

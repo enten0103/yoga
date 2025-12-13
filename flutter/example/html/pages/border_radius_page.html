@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BorderRadiusPage - HtmlDiv Border Radius</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/border_radius_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .box {
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Border Radius（HTML/CSS 对照）</h1>
+
+        <h2>1. Uniform Radius (10px)</h2>
+        <div class="box" style="width:100px;height:100px;border:5px solid #1976d2;border-radius:10px;">Box</div>
+
+        <h2>2. Individual Corners</h2>
+        <div class="box"
+            style="width:100px;height:100px;border:5px solid #2e7d32;border-top-left-radius:20px;border-bottom-right-radius:20px;">
+            Box</div>
+
+        <h2>3. Dashed Border with Radius</h2>
+        <div class="box" style="width:100px;height:100px;border:3px dashed #fb8c00;border-radius:15px;">Box</div>
+
+        <h2>4. Double Border with Radius</h2>
+        <div class="box" style="width:100px;height:100px;border:6px double #8e24aa;border-radius:15px;">Box</div>
+
+        <h2>5. Elliptical Radius</h2>
+        <div class="box" style="width:150px;height:100px;border:4px solid #c62828;border-radius:40px / 20px;">Box</div>
+
+    </div>
+</body>
+
+</html>
