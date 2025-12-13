@@ -98,6 +98,94 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('Negative top margin pulls block upward (overlap)', (
+    WidgetTester tester,
+  ) async {
+    const aKey = ValueKey('negTopA');
+    const bKey = ValueKey('negTopB');
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: HtmlDiv(
+            width: const FixedSize(200),
+            children: const [
+              HtmlDiv(
+                key: aKey,
+                width: FixedSize(200),
+                height: FixedSize(40),
+                background: HtmlBackground(color: Color(0xFFE8F5E9)),
+              ),
+              HtmlDiv(
+                key: bKey,
+                width: FixedSize(200),
+                height: FixedSize(40),
+                margin: HtmlMargin.only(top: HtmlLength.px(-10)),
+                background: HtmlBackground(color: Color(0xFFE3F2FD)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Offset aTopLeft = tester.getTopLeft(find.byKey(aKey));
+    final Offset bTopLeft = tester.getTopLeft(find.byKey(bKey));
+
+    // A height=40; collapse(0,-10)=-10 => B starts at y=30 (overlaps by 10).
+    expect(bTopLeft.dy - aTopLeft.dy, 30);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Negative horizontal margins shift and expand available width', (
+    WidgetTester tester,
+  ) async {
+    const parentKey = ValueKey('negHMParent');
+    const childKey = ValueKey('negHMChild');
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: HtmlDiv(
+            key: parentKey,
+            width: const FixedSize(200),
+            children: const [
+              HtmlDiv(
+                key: childKey,
+                width: AutoSize(),
+                height: FixedSize(20),
+                margin: HtmlMargin.only(
+                  left: HtmlLength.px(-20),
+                  right: HtmlLength.px(-20),
+                ),
+                background: HtmlBackground(color: Color(0xFFFFF3E0)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Offset parentTopLeft = tester.getTopLeft(find.byKey(parentKey));
+    final Offset childTopLeft = tester.getTopLeft(find.byKey(childKey));
+    final RenderBox childBox = tester.renderObject(find.byKey(childKey));
+
+    // Negative left margin shifts left.
+    expect(childTopLeft.dx - parentTopLeft.dx, -20);
+    // AutoSize block fills the provided maxWidth; negative margins expand it.
+    // parent contentWidth=200, m.horizontal=-40 => child maxWidth=240.
+    expect(childBox.size.width, equals(240));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Horizontal auto margins distribute remaining space', (
     WidgetTester tester,
   ) async {

@@ -673,9 +673,17 @@ class _BackgroundAxisTile {
   });
 }
 
+enum HtmlDisplay { block, inline }
+
+enum HtmlTextAlign { start, center, end, justify }
+
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
+  final HtmlDisplay display;
+  final HtmlTextAlign textAlign;
+  final HtmlLength? lineHeight;
+  final HtmlLength textIndent;
   final HtmlMargin? margin;
   final HtmlBorder? border;
   final HtmlBorderRadius? borderRadius;
@@ -688,6 +696,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     super.key,
     this.width = const AutoSize(),
     this.height = const AutoSize(),
+    this.display = HtmlDisplay.block,
+    this.textAlign = HtmlTextAlign.start,
+    this.lineHeight,
+    this.textIndent = const HtmlLength.px(0),
     this.margin,
     this.border,
     this.borderRadius,
@@ -703,6 +715,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     return RenderHtmlDiv(
       width: width,
       height: height,
+      display: display,
+      textAlign: textAlign,
+      lineHeight: lineHeight,
+      textIndent: textIndent,
       margin: margin,
       border: border,
       borderRadius: borderRadius,
@@ -719,6 +735,10 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     renderObject
       ..width = width
       ..height = height
+      ..display = display
+      ..textAlign = textAlign
+      ..lineHeight = lineHeight
+      ..textIndent = textIndent
       ..margin = margin
       ..border = border
       ..borderRadius = borderRadius
@@ -738,6 +758,10 @@ class RenderHtmlDiv extends RenderBox
         RenderBoxContainerDefaultsMixin<RenderBox, HtmlDivParentData> {
   HtmlSize _width;
   HtmlSize _height;
+  HtmlDisplay _display;
+  HtmlTextAlign _textAlign;
+  HtmlLength? _lineHeight;
+  HtmlLength _textIndent;
   HtmlMargin? _margin;
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
@@ -762,6 +786,10 @@ class RenderHtmlDiv extends RenderBox
   RenderHtmlDiv({
     required HtmlSize width,
     required HtmlSize height,
+    HtmlDisplay display = HtmlDisplay.block,
+    HtmlTextAlign textAlign = HtmlTextAlign.start,
+    HtmlLength? lineHeight,
+    HtmlLength textIndent = const HtmlLength.px(0),
     HtmlMargin? margin,
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
@@ -772,6 +800,10 @@ class RenderHtmlDiv extends RenderBox
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
+       _display = display,
+       _textAlign = textAlign,
+       _lineHeight = lineHeight,
+       _textIndent = textIndent,
        _margin = margin,
        _border = border,
        _borderRadius = borderRadius,
@@ -818,6 +850,38 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
+  HtmlDisplay get display => _display;
+  set display(HtmlDisplay value) {
+    if (_display != value) {
+      _display = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlTextAlign get textAlign => _textAlign;
+  set textAlign(HtmlTextAlign value) {
+    if (_textAlign != value) {
+      _textAlign = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlLength? get lineHeight => _lineHeight;
+  set lineHeight(HtmlLength? value) {
+    if (_lineHeight != value) {
+      _lineHeight = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlLength get textIndent => _textIndent;
+  set textIndent(HtmlLength value) {
+    if (_textIndent != value) {
+      _textIndent = value;
+      markNeedsLayout();
+    }
+  }
+
   HtmlMargin? get margin => _margin;
   set margin(HtmlMargin? value) {
     if (_margin != value) {
@@ -835,6 +899,48 @@ class RenderHtmlDiv extends RenderBox
   static HtmlMargin? _readChildHtmlMargin(RenderBox child) {
     if (child is RenderHtmlDiv) return child._margin;
     return null;
+  }
+
+  static HtmlDisplay _readChildHtmlDisplay(RenderBox child) {
+    if (child is RenderHtmlDiv) return child._display;
+    // Treat plain text as inline-level content by default (CSS-like).
+    if (child is RenderParagraph) return HtmlDisplay.inline;
+    return HtmlDisplay.block;
+  }
+
+  static bool _hasInlineContent(RenderHtmlDiv div) {
+    RenderBox? child = div.firstChild;
+    while (child != null) {
+      final HtmlDivParentData pd = child.parentData! as HtmlDivParentData;
+      if (_readChildHtmlDisplay(child) == HtmlDisplay.inline) return true;
+      child = pd.nextSibling;
+    }
+    return false;
+  }
+
+  static bool _isVisuallyTransparent(RenderHtmlDiv div) {
+    final HtmlBackground? bg = div._background;
+    final bool hasBackground =
+        bg != null && (bg.color != null || bg.image != null);
+    return !hasBackground &&
+        div._border == null &&
+        div._boxShadow.isEmpty &&
+        div._transform == null;
+  }
+
+  static bool _paintsInInlineLayer(RenderBox child) {
+    final HtmlDisplay d = _readChildHtmlDisplay(child);
+    if (d == HtmlDisplay.inline) return true;
+    // Special case: a transparent block that only exists to host inline/text
+    // should paint in the inline layer so its text is not covered by later
+    // block backgrounds when negative margins cause overlap.
+    if (child is RenderHtmlDiv &&
+        child._display == HtmlDisplay.block &&
+        _isVisuallyTransparent(child) &&
+        _hasInlineContent(child)) {
+      return true;
+    }
+    return false;
   }
 
   static EdgeInsets _resolveChildMargin(
@@ -1064,6 +1170,13 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
+  @override
+  double? computeDistanceToActualBaseline(TextBaseline baseline) {
+    // CSS inline-block baseline is the bottom margin edge by default.
+    // We approximate this by using the bottom edge of the border box.
+    return size.height;
+  }
+
   double _getSideWidth(HtmlBorderSide side, double containerWidth) {
     if (side.style == HtmlBorderStyle.hidden) return 0.0;
     final w = side.width;
@@ -1094,6 +1207,127 @@ class RenderHtmlDiv extends RenderBox
     );
   }
 
+  static double _inlineMinContentWidth(RenderBox? firstChild, double height) {
+    double maxBoxWidth = 0;
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final EdgeInsets m = _resolveChildMargin(child, 0);
+      final double childWidth = child.getMinIntrinsicWidth(height);
+      maxBoxWidth = math.max(maxBoxWidth, childWidth + m.horizontal);
+      child = (child.parentData as HtmlDivParentData).nextSibling;
+    }
+    return maxBoxWidth;
+  }
+
+  static double _inlineMaxContentWidth(RenderBox? firstChild, double height) {
+    double maxLineWidth = 0;
+    double currentLineWidth = 0;
+
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final EdgeInsets m = _resolveChildMargin(child, 0);
+      final HtmlDisplay d = _readChildHtmlDisplay(child);
+
+      if (d == HtmlDisplay.inline) {
+        final double childWidth = child.getMaxIntrinsicWidth(height);
+        currentLineWidth += childWidth + m.horizontal;
+      } else {
+        maxLineWidth = math.max(maxLineWidth, currentLineWidth);
+        final double childWidth = child.getMaxIntrinsicWidth(height);
+        maxLineWidth = math.max(maxLineWidth, childWidth + m.horizontal);
+        currentLineWidth = 0;
+      }
+
+      child = (child.parentData as HtmlDivParentData).nextSibling;
+    }
+
+    maxLineWidth = math.max(maxLineWidth, currentLineWidth);
+    return maxLineWidth;
+  }
+
+  static double _inlineIntrinsicHeight(
+    RenderBox? firstChild,
+    double width,
+    HtmlLength? lineHeight,
+    HtmlLength textIndent,
+  ) {
+    if (!width.isFinite || width <= 0) return 0;
+
+    final double indentPx = textIndent.resolvePx(reference: width);
+    bool indentApplied = false;
+    double currentLineIndent = 0;
+
+    double currentY = 0;
+    double inlineX = 0;
+    double lineAscent = 0;
+    double lineDescent = 0;
+
+    double flushLine() {
+      final double natural = lineAscent + lineDescent;
+      if (natural <= 0) return 0;
+      if (lineHeight == null || lineHeight.isAuto) return natural;
+      final double target = lineHeight.resolvePx(reference: natural);
+      if (!target.isFinite) return natural;
+      return math.max(0.0, target);
+    }
+
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final HtmlDisplay d = _readChildHtmlDisplay(child);
+      final EdgeInsets m = _resolveChildMargin(child, width);
+
+      if (d == HtmlDisplay.inline) {
+        if (inlineX == 0) {
+          currentLineIndent = indentApplied ? 0.0 : indentPx;
+        }
+        final double available = math.max(0.0, width - currentLineIndent);
+        final double childMaxWidth = math.max(0.0, available - m.horizontal);
+        final double childWidth = child.getMaxIntrinsicWidth(double.infinity);
+        final double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
+        final double baselineDistance =
+            child.getDistanceToBaseline(TextBaseline.alphabetic) ?? childHeight;
+
+        final double inlineBoxWidth = childWidth + m.horizontal;
+        if (inlineX > 0 && inlineX + inlineBoxWidth > available) {
+          currentY += flushLine();
+          inlineX = 0;
+          lineAscent = 0;
+          lineDescent = 0;
+          indentApplied = true;
+          currentLineIndent = 0;
+        }
+
+        inlineX += inlineBoxWidth;
+        final double ascent = m.top + baselineDistance;
+        final double descent = (childHeight - baselineDistance) + m.bottom;
+        lineAscent = math.max(lineAscent, ascent);
+        lineDescent = math.max(lineDescent, descent);
+
+        if (!indentApplied) {
+          // After we've placed content on the first inline line, subsequent lines are not indented.
+          indentApplied = true;
+        }
+      } else {
+        if (inlineX > 0) {
+          currentY += flushLine();
+          inlineX = 0;
+          lineAscent = 0;
+          lineDescent = 0;
+          indentApplied = true;
+          currentLineIndent = 0;
+        }
+        final double childMaxWidth = math.max(0.0, width - m.horizontal);
+        final double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
+        currentY += m.top + childHeight + m.bottom;
+      }
+
+      child = (child.parentData as HtmlDivParentData).nextSibling;
+    }
+
+    if (inlineX > 0) currentY += flushLine();
+    return currentY;
+  }
+
   @override
   double computeMinIntrinsicWidth(double height) {
     EdgeInsets borderW = _calculateBorderWidths(0);
@@ -1102,15 +1336,19 @@ class RenderHtmlDiv extends RenderBox
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
     } else {
-      RenderBox? child = firstChild;
-      while (child != null) {
-        // Percentage margins depend on containing block width; ignore in width intrinsics.
-        final EdgeInsets m = _resolveChildMargin(child, 0);
-        contentW = math.max(
-          contentW,
-          child.getMinIntrinsicWidth(height) + m.horizontal,
-        );
-        child = (child.parentData as HtmlDivParentData).nextSibling;
+      if (_display == HtmlDisplay.inline) {
+        contentW = _inlineMinContentWidth(firstChild, height);
+      } else {
+        RenderBox? child = firstChild;
+        while (child != null) {
+          // Percentage margins depend on containing block width; ignore in width intrinsics.
+          final EdgeInsets m = _resolveChildMargin(child, 0);
+          contentW = math.max(
+            contentW,
+            child.getMinIntrinsicWidth(height) + m.horizontal,
+          );
+          child = (child.parentData as HtmlDivParentData).nextSibling;
+        }
       }
     }
 
@@ -1129,15 +1367,19 @@ class RenderHtmlDiv extends RenderBox
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
     } else {
-      RenderBox? child = firstChild;
-      while (child != null) {
-        // Percentage margins depend on containing block width; ignore in width intrinsics.
-        final EdgeInsets m = _resolveChildMargin(child, 0);
-        contentW = math.max(
-          contentW,
-          child.getMaxIntrinsicWidth(height) + m.horizontal,
-        );
-        child = (child.parentData as HtmlDivParentData).nextSibling;
+      if (_display == HtmlDisplay.inline) {
+        contentW = _inlineMaxContentWidth(firstChild, height);
+      } else {
+        RenderBox? child = firstChild;
+        while (child != null) {
+          // Percentage margins depend on containing block width; ignore in width intrinsics.
+          final EdgeInsets m = _resolveChildMargin(child, 0);
+          contentW = math.max(
+            contentW,
+            child.getMaxIntrinsicWidth(height) + m.horizontal,
+          );
+          child = (child.parentData as HtmlDivParentData).nextSibling;
+        }
       }
     }
 
@@ -1159,16 +1401,26 @@ class RenderHtmlDiv extends RenderBox
       final double referenceWidth = width.isFinite
           ? math.max(0.0, width - borderW.horizontal)
           : 0.0;
-      double prevBottom = 0;
-      RenderBox? child = firstChild;
-      while (child != null) {
-        final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
-        contentH += _collapseMargins(prevBottom, m.top);
-        contentH += child.getMinIntrinsicHeight(width);
-        prevBottom = m.bottom;
-        child = (child.parentData as HtmlDivParentData).nextSibling;
+
+      if (_display == HtmlDisplay.inline) {
+        contentH = _inlineIntrinsicHeight(
+          firstChild,
+          referenceWidth,
+          _lineHeight,
+          _textIndent,
+        );
+      } else {
+        double prevBottom = 0;
+        RenderBox? child = firstChild;
+        while (child != null) {
+          final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
+          contentH += _collapseMargins(prevBottom, m.top);
+          contentH += child.getMinIntrinsicHeight(width);
+          prevBottom = m.bottom;
+          child = (child.parentData as HtmlDivParentData).nextSibling;
+        }
+        contentH += prevBottom;
       }
-      contentH += prevBottom;
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
@@ -1189,16 +1441,26 @@ class RenderHtmlDiv extends RenderBox
       final double referenceWidth = width.isFinite
           ? math.max(0.0, width - borderW.horizontal)
           : 0.0;
-      double prevBottom = 0;
-      RenderBox? child = firstChild;
-      while (child != null) {
-        final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
-        contentH += _collapseMargins(prevBottom, m.top);
-        contentH += child.getMaxIntrinsicHeight(width);
-        prevBottom = m.bottom;
-        child = (child.parentData as HtmlDivParentData).nextSibling;
+
+      if (_display == HtmlDisplay.inline) {
+        contentH = _inlineIntrinsicHeight(
+          firstChild,
+          referenceWidth,
+          _lineHeight,
+          _textIndent,
+        );
+      } else {
+        double prevBottom = 0;
+        RenderBox? child = firstChild;
+        while (child != null) {
+          final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
+          contentH += _collapseMargins(prevBottom, m.top);
+          contentH += child.getMaxIntrinsicHeight(width);
+          prevBottom = m.bottom;
+          child = (child.parentData as HtmlDivParentData).nextSibling;
+        }
+        contentH += prevBottom;
       }
-      contentH += prevBottom;
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
@@ -1226,7 +1488,7 @@ class RenderHtmlDiv extends RenderBox
             constraints.maxWidth * (_width as PercentSize).value / 100;
       }
     } else if (_width is AutoSize) {
-      if (constraints.hasBoundedWidth) {
+      if (constraints.hasBoundedWidth && _display == HtmlDisplay.block) {
         targetWidth = constraints.maxWidth;
       }
     }
@@ -1242,8 +1504,15 @@ class RenderHtmlDiv extends RenderBox
       double intrinsicWidth;
       if (_width is MinContent) {
         intrinsicWidth = computeMinIntrinsicWidth(double.infinity);
-      } else if (_width is MaxContent || _width is AutoSize) {
+      } else if (_width is MaxContent) {
         intrinsicWidth = computeMaxIntrinsicWidth(double.infinity);
+      } else if (_width is AutoSize && _display == HtmlDisplay.inline) {
+        final double minI = computeMinIntrinsicWidth(double.infinity);
+        final double maxI = computeMaxIntrinsicWidth(double.infinity);
+        final double available = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : double.infinity;
+        intrinsicWidth = math.min(maxI, math.max(minI, available));
       } else if (_width is FitContent) {
         double minI = computeMinIntrinsicWidth(double.infinity);
         double maxI = computeMaxIntrinsicWidth(double.infinity);
@@ -1251,6 +1520,8 @@ class RenderHtmlDiv extends RenderBox
             ? constraints.maxWidth
             : double.infinity;
         intrinsicWidth = math.min(maxI, math.max(minI, available));
+      } else if (_width is AutoSize) {
+        intrinsicWidth = computeMaxIntrinsicWidth(double.infinity);
       } else {
         intrinsicWidth = 0;
       }
@@ -1277,10 +1548,185 @@ class RenderHtmlDiv extends RenderBox
     double currentY = yOffset;
     double prevBottom = 0;
 
+    bool inInlineRun = false;
+    final List<RenderBox> lineChildren = <RenderBox>[];
+    final List<EdgeInsets> lineMargins = <EdgeInsets>[];
+    final List<double> lineBaselines = <double>[];
+    final List<double> lineXs = <double>[];
+    double lineUsedWidth = 0;
+    double lineAscent = 0;
+    double lineDescent = 0;
+
+    final double indentPx = _textIndent.resolvePx(reference: contentWidth);
+    bool indentApplied = false;
+    double currentLineIndent = 0;
+
+    (double ascent, double descent) applyLineHeight(
+      double ascent,
+      double descent,
+    ) {
+      final double natural = ascent + descent;
+      if (natural <= 0) return (ascent, descent);
+      final HtmlLength? lh = _lineHeight;
+      if (lh == null || lh.isAuto) return (ascent, descent);
+      final double target = lh.resolvePx(reference: natural);
+      if (!target.isFinite) return (ascent, descent);
+      final double delta = target - natural;
+      final double half = delta / 2.0;
+      return (math.max(0.0, ascent + half), math.max(0.0, descent + half));
+    }
+
+    double flushLine({required bool isLastLine}) {
+      if (lineChildren.isEmpty) return 0;
+
+      final (double finalAscent, double finalDescent) = applyLineHeight(
+        lineAscent,
+        lineDescent,
+      );
+
+      final double lineHeight = finalAscent + finalDescent;
+      final double availableWidth = math.max(
+        0.0,
+        contentWidth - currentLineIndent,
+      );
+      final double extraSpace = math.max(0.0, availableWidth - lineUsedWidth);
+
+      double startShift = 0;
+      double gapExtra = 0;
+
+      if (_textAlign == HtmlTextAlign.center) {
+        startShift = extraSpace / 2.0;
+      } else if (_textAlign == HtmlTextAlign.end) {
+        startShift = extraSpace;
+      } else if (_textAlign == HtmlTextAlign.justify &&
+          !isLastLine &&
+          lineChildren.length > 1) {
+        gapExtra = extraSpace / (lineChildren.length - 1);
+      }
+
+      final double baselineY = currentY + finalAscent;
+      for (int i = 0; i < lineChildren.length; i++) {
+        final RenderBox c = lineChildren[i];
+        final HtmlDivParentData pd = c.parentData as HtmlDivParentData;
+        final EdgeInsets m = lineMargins[i];
+        final double baselineDistance = lineBaselines[i];
+        final double childTop = baselineY - baselineDistance;
+        final double childLeft =
+            xOffset +
+            currentLineIndent +
+            startShift +
+            lineXs[i] +
+            (gapExtra * i) +
+            m.left;
+        pd.offset = Offset(childLeft, childTop);
+      }
+
+      lineChildren.clear();
+      lineMargins.clear();
+      lineBaselines.clear();
+      lineXs.clear();
+      lineUsedWidth = 0;
+      lineAscent = 0;
+      lineDescent = 0;
+
+      if (!indentApplied) {
+        indentApplied = true;
+      }
+      currentLineIndent = 0;
+      return lineHeight;
+    }
+
     RenderBox? child = firstChild;
     while (child != null) {
       final HtmlDivParentData childParentData =
           child.parentData as HtmlDivParentData;
+
+      final HtmlDisplay childDisplay = _readChildHtmlDisplay(child);
+      final bool isInline = childDisplay == HtmlDisplay.inline;
+
+      if (isInline) {
+        if (!inInlineRun) {
+          // Inline content does not participate in margin collapsing.
+          currentY += prevBottom;
+          prevBottom = 0;
+          inInlineRun = true;
+          lineChildren.clear();
+          lineMargins.clear();
+          lineBaselines.clear();
+          lineXs.clear();
+          lineUsedWidth = 0;
+          lineAscent = 0;
+          lineDescent = 0;
+          currentLineIndent = indentApplied ? 0.0 : indentPx;
+        }
+
+        if (lineChildren.isEmpty) {
+          currentLineIndent = indentApplied ? 0.0 : indentPx;
+        }
+
+        final EdgeInsets m = _resolveChildMargin(child, contentWidth);
+        final double availableWidth = math.max(
+          0.0,
+          contentWidth - currentLineIndent,
+        );
+        final double childMaxWidth = math.max(
+          0.0,
+          availableWidth - m.horizontal,
+        );
+        child.layout(
+          BoxConstraints(maxWidth: childMaxWidth),
+          parentUsesSize: true,
+        );
+
+        double inlineBoxWidth = m.left + child.size.width + m.right;
+        double wrapWidth = math.max(0.0, contentWidth - currentLineIndent);
+        if (lineUsedWidth > 0 && lineUsedWidth + inlineBoxWidth > wrapWidth) {
+          currentY += flushLine(isLastLine: false);
+
+          // New line may have different available width (e.g. first line had indent).
+          if (lineChildren.isEmpty) {
+            currentLineIndent = indentApplied ? 0.0 : indentPx;
+          }
+          final double newAvailableWidth = math.max(
+            0.0,
+            contentWidth - currentLineIndent,
+          );
+          final double newChildMaxWidth = math.max(
+            0.0,
+            newAvailableWidth - m.horizontal,
+          );
+          child.layout(
+            BoxConstraints(maxWidth: newChildMaxWidth),
+            parentUsesSize: true,
+          );
+          inlineBoxWidth = m.left + child.size.width + m.right;
+          wrapWidth = newAvailableWidth;
+        }
+
+        final double baselineDistance =
+            child.getDistanceToBaseline(TextBaseline.alphabetic) ??
+            child.size.height;
+        final double ascent = m.top + baselineDistance;
+        final double descent =
+            (child.size.height - baselineDistance) + m.bottom;
+        lineAscent = math.max(lineAscent, ascent);
+        lineDescent = math.max(lineDescent, descent);
+
+        lineChildren.add(child);
+        lineMargins.add(m);
+        lineBaselines.add(baselineDistance);
+        lineXs.add(lineUsedWidth);
+        lineUsedWidth += inlineBoxWidth;
+
+        child = childParentData.nextSibling;
+        continue;
+      }
+
+      if (inInlineRun) {
+        currentY += flushLine(isLastLine: true);
+        inInlineRun = false;
+        prevBottom = 0;
+      }
 
       final HtmlMargin? childMarginObj = _readChildHtmlMargin(child);
       final EdgeInsets m = _resolveChildMargin(child, contentWidth);
@@ -1317,7 +1763,13 @@ class RenderHtmlDiv extends RenderBox
       child = childParentData.nextSibling;
     }
 
-    double contentHeight = (currentY - yOffset) + prevBottom;
+    if (inInlineRun) {
+      currentY += flushLine(isLastLine: true);
+      inInlineRun = false;
+      prevBottom = 0;
+    }
+
+    final double contentHeight = (currentY - yOffset) + prevBottom;
 
     double targetHeight;
     if (_height is FixedSize) {
@@ -1374,7 +1826,35 @@ class RenderHtmlDiv extends RenderBox
         _paintMixedBorder(context, offset);
       }
     }
-    defaultPaint(context, offset);
+    // Paint order policy:
+    // - Paint all block-level children first.
+    // - Then paint all inline-level children (on top), to match typical HTML expectations
+    //   when inline content overlaps block backgrounds due to negative margins.
+    _paintChildrenSeparated(context, offset);
+  }
+
+  void _paintChildrenSeparated(PaintingContext context, Offset offset) {
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final HtmlDivParentData childParentData =
+          child.parentData! as HtmlDivParentData;
+      final bool inlineLayer = _paintsInInlineLayer(child);
+      if (!inlineLayer) {
+        context.paintChild(child, childParentData.offset + offset);
+      }
+      child = childParentData.nextSibling;
+    }
+
+    child = firstChild;
+    while (child != null) {
+      final HtmlDivParentData childParentData =
+          child.parentData! as HtmlDivParentData;
+      final bool inlineLayer = _paintsInInlineLayer(child);
+      if (inlineLayer) {
+        context.paintChild(child, childParentData.offset + offset);
+      }
+      child = childParentData.nextSibling;
+    }
   }
 
   @override
@@ -2364,6 +2844,39 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
-    return defaultHitTestChildren(result, position: position);
+    final List<RenderBox> blockChildren = <RenderBox>[];
+    final List<RenderBox> inlineChildren = <RenderBox>[];
+
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final HtmlDivParentData childParentData =
+          child.parentData! as HtmlDivParentData;
+      final bool inlineLayer = _paintsInInlineLayer(child);
+      (inlineLayer ? inlineChildren : blockChildren).add(child);
+      child = childParentData.nextSibling;
+    }
+
+    bool hitTestChild(RenderBox child) {
+      final HtmlDivParentData childParentData =
+          child.parentData! as HtmlDivParentData;
+      return result.addWithPaintOffset(
+        offset: childParentData.offset,
+        position: position,
+        hitTest: (BoxHitTestResult result, Offset transformed) {
+          return child.hitTest(result, position: transformed);
+        },
+      );
+    }
+
+    // Inline children paint last => hit test first.
+    for (int i = inlineChildren.length - 1; i >= 0; i--) {
+      if (hitTestChild(inlineChildren[i])) return true;
+    }
+
+    for (int i = blockChildren.length - 1; i >= 0; i--) {
+      if (hitTestChild(blockChildren[i])) return true;
+    }
+
+    return false;
   }
 }

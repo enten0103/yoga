@@ -13,6 +13,8 @@ import 'pages/background_page.dart';
 import 'pages/box_shadow_page.dart';
 import 'pages/margin_page.dart';
 import 'pages/transform_page.dart';
+import 'pages/inline_page.dart';
+import 'pages/css_paint_order_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -132,6 +134,20 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const TransformPage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv Inline / Baseline / Text 示例'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const InlinePage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('CSS 重叠/绘制顺序对照 (index.html)'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const CssPaintOrderPage()),
             ),
           ),
         ],

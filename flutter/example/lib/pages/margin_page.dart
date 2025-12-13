@@ -52,6 +52,26 @@ class MarginPage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _section(
+            title: '负 margin-top：产生重叠（向上拉动）',
+            child: _stack(
+              children: const [
+                _Block(
+                  label: 'A: height 40, margin-bottom 0',
+                  height: 40,
+                  margin: HtmlMargin.only(bottom: HtmlLength.px(0)),
+                  color: Color(0xFFE8F5E9),
+                ),
+                _Block(
+                  label: 'B: height 40, margin-top -10 (overlap)',
+                  height: 40,
+                  margin: HtmlMargin.only(top: HtmlLength.px(-10)),
+                  color: Color(0xFFE3F2FD),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _section(
             title: '水平边距：影响可用宽度与 x 偏移',
             child: _stack(
               children: const [
