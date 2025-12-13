@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 // 尺寸定义
 abstract class HtmlSize {
@@ -236,6 +237,37 @@ class HtmlBackground {
     this.image,
     this.clip = HtmlBackgroundClip.borderBox,
   });
+}
+
+// Transform (CSS-inspired model)
+//
+// Notes:
+// - Transforms do not affect layout, only painting and hit testing.
+// - The transform origin is resolved against the border-box size.
+class HtmlTransform {
+  final Matrix4 matrix;
+
+  /// Equivalent to CSS `transform-origin` alignment in the border box.
+  ///
+  /// Default is center.
+  final Alignment originAlignment;
+
+  /// Additional origin offset in logical pixels.
+  final Offset origin;
+
+  /// Additional origin offset in percent of border-box size.
+  ///
+  /// If set, dx is treated as % of width, dy as % of height.
+  final Offset? originPercent;
+
+  HtmlTransform({
+    Matrix4? matrix,
+    this.originAlignment = Alignment.center,
+    this.origin = Offset.zero,
+    this.originPercent,
+  }) : matrix = matrix ?? Matrix4.identity();
+
+  static HtmlTransform identity() => HtmlTransform();
 }
 
 // Box Shadow (CSS-inspired model)
@@ -528,6 +560,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlBoxSizing boxSizing;
   final HtmlBackground? background;
   final List<HtmlBoxShadow> boxShadow;
+  final HtmlTransform? transform;
 
   const HtmlDiv({
     super.key,
@@ -538,6 +571,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.boxSizing = HtmlBoxSizing.contentBox,
     this.background,
     this.boxShadow = const <HtmlBoxShadow>[],
+    this.transform,
     super.children = const [],
   });
 
@@ -550,6 +584,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       borderRadius: borderRadius,
       background: background,
       boxShadow: boxShadow,
+      transform: transform,
       imageConfiguration: createLocalImageConfiguration(context),
       boxSizing: boxSizing,
     );
@@ -564,6 +599,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..borderRadius = borderRadius
       ..background = background
       ..boxShadow = boxShadow
+      ..transform = transform
       ..imageConfiguration = createLocalImageConfiguration(context)
       ..boxSizing = boxSizing;
   }
@@ -581,6 +617,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlBorderRadius? _borderRadius;
   HtmlBackground? _background;
   List<HtmlBoxShadow> _boxShadow;
+  HtmlTransform? _transform;
   ImageConfiguration _imageConfiguration = ImageConfiguration.empty;
   final Map<ImageProvider, ImageStream> _borderImageStreams =
       <ImageProvider, ImageStream>{};
@@ -603,6 +640,7 @@ class RenderHtmlDiv extends RenderBox
     HtmlBorderRadius? borderRadius,
     HtmlBackground? background,
     List<HtmlBoxShadow> boxShadow = const <HtmlBoxShadow>[],
+    HtmlTransform? transform,
     ImageConfiguration imageConfiguration = ImageConfiguration.empty,
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
@@ -611,6 +649,7 @@ class RenderHtmlDiv extends RenderBox
        _borderRadius = borderRadius,
        _background = background,
        _boxShadow = boxShadow,
+       _transform = transform,
        _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
 
@@ -684,6 +723,42 @@ class RenderHtmlDiv extends RenderBox
       _boxShadow = value;
       markNeedsPaint();
     }
+  }
+
+  HtmlTransform? get transform => _transform;
+  set transform(HtmlTransform? value) {
+    if (_transform != value) {
+      _transform = value;
+      markNeedsPaint();
+      markNeedsSemanticsUpdate();
+    }
+  }
+
+  Offset _resolveTransformOrigin(HtmlTransform t) {
+    if (size.isEmpty) return t.origin;
+    final Offset aligned = t.originAlignment.alongSize(size);
+    final Offset percent = t.originPercent == null
+        ? Offset.zero
+        : Offset(
+            size.width * t.originPercent!.dx / 100.0,
+            size.height * t.originPercent!.dy / 100.0,
+          );
+    return aligned + t.origin + percent;
+  }
+
+  Matrix4? _effectiveTransform() {
+    final HtmlTransform? t = _transform;
+    if (t == null) return null;
+
+    final Offset origin = _resolveTransformOrigin(t);
+    final Matrix4 m = Matrix4.identity()
+      ..translate(origin.dx, origin.dy)
+      ..multiply(t.matrix)
+      ..translate(-origin.dx, -origin.dy);
+
+    // Avoid creating a compositing layer for pure identity.
+    if (m.isIdentity()) return null;
+    return m;
   }
 
   ImageConfiguration get imageConfiguration => _imageConfiguration;
@@ -1072,6 +1147,16 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   void paint(PaintingContext context, Offset offset) {
+    final Matrix4? t = _effectiveTransform();
+    if (t == null) {
+      _paintWithoutTransform(context, offset);
+      return;
+    }
+
+    context.pushTransform(needsCompositing, offset, t, _paintWithoutTransform);
+  }
+
+  void _paintWithoutTransform(PaintingContext context, Offset offset) {
     _paintBoxShadowIfNeeded(context, offset, inset: false);
     _paintBackgroundIfNeeded(context, offset);
     _paintBoxShadowIfNeeded(context, offset, inset: true);
@@ -1084,6 +1169,30 @@ class RenderHtmlDiv extends RenderBox
       }
     }
     defaultPaint(context, offset);
+  }
+
+  @override
+  bool hitTest(BoxHitTestResult result, {required Offset position}) {
+    final Matrix4? t = _effectiveTransform();
+    if (t == null) {
+      return super.hitTest(result, position: position);
+    }
+    return result.addWithPaintTransform(
+      transform: t,
+      position: position,
+      hitTest: (BoxHitTestResult result, Offset transformed) {
+        return super.hitTest(result, position: transformed);
+      },
+    );
+  }
+
+  @override
+  void applyPaintTransform(RenderBox child, Matrix4 transform) {
+    super.applyPaintTransform(child, transform);
+    final Matrix4? t = _effectiveTransform();
+    if (t != null) {
+      transform.multiply(t);
+    }
   }
 
   void _paintBoxShadowIfNeeded(

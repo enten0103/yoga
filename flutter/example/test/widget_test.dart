@@ -62,4 +62,18 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets('Home page navigates to Transform demo', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('HtmlDiv Transform 示例'), findsOneWidget);
+
+    await tester.tap(find.text('HtmlDiv Transform 示例'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'HtmlDiv Transform 示例'), findsOneWidget);
+  });
 }
