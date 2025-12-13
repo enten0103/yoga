@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlexLayoutPage - HtmlDiv Flex (Yoga) 示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/flex_layout_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .frame {
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: #eee;
+            height: 96px;
+            display: flex;
+            align-items: center;
+            box-sizing: border-box;
+        }
+
+        .frame.tall {
+            height: 180px;
+        }
+
+        .frame.wrap {
+            height: 200px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .frame.wrap-reverse {
+            height: 200px;
+            align-items: flex-start;
+            flex-wrap: wrap-reverse;
+        }
+
+        .frame.column {
+            flex-direction: column;
+        }
+
+        .space-between {
+            justify-content: space-between;
+        }
+
+        .center {
+            justify-content: center;
+        }
+
+        .flex-end {
+            justify-content: flex-end;
+        }
+
+        .tile {
+            width: 72px;
+            height: 44px;
+            margin: 8px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .tile.h36 {
+            height: 36px;
+        }
+
+        .tile.w180 {
+            width: 180px;
+        }
+
+        .tile.w200 {
+            width: 200px;
+        }
+
+        .tile.w140 {
+            width: 140px;
+        }
+
+        .a {
+            background: #009688;
+        }
+
+        .b {
+            background: #3f51b5;
+        }
+
+        .c {
+            background: #ff5722;
+        }
+
+        .grow {
+            flex: 1 1 auto;
+            min-width: 0;
+        }
+
+        .align-self-end {
+            align-self: flex-end;
+        }
+
+        .align-self-stretch {
+            align-self: stretch;
+        }
+
+        .basis140 {
+            flex-basis: 140px;
+        }
+
+        .shrink0 {
+            flex-shrink: 0;
+        }
+
+        .center-auto {
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Flex (Yoga) 示例（HTML/CSS 近似对照）</h1>
+
+        <h2>justify-content：space-between + align-items：center</h2>
+        <div class="frame space-between">
+            <div class="tile a">A</div>
+            <div class="tile b">B</div>
+            <div class="tile c">C</div>
+        </div>
+
+        <h2>justify-content：center / flex-end</h2>
+        <div class="frame center">
+            <div class="tile a">A</div>
+            <div class="tile b">B</div>
+        </div>
+        <div class="frame flex-end" style="margin-top: 8px;">
+            <div class="tile a">A</div>
+            <div class="tile b">B</div>
+        </div>
+
+        <h2>flex-grow：中间项扩展</h2>
+        <div class="frame">
+            <div class="tile a">L</div>
+            <div class="tile b grow">Grow</div>
+            <div class="tile c">R</div>
+        </div>
+
+        <h2>flex-direction：column（纵向主轴）</h2>
+        <div class="frame tall column space-between">
+            <div class="tile w200 a">Top</div>
+            <div class="tile w200 b">Mid</div>
+            <div class="tile w200 c">Bottom</div>
+        </div>
+
+        <h2>flex-wrap：wrap（多行换行）</h2>
+        <div class="frame wrap">
+            <div class="tile a">1</div>
+            <div class="tile b">2</div>
+            <div class="tile c">3</div>
+            <div class="tile" style="background:#9c27b0">4</div>
+            <div class="tile" style="background:#607d8b">5</div>
+            <div class="tile" style="background:#795548">6</div>
+            <div class="tile" style="background:#4caf50">7</div>
+            <div class="tile" style="background:#2196f3">8</div>
+        </div>
+
+        <h2>flex-wrap：wrap-reverse（反向换行）</h2>
+        <div class="frame wrap-reverse">
+            <div class="tile a">1</div>
+            <div class="tile b">2</div>
+            <div class="tile c">3</div>
+            <div class="tile" style="background:#9c27b0">4</div>
+            <div class="tile" style="background:#607d8b">5</div>
+            <div class="tile" style="background:#795548">6</div>
+            <div class="tile" style="background:#4caf50">7</div>
+            <div class="tile" style="background:#2196f3">8</div>
+        </div>
+
+        <h2>align-self：子项覆盖容器 align-items</h2>
+        <div class="frame" style="align-items:flex-start;">
+            <div class="tile h36 a">auto</div>
+            <div class="tile h36 b align-self-end">align-self:end</div>
+            <div class="tile h36 c align-self-stretch">align-self:stretch</div>
+        </div>
+
+        <h2>flex-basis + flex-shrink：小容器下按比例收缩</h2>
+        <div class="frame" style="width:260px;">
+            <div class="tile w140 a basis140">basis=140</div>
+            <div class="tile w140 b basis140">basis=140</div>
+            <div class="tile w140 c basis140 shrink0">shrink=0</div>
+        </div>
+
+        <h2>margin-left/right:auto：子项居中</h2>
+        <div class="frame">
+            <div class="tile w180 b center-auto">Centered</div>
+        </div>
+    </div>
+</body>
+
+</html>

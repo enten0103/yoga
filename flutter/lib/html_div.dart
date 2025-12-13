@@ -1,7 +1,10 @@
+import 'dart:ffi' as ffi;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+
+import 'src/yoga_ffi.dart';
 
 // 尺寸定义
 abstract class HtmlSize {
@@ -673,7 +676,24 @@ class _BackgroundAxisTile {
   });
 }
 
-enum HtmlDisplay { block, inline }
+enum HtmlDisplay { block, inline, flex }
+
+enum HtmlFlexDirection { row, rowReverse, column, columnReverse }
+
+enum HtmlJustifyContent {
+  flexStart,
+  center,
+  flexEnd,
+  spaceBetween,
+  spaceAround,
+  spaceEvenly,
+}
+
+enum HtmlAlignItems { stretch, flexStart, center, flexEnd, baseline }
+
+enum HtmlAlignSelf { auto, stretch, flexStart, center, flexEnd, baseline }
+
+enum HtmlFlexWrap { noWrap, wrap, wrapReverse }
 
 enum HtmlTextAlign { start, center, end, justify }
 
@@ -685,6 +705,17 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize? minHeight;
   final HtmlSize? maxHeight;
   final HtmlDisplay display;
+  // Flex container styles (used when display == flex)
+  final HtmlFlexDirection flexDirection;
+  final HtmlJustifyContent justifyContent;
+  final HtmlAlignItems alignItems;
+  final HtmlFlexWrap flexWrap;
+
+  // Flex item styles (used when parent is flex)
+  final double flexGrow;
+  final double flexShrink;
+  final HtmlLength flexBasis;
+  final HtmlAlignSelf alignSelf;
   final HtmlTextAlign textAlign;
   final HtmlLength? lineHeight;
   final HtmlLength textIndent;
@@ -705,6 +736,14 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.minHeight,
     this.maxHeight,
     this.display = HtmlDisplay.block,
+    this.flexDirection = HtmlFlexDirection.row,
+    this.justifyContent = HtmlJustifyContent.flexStart,
+    this.alignItems = HtmlAlignItems.stretch,
+    this.flexWrap = HtmlFlexWrap.noWrap,
+    this.flexGrow = 0.0,
+    this.flexShrink = 1.0,
+    this.flexBasis = const HtmlLength.auto(),
+    this.alignSelf = HtmlAlignSelf.auto,
     this.textAlign = HtmlTextAlign.start,
     this.lineHeight,
     this.textIndent = const HtmlLength.px(0),
@@ -728,6 +767,14 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       minHeight: minHeight,
       maxHeight: maxHeight,
       display: display,
+      flexDirection: flexDirection,
+      justifyContent: justifyContent,
+      alignItems: alignItems,
+      flexWrap: flexWrap,
+      flexGrow: flexGrow,
+      flexShrink: flexShrink,
+      flexBasis: flexBasis,
+      alignSelf: alignSelf,
       textAlign: textAlign,
       lineHeight: lineHeight,
       textIndent: textIndent,
@@ -752,6 +799,14 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..minHeight = minHeight
       ..maxHeight = maxHeight
       ..display = display
+      ..flexDirection = flexDirection
+      ..justifyContent = justifyContent
+      ..alignItems = alignItems
+      ..flexWrap = flexWrap
+      ..flexGrow = flexGrow
+      ..flexShrink = flexShrink
+      ..flexBasis = flexBasis
+      ..alignSelf = alignSelf
       ..textAlign = textAlign
       ..lineHeight = lineHeight
       ..textIndent = textIndent
@@ -779,6 +834,14 @@ class RenderHtmlDiv extends RenderBox
   HtmlSize? _minHeight;
   HtmlSize? _maxHeight;
   HtmlDisplay _display;
+  HtmlFlexDirection _flexDirection;
+  HtmlJustifyContent _justifyContent;
+  HtmlAlignItems _alignItems;
+  HtmlFlexWrap _flexWrap;
+  double _flexGrow;
+  double _flexShrink;
+  HtmlLength _flexBasis;
+  HtmlAlignSelf _alignSelf;
   HtmlTextAlign _textAlign;
   HtmlLength? _lineHeight;
   HtmlLength _textIndent;
@@ -801,6 +864,8 @@ class RenderHtmlDiv extends RenderBox
   ImageProvider? _backgroundImageProvider;
   HtmlBoxSizing _boxSizing;
 
+  Yoga? _yoga;
+
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
 
   RenderHtmlDiv({
@@ -811,6 +876,14 @@ class RenderHtmlDiv extends RenderBox
     HtmlSize? minHeight,
     HtmlSize? maxHeight,
     HtmlDisplay display = HtmlDisplay.block,
+    HtmlFlexDirection flexDirection = HtmlFlexDirection.row,
+    HtmlJustifyContent justifyContent = HtmlJustifyContent.flexStart,
+    HtmlAlignItems alignItems = HtmlAlignItems.stretch,
+    HtmlFlexWrap flexWrap = HtmlFlexWrap.noWrap,
+    double flexGrow = 0.0,
+    double flexShrink = 1.0,
+    HtmlLength flexBasis = const HtmlLength.auto(),
+    HtmlAlignSelf alignSelf = HtmlAlignSelf.auto,
     HtmlTextAlign textAlign = HtmlTextAlign.start,
     HtmlLength? lineHeight,
     HtmlLength textIndent = const HtmlLength.px(0),
@@ -829,6 +902,14 @@ class RenderHtmlDiv extends RenderBox
        _minHeight = minHeight,
        _maxHeight = maxHeight,
        _display = display,
+       _flexDirection = flexDirection,
+       _justifyContent = justifyContent,
+       _alignItems = alignItems,
+       _flexWrap = flexWrap,
+       _flexGrow = flexGrow,
+       _flexShrink = flexShrink,
+       _flexBasis = flexBasis,
+       _alignSelf = alignSelf,
        _textAlign = textAlign,
        _lineHeight = lineHeight,
        _textIndent = textIndent,
@@ -915,6 +996,366 @@ class RenderHtmlDiv extends RenderBox
     if (_display != value) {
       _display = value;
       markNeedsLayout();
+    }
+  }
+
+  HtmlFlexDirection get flexDirection => _flexDirection;
+  set flexDirection(HtmlFlexDirection value) {
+    if (_flexDirection != value) {
+      _flexDirection = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlJustifyContent get justifyContent => _justifyContent;
+  set justifyContent(HtmlJustifyContent value) {
+    if (_justifyContent != value) {
+      _justifyContent = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlAlignItems get alignItems => _alignItems;
+  set alignItems(HtmlAlignItems value) {
+    if (_alignItems != value) {
+      _alignItems = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlFlexWrap get flexWrap => _flexWrap;
+  set flexWrap(HtmlFlexWrap value) {
+    if (_flexWrap != value) {
+      _flexWrap = value;
+      markNeedsLayout();
+    }
+  }
+
+  double get flexGrow => _flexGrow;
+  set flexGrow(double value) {
+    if (_flexGrow != value) {
+      _flexGrow = value;
+      markNeedsLayout();
+    }
+  }
+
+  double get flexShrink => _flexShrink;
+  set flexShrink(double value) {
+    if (_flexShrink != value) {
+      _flexShrink = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlLength get flexBasis => _flexBasis;
+  set flexBasis(HtmlLength value) {
+    if (_flexBasis != value) {
+      _flexBasis = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlAlignSelf get alignSelf => _alignSelf;
+  set alignSelf(HtmlAlignSelf value) {
+    if (_alignSelf != value) {
+      _alignSelf = value;
+      markNeedsLayout();
+    }
+  }
+
+  Yoga _ensureYoga() {
+    return _yoga ??= Yoga();
+  }
+
+  static int _toYGFlexDirection(HtmlFlexDirection v) {
+    return switch (v) {
+      HtmlFlexDirection.row => YGFlexDirection.row,
+      HtmlFlexDirection.rowReverse => YGFlexDirection.rowReverse,
+      HtmlFlexDirection.column => YGFlexDirection.column,
+      HtmlFlexDirection.columnReverse => YGFlexDirection.columnReverse,
+    };
+  }
+
+  static int _toYGJustifyContent(HtmlJustifyContent v) {
+    return switch (v) {
+      HtmlJustifyContent.flexStart => YGJustify.flexStart,
+      HtmlJustifyContent.center => YGJustify.center,
+      HtmlJustifyContent.flexEnd => YGJustify.flexEnd,
+      HtmlJustifyContent.spaceBetween => YGJustify.spaceBetween,
+      HtmlJustifyContent.spaceAround => YGJustify.spaceAround,
+      HtmlJustifyContent.spaceEvenly => YGJustify.spaceEvenly,
+    };
+  }
+
+  static int _toYGAlignItems(HtmlAlignItems v) {
+    return switch (v) {
+      HtmlAlignItems.stretch => YGAlign.stretch,
+      HtmlAlignItems.flexStart => YGAlign.flexStart,
+      HtmlAlignItems.center => YGAlign.center,
+      HtmlAlignItems.flexEnd => YGAlign.flexEnd,
+      HtmlAlignItems.baseline => YGAlign.baseline,
+    };
+  }
+
+  static int _toYGAlignSelf(HtmlAlignSelf v) {
+    return switch (v) {
+      HtmlAlignSelf.auto => YGAlign.auto,
+      HtmlAlignSelf.stretch => YGAlign.stretch,
+      HtmlAlignSelf.flexStart => YGAlign.flexStart,
+      HtmlAlignSelf.center => YGAlign.center,
+      HtmlAlignSelf.flexEnd => YGAlign.flexEnd,
+      HtmlAlignSelf.baseline => YGAlign.baseline,
+    };
+  }
+
+  static int _toYGWrap(HtmlFlexWrap v) {
+    return switch (v) {
+      HtmlFlexWrap.noWrap => YGWrap.noWrap,
+      HtmlFlexWrap.wrap => YGWrap.wrap,
+      HtmlFlexWrap.wrapReverse => YGWrap.wrapReverse,
+    };
+  }
+
+  void _applyFlexBasis(
+    Yoga yoga,
+    ffi.Pointer<ffi.Void> node,
+    HtmlLength basis,
+    double referenceWidth,
+  ) {
+    if (basis.isAuto) {
+      yoga.setFlexBasisAuto(node);
+      return;
+    }
+    if (basis.isPercent) {
+      yoga.setFlexBasisPercent(node, basis.value);
+      return;
+    }
+    yoga.setFlexBasis(node, basis.resolvePx(reference: referenceWidth));
+  }
+
+  void _applyYogaSizeFromHtmlSize(
+    Yoga yoga,
+    ffi.Pointer<ffi.Void> node, {
+    required bool isWidth,
+    required HtmlSize size,
+  }) {
+    if (size is FixedSize) {
+      if (isWidth) {
+        yoga.setWidth(node, size.value);
+      } else {
+        yoga.setHeight(node, size.value);
+      }
+      return;
+    }
+    if (size is PercentSize) {
+      if (isWidth) {
+        yoga.setWidthPercent(node, size.value);
+      } else {
+        yoga.setHeightPercent(node, size.value);
+      }
+      return;
+    }
+    if (isWidth) {
+      yoga.setWidthAuto(node);
+    } else {
+      yoga.setHeightAuto(node);
+    }
+  }
+
+  double _performFlexLayout({
+    required double contentWidth,
+    required double xOffset,
+    required double yOffset,
+    required double availableBorderBoxHeight,
+    required double borderVertical,
+  }) {
+    final Yoga yoga = _ensureYoga();
+    final ffi.Pointer<ffi.Void> root = yoga.newNode();
+
+    final List<RenderBox> children = <RenderBox>[];
+    RenderBox? child = firstChild;
+    while (child != null) {
+      children.add(child);
+      child = (child.parentData! as HtmlDivParentData).nextSibling;
+    }
+
+    final List<ffi.Pointer<ffi.Void>> childNodes = <ffi.Pointer<ffi.Void>>[];
+
+    try {
+      yoga.setDisplay(root, YGDisplay.flex);
+      yoga.setFlexDirection(root, _toYGFlexDirection(_flexDirection));
+      yoga.setJustifyContent(root, _toYGJustifyContent(_justifyContent));
+      yoga.setAlignItems(root, _toYGAlignItems(_alignItems));
+      yoga.setFlexWrap(root, _toYGWrap(_flexWrap));
+
+      yoga.setWidth(root, contentWidth);
+
+      if (_height is FixedSize) {
+        final double h = (_height as FixedSize).value;
+        final double contentH = _boxSizing == HtmlBoxSizing.borderBox
+            ? math.max(0.0, h - borderVertical)
+            : h;
+        yoga.setHeight(root, contentH);
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        final double h =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+        final double contentH = _boxSizing == HtmlBoxSizing.borderBox
+            ? math.max(0.0, h - borderVertical)
+            : h;
+        yoga.setHeight(root, contentH);
+      } else {
+        yoga.setHeightAuto(root);
+      }
+
+      final bool mainAxisIsRow =
+          _flexDirection == HtmlFlexDirection.row ||
+          _flexDirection == HtmlFlexDirection.rowReverse;
+
+      for (final RenderBox c in children) {
+        // Loose pre-layout for a measurable basis.
+        c.layout(
+          BoxConstraints(
+            minWidth: 0,
+            maxWidth: contentWidth,
+            minHeight: 0,
+            maxHeight: double.infinity,
+          ),
+          parentUsesSize: true,
+        );
+
+        final ffi.Pointer<ffi.Void> node = yoga.newNode();
+        childNodes.add(node);
+        yoga.insertChild(root, node, childNodes.length - 1);
+
+        // Flex item styles.
+        if (c is RenderHtmlDiv) {
+          yoga.setFlexGrow(node, c._flexGrow);
+          yoga.setFlexShrink(node, c._flexShrink);
+          _applyFlexBasis(yoga, node, c._flexBasis, contentWidth);
+          yoga.setAlignSelf(node, _toYGAlignSelf(c._alignSelf));
+        } else {
+          yoga.setFlexGrow(node, 0.0);
+          yoga.setFlexShrink(node, 1.0);
+          yoga.setFlexBasisAuto(node);
+          yoga.setAlignSelf(node, YGAlign.auto);
+        }
+
+        // Margin.
+        final HtmlMargin? mObj = _readChildHtmlMargin(c);
+        if (mObj != null) {
+          if (mObj.left.isAuto) {
+            yoga.setMarginAuto(node, YGEdge.left);
+          } else {
+            yoga.setMargin(
+              node,
+              YGEdge.left,
+              mObj.left.resolvePx(reference: contentWidth),
+            );
+          }
+          if (mObj.right.isAuto) {
+            yoga.setMarginAuto(node, YGEdge.right);
+          } else {
+            yoga.setMargin(
+              node,
+              YGEdge.right,
+              mObj.right.resolvePx(reference: contentWidth),
+            );
+          }
+          yoga.setMargin(
+            node,
+            YGEdge.top,
+            mObj.top.isAuto ? 0.0 : mObj.top.resolvePx(reference: contentWidth),
+          );
+          yoga.setMargin(
+            node,
+            YGEdge.bottom,
+            mObj.bottom.isAuto
+                ? 0.0
+                : mObj.bottom.resolvePx(reference: contentWidth),
+          );
+        }
+
+        // Size. Forward explicit width/height; otherwise use measured size.
+        if (c is RenderHtmlDiv) {
+          final HtmlSize w = c._width;
+          final HtmlSize h = c._height;
+
+          if (mainAxisIsRow) {
+            if (w is FixedSize || w is PercentSize) {
+              _applyYogaSizeFromHtmlSize(yoga, node, isWidth: true, size: w);
+            } else {
+              yoga.setWidthAuto(node);
+              yoga.setFlexBasis(node, c.size.width);
+            }
+
+            if (_alignItems == HtmlAlignItems.stretch &&
+                !(h is FixedSize || h is PercentSize)) {
+              yoga.setHeightAuto(node);
+            } else if (h is FixedSize || h is PercentSize) {
+              _applyYogaSizeFromHtmlSize(yoga, node, isWidth: false, size: h);
+            } else {
+              yoga.setHeight(node, c.size.height);
+            }
+          } else {
+            if (h is FixedSize || h is PercentSize) {
+              _applyYogaSizeFromHtmlSize(yoga, node, isWidth: false, size: h);
+            } else {
+              yoga.setHeightAuto(node);
+              yoga.setFlexBasis(node, c.size.height);
+            }
+
+            if (_alignItems == HtmlAlignItems.stretch &&
+                !(w is FixedSize || w is PercentSize)) {
+              yoga.setWidthAuto(node);
+            } else if (w is FixedSize || w is PercentSize) {
+              _applyYogaSizeFromHtmlSize(yoga, node, isWidth: true, size: w);
+            } else {
+              yoga.setWidth(node, c.size.width);
+            }
+          }
+        } else {
+          yoga.setWidth(node, c.size.width);
+          yoga.setHeight(node, c.size.height);
+        }
+      }
+
+      final double availableContentHeight = availableBorderBoxHeight.isFinite
+          ? math.max(0.0, availableBorderBoxHeight - borderVertical)
+          : double.nan;
+
+      yoga.calculateLayout(
+        root,
+        availableWidth: contentWidth,
+        availableHeight: availableContentHeight,
+      );
+
+      double maxBottom = yOffset;
+      for (int i = 0; i < children.length; i++) {
+        final RenderBox c = children[i];
+        final ffi.Pointer<ffi.Void> node = childNodes[i];
+
+        final double left = yoga.getLeft(node);
+        final double top = yoga.getTop(node);
+        final double w = yoga.getLayoutWidth(node);
+        final double h = yoga.getLayoutHeight(node);
+
+        c.layout(
+          BoxConstraints.tightFor(width: w, height: h),
+          parentUsesSize: true,
+        );
+
+        final HtmlDivParentData pd = c.parentData! as HtmlDivParentData;
+        pd.offset = Offset(xOffset + left, yOffset + top);
+        maxBottom = math.max(maxBottom, pd.offset.dy + c.size.height);
+      }
+
+      return math.max(0.0, maxBottom - yOffset);
+    } finally {
+      try {
+        yoga.freeNodeRecursive(root);
+      } catch (_) {
+        // ignore
+      }
     }
   }
 
@@ -1627,7 +2068,7 @@ class RenderHtmlDiv extends RenderBox
       }
     } else if (_width is AutoSize &&
         constraints.hasBoundedWidth &&
-        _display == HtmlDisplay.block) {
+        (_display == HtmlDisplay.block || _display == HtmlDisplay.flex)) {
       sizingWidth = availableSizingWidth;
     } else {
       // Intrinsic / shrink-to-fit cases.
@@ -1674,6 +2115,49 @@ class RenderHtmlDiv extends RenderBox
     double xOffset = _computedBorderWidths.left;
     double currentY = yOffset;
     double prevBottom = 0;
+
+    if (_display == HtmlDisplay.flex) {
+      final double contentHeight = _performFlexLayout(
+        contentWidth: contentWidth,
+        xOffset: xOffset,
+        yOffset: yOffset,
+        availableBorderBoxHeight: availableBorderBoxHeight,
+        borderVertical: borderVertical,
+      );
+
+      double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
+      double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
+      if (minH != null && maxH != null && maxH < minH) {
+        maxH = minH;
+      }
+
+      double sizingHeight;
+      if (_height is FixedSize) {
+        sizingHeight = (_height as FixedSize).value;
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        sizingHeight =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+      } else {
+        // auto height depends on boxSizing.
+        sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? (contentHeight + borderVertical)
+            : contentHeight;
+      }
+
+      if (minH != null) sizingHeight = math.max(sizingHeight, minH);
+      if (maxH != null) sizingHeight = math.min(sizingHeight, maxH);
+
+      double borderBoxHeight;
+      if (_boxSizing == HtmlBoxSizing.borderBox) {
+        borderBoxHeight = sizingHeight;
+      } else {
+        borderBoxHeight = sizingHeight + borderVertical;
+      }
+      borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
+
+      size = Size(borderBoxWidth, borderBoxHeight);
+      return;
+    }
 
     bool inInlineRun = false;
     final List<RenderBox> lineChildren = <RenderBox>[];
@@ -1958,7 +2442,11 @@ class RenderHtmlDiv extends RenderBox
     // - Paint all block-level children first.
     // - Then paint all inline-level children (on top), to match typical HTML expectations
     //   when inline content overlaps block backgrounds due to negative margins.
-    _paintChildrenSeparated(context, offset);
+    if (_display == HtmlDisplay.flex) {
+      defaultPaint(context, offset);
+    } else {
+      _paintChildrenSeparated(context, offset);
+    }
   }
 
   void _paintChildrenSeparated(PaintingContext context, Offset offset) {
@@ -2972,6 +3460,9 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    if (_display == HtmlDisplay.flex) {
+      return defaultHitTestChildren(result, position: position);
+    }
     final List<RenderBox> blockChildren = <RenderBox>[];
     final List<RenderBox> inlineChildren = <RenderBox>[];
 

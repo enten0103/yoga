@@ -16,6 +16,7 @@ import 'pages/transform_page.dart';
 import 'pages/inline_page.dart';
 import 'pages/css_paint_order_page.dart';
 import 'pages/min_max_size_page.dart';
+import 'pages/flex_layout_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -39,6 +40,13 @@ class HomePage extends StatelessWidget {
       appBar: AppBar(title: const Text('HtmlDiv 示例')),
       body: ListView(
         children: [
+          ListTile(
+            title: const Text('HtmlDiv Flex (Yoga) 示例'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FlexLayoutPage()),
+            ),
+          ),
           ListTile(
             title: const Text('HtmlDiv 固定尺寸布局'),
             onTap: () => Navigator.push(
