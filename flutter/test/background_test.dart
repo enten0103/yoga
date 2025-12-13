@@ -80,12 +80,15 @@ void main() {
                   repeatX: HtmlBackgroundRepeat.space,
                   repeatY: HtmlBackgroundRepeat.round,
                   size: const HtmlBackgroundSize.explicit(
-                    width: 18,
-                    height: 18,
+                    width: HtmlLength.px(18),
+                    height: HtmlLength.px(18),
                   ),
                   position: const HtmlBackgroundPosition(
                     alignment: Alignment.topLeft,
-                    offset: Offset(3, 5),
+                    offset: HtmlLengthOffset(
+                      dx: HtmlLength.px(3),
+                      dy: HtmlLength.px(5),
+                    ),
                   ),
                 ),
               ),
@@ -142,7 +145,10 @@ void main() {
             size: const HtmlBackgroundSize.contain(),
             position: const HtmlBackgroundPosition(
               alignment: Alignment.center,
-              offset: Offset(6, 4),
+              offset: HtmlLengthOffset(
+                dx: HtmlLength.px(6),
+                dy: HtmlLength.px(4),
+              ),
             ),
           ),
         ),
@@ -163,7 +169,10 @@ void main() {
             image: MemoryImage(pngBytes),
             repeatX: HtmlBackgroundRepeat.space,
             repeatY: HtmlBackgroundRepeat.round,
-            size: const HtmlBackgroundSize.explicit(width: 12, height: 10),
+            size: const HtmlBackgroundSize.explicit(
+              width: HtmlLength.px(12),
+              height: HtmlLength.px(10),
+            ),
             position: const HtmlBackgroundPosition(
               alignment: Alignment.centerLeft,
             ),

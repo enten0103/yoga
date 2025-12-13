@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 // 尺寸定义
 abstract class HtmlSize {
@@ -168,6 +167,143 @@ class HtmlBorderRadius {
   }
 }
 
+// Unified length value
+//
+// Supports:
+// - px
+// - percent (of a provided reference)
+// - auto
+enum HtmlLengthUnit { px, percent, auto }
+
+class HtmlLength {
+  final double value;
+  final HtmlLengthUnit unit;
+
+  const HtmlLength._(this.value, this.unit);
+
+  const HtmlLength.px(double value) : this._(value, HtmlLengthUnit.px);
+  const HtmlLength.percent(double value)
+    : this._(value, HtmlLengthUnit.percent);
+  const HtmlLength.auto() : this._(0, HtmlLengthUnit.auto);
+
+  bool get isAuto => unit == HtmlLengthUnit.auto;
+  bool get isPercent => unit == HtmlLengthUnit.percent;
+
+  double resolvePx({required double reference}) {
+    switch (unit) {
+      case HtmlLengthUnit.px:
+        return value;
+      case HtmlLengthUnit.percent:
+        return reference * value / 100.0;
+      case HtmlLengthUnit.auto:
+        return 0.0;
+    }
+  }
+}
+
+/// 2D length pair (px/percent/auto per axis).
+///
+/// Used to unify APIs that accept either pixel or percentage offsets.
+class HtmlLengthOffset {
+  final HtmlLength dx;
+  final HtmlLength dy;
+
+  const HtmlLengthOffset({
+    this.dx = const HtmlLength.px(0),
+    this.dy = const HtmlLength.px(0),
+  });
+
+  const HtmlLengthOffset.auto()
+    : dx = const HtmlLength.auto(),
+      dy = const HtmlLength.auto();
+
+  const HtmlLengthOffset.zero() : this();
+
+  Offset resolve({
+    required double referenceWidth,
+    required double referenceHeight,
+  }) {
+    return Offset(
+      dx.resolvePx(reference: referenceWidth),
+      dy.resolvePx(reference: referenceHeight),
+    );
+  }
+
+  Offset resolveForSize(Size size) {
+    return resolve(referenceWidth: size.width, referenceHeight: size.height);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is HtmlLengthOffset && other.dx == dx && other.dy == dy;
+  }
+
+  @override
+  int get hashCode => Object.hash(dx, dy);
+}
+
+// Margin (CSS-inspired model)
+//
+// Notes:
+// - Margin does not paint.
+// - Margin affects layout in the parent block flow.
+// - Vertical margins between adjacent block children collapse per CSS rules.
+class HtmlMargin {
+  final HtmlLength top;
+  final HtmlLength right;
+  final HtmlLength bottom;
+  final HtmlLength left;
+
+  const HtmlMargin({
+    this.top = const HtmlLength.px(0),
+    this.right = const HtmlLength.px(0),
+    this.bottom = const HtmlLength.px(0),
+    this.left = const HtmlLength.px(0),
+  });
+
+  const HtmlMargin.all(HtmlLength value)
+    : top = value,
+      right = value,
+      bottom = value,
+      left = value;
+
+  const HtmlMargin.only({
+    this.top = const HtmlLength.px(0),
+    this.right = const HtmlLength.px(0),
+    this.bottom = const HtmlLength.px(0),
+    this.left = const HtmlLength.px(0),
+  });
+
+  const HtmlMargin.symmetric({
+    HtmlLength vertical = const HtmlLength.px(0),
+    HtmlLength horizontal = const HtmlLength.px(0),
+  }) : top = vertical,
+       right = horizontal,
+       bottom = vertical,
+       left = horizontal;
+
+  /// Convenience for the common CSS pattern `margin-left: auto; margin-right: auto;`.
+  const HtmlMargin.horizontalAuto({
+    this.top = const HtmlLength.px(0),
+    this.bottom = const HtmlLength.px(0),
+  }) : right = const HtmlLength.auto(),
+       left = const HtmlLength.auto();
+
+  /// Resolves the margin to physical pixels.
+  ///
+  /// Per CSS, percentage margins are relative to the containing block width.
+  /// For normal block flow, vertical `auto` behaves like 0.
+  EdgeInsets resolve({required double referenceWidth}) {
+    return EdgeInsets.fromLTRB(
+      left.resolvePx(reference: referenceWidth),
+      top.resolvePx(reference: referenceWidth),
+      right.resolvePx(reference: referenceWidth),
+      bottom.resolvePx(reference: referenceWidth),
+    );
+  }
+}
+
 // Background (CSS-inspired model)
 //
 // Minimal support:
@@ -186,8 +322,8 @@ enum HtmlBackgroundSizeType { auto, contain, cover, explicit }
 
 class HtmlBackgroundSize {
   final HtmlBackgroundSizeType type;
-  final double? width;
-  final double? height;
+  final HtmlLength? width;
+  final HtmlLength? height;
 
   const HtmlBackgroundSize._(this.type, {this.width, this.height});
 
@@ -195,19 +331,17 @@ class HtmlBackgroundSize {
   const HtmlBackgroundSize.contain() : this._(HtmlBackgroundSizeType.contain);
   const HtmlBackgroundSize.cover() : this._(HtmlBackgroundSizeType.cover);
 
-  const HtmlBackgroundSize.explicit({
-    required double width,
-    required double height,
-  }) : this._(HtmlBackgroundSizeType.explicit, width: width, height: height);
+  const HtmlBackgroundSize.explicit({HtmlLength? width, HtmlLength? height})
+    : this._(HtmlBackgroundSizeType.explicit, width: width, height: height);
 }
 
 class HtmlBackgroundPosition {
   final Alignment alignment;
-  final Offset offset;
+  final HtmlLengthOffset offset;
 
   const HtmlBackgroundPosition({
     this.alignment = Alignment.topLeft,
-    this.offset = Offset.zero,
+    this.offset = const HtmlLengthOffset.zero(),
   });
 }
 
@@ -252,19 +386,13 @@ class HtmlTransform {
   /// Default is center.
   final Alignment originAlignment;
 
-  /// Additional origin offset in logical pixels.
-  final Offset origin;
-
-  /// Additional origin offset in percent of border-box size.
-  ///
-  /// If set, dx is treated as % of width, dy as % of height.
-  final Offset? originPercent;
+  /// Additional origin offset in logical pixels or percent of border-box size.
+  final HtmlLengthOffset originOffset;
 
   HtmlTransform({
     Matrix4? matrix,
     this.originAlignment = Alignment.center,
-    this.origin = Offset.zero,
-    this.originPercent,
+    this.originOffset = const HtmlLengthOffset.zero(),
   }) : matrix = matrix ?? Matrix4.identity();
 
   static HtmlTransform identity() => HtmlTransform();
@@ -275,21 +403,14 @@ class HtmlTransform {
 // Supports multiple shadows and `inset`.
 class HtmlBoxShadow {
   final Color color;
-  final Offset offset;
-
-  /// Percentage offsets relative to the border-box size.
-  ///
-  /// If set, dx is treated as % of box width, dy as % of box height,
-  /// and it overrides [offset].
-  final Offset? offsetPercent;
+  final HtmlLengthOffset offset;
   final double blurRadius;
   final double spreadRadius;
   final bool inset;
 
   const HtmlBoxShadow({
     this.color = const Color(0xFF000000),
-    this.offset = Offset.zero,
-    this.offsetPercent,
+    this.offset = const HtmlLengthOffset.zero(),
     this.blurRadius = 0.0,
     this.spreadRadius = 0.0,
     this.inset = false,
@@ -555,6 +676,7 @@ class _BackgroundAxisTile {
 class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlSize width;
   final HtmlSize height;
+  final HtmlMargin? margin;
   final HtmlBorder? border;
   final HtmlBorderRadius? borderRadius;
   final HtmlBoxSizing boxSizing;
@@ -566,6 +688,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     super.key,
     this.width = const AutoSize(),
     this.height = const AutoSize(),
+    this.margin,
     this.border,
     this.borderRadius,
     this.boxSizing = HtmlBoxSizing.contentBox,
@@ -580,6 +703,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     return RenderHtmlDiv(
       width: width,
       height: height,
+      margin: margin,
       border: border,
       borderRadius: borderRadius,
       background: background,
@@ -595,6 +719,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     renderObject
       ..width = width
       ..height = height
+      ..margin = margin
       ..border = border
       ..borderRadius = borderRadius
       ..background = background
@@ -613,6 +738,7 @@ class RenderHtmlDiv extends RenderBox
         RenderBoxContainerDefaultsMixin<RenderBox, HtmlDivParentData> {
   HtmlSize _width;
   HtmlSize _height;
+  HtmlMargin? _margin;
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
   HtmlBackground? _background;
@@ -636,6 +762,7 @@ class RenderHtmlDiv extends RenderBox
   RenderHtmlDiv({
     required HtmlSize width,
     required HtmlSize height,
+    HtmlMargin? margin,
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
     HtmlBackground? background,
@@ -645,6 +772,7 @@ class RenderHtmlDiv extends RenderBox
     HtmlBoxSizing boxSizing = HtmlBoxSizing.contentBox,
   }) : _width = width,
        _height = height,
+       _margin = margin,
        _border = border,
        _borderRadius = borderRadius,
        _background = background,
@@ -688,6 +816,34 @@ class RenderHtmlDiv extends RenderBox
       _height = value;
       markNeedsLayout();
     }
+  }
+
+  HtmlMargin? get margin => _margin;
+  set margin(HtmlMargin? value) {
+    if (_margin != value) {
+      _margin = value;
+      markNeedsLayout();
+    }
+  }
+
+  static double _collapseMargins(double a, double b) {
+    if (a >= 0 && b >= 0) return math.max(a, b);
+    if (a <= 0 && b <= 0) return math.min(a, b);
+    return a + b;
+  }
+
+  static HtmlMargin? _readChildHtmlMargin(RenderBox child) {
+    if (child is RenderHtmlDiv) return child._margin;
+    return null;
+  }
+
+  static EdgeInsets _resolveChildMargin(
+    RenderBox child,
+    double referenceWidth,
+  ) {
+    final HtmlMargin? m = _readChildHtmlMargin(child);
+    if (m == null) return EdgeInsets.zero;
+    return m.resolve(referenceWidth: referenceWidth);
   }
 
   HtmlBorder? get border => _border;
@@ -735,15 +891,12 @@ class RenderHtmlDiv extends RenderBox
   }
 
   Offset _resolveTransformOrigin(HtmlTransform t) {
-    if (size.isEmpty) return t.origin;
+    if (size.isEmpty) {
+      return t.originOffset.resolve(referenceWidth: 0, referenceHeight: 0);
+    }
     final Offset aligned = t.originAlignment.alongSize(size);
-    final Offset percent = t.originPercent == null
-        ? Offset.zero
-        : Offset(
-            size.width * t.originPercent!.dx / 100.0,
-            size.height * t.originPercent!.dy / 100.0,
-          );
-    return aligned + t.origin + percent;
+    final Offset offset = t.originOffset.resolveForSize(size);
+    return aligned + offset;
   }
 
   Matrix4? _effectiveTransform() {
@@ -752,9 +905,9 @@ class RenderHtmlDiv extends RenderBox
 
     final Offset origin = _resolveTransformOrigin(t);
     final Matrix4 m = Matrix4.identity()
-      ..translate(origin.dx, origin.dy)
+      ..translateByDouble(origin.dx, origin.dy, 0.0, 1.0)
       ..multiply(t.matrix)
-      ..translate(-origin.dx, -origin.dy);
+      ..translateByDouble(-origin.dx, -origin.dy, 0.0, 1.0);
 
     // Avoid creating a compositing layer for pure identity.
     if (m.isIdentity()) return null;
@@ -951,7 +1104,12 @@ class RenderHtmlDiv extends RenderBox
     } else {
       RenderBox? child = firstChild;
       while (child != null) {
-        contentW = math.max(contentW, child.getMinIntrinsicWidth(height));
+        // Percentage margins depend on containing block width; ignore in width intrinsics.
+        final EdgeInsets m = _resolveChildMargin(child, 0);
+        contentW = math.max(
+          contentW,
+          child.getMinIntrinsicWidth(height) + m.horizontal,
+        );
         child = (child.parentData as HtmlDivParentData).nextSibling;
       }
     }
@@ -973,7 +1131,12 @@ class RenderHtmlDiv extends RenderBox
     } else {
       RenderBox? child = firstChild;
       while (child != null) {
-        contentW = math.max(contentW, child.getMaxIntrinsicWidth(height));
+        // Percentage margins depend on containing block width; ignore in width intrinsics.
+        final EdgeInsets m = _resolveChildMargin(child, 0);
+        contentW = math.max(
+          contentW,
+          child.getMaxIntrinsicWidth(height) + m.horizontal,
+        );
         child = (child.parentData as HtmlDivParentData).nextSibling;
       }
     }
@@ -993,11 +1156,19 @@ class RenderHtmlDiv extends RenderBox
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
     } else {
+      final double referenceWidth = width.isFinite
+          ? math.max(0.0, width - borderW.horizontal)
+          : 0.0;
+      double prevBottom = 0;
       RenderBox? child = firstChild;
       while (child != null) {
+        final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
+        contentH += _collapseMargins(prevBottom, m.top);
         contentH += child.getMinIntrinsicHeight(width);
+        prevBottom = m.bottom;
         child = (child.parentData as HtmlDivParentData).nextSibling;
       }
+      contentH += prevBottom;
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
@@ -1015,11 +1186,19 @@ class RenderHtmlDiv extends RenderBox
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
     } else {
+      final double referenceWidth = width.isFinite
+          ? math.max(0.0, width - borderW.horizontal)
+          : 0.0;
+      double prevBottom = 0;
       RenderBox? child = firstChild;
       while (child != null) {
+        final EdgeInsets m = _resolveChildMargin(child, referenceWidth);
+        contentH += _collapseMargins(prevBottom, m.top);
         contentH += child.getMaxIntrinsicHeight(width);
+        prevBottom = m.bottom;
         child = (child.parentData as HtmlDivParentData).nextSibling;
       }
+      contentH += prevBottom;
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
@@ -1093,25 +1272,52 @@ class RenderHtmlDiv extends RenderBox
       contentWidth = targetWidth;
     }
 
-    BoxConstraints childConstraints = BoxConstraints(maxWidth: contentWidth);
-
     double yOffset = _computedBorderWidths.top;
     double xOffset = _computedBorderWidths.left;
-    double maxChildWidth = 0;
     double currentY = yOffset;
+    double prevBottom = 0;
 
     RenderBox? child = firstChild;
     while (child != null) {
       final HtmlDivParentData childParentData =
           child.parentData as HtmlDivParentData;
+
+      final HtmlMargin? childMarginObj = _readChildHtmlMargin(child);
+      final EdgeInsets m = _resolveChildMargin(child, contentWidth);
+      final double collapsed = _collapseMargins(prevBottom, m.top);
+      currentY += collapsed;
+
+      final double childMaxWidth = math.max(0.0, contentWidth - m.horizontal);
+      final BoxConstraints childConstraints = BoxConstraints(
+        maxWidth: childMaxWidth,
+      );
       child.layout(childConstraints, parentUsesSize: true);
-      childParentData.offset = Offset(xOffset, currentY);
+
+      double autoLeft = 0;
+      if (childMarginObj != null &&
+          (childMarginObj.left.isAuto || childMarginObj.right.isAuto)) {
+        final double fixedHorizontal =
+            (childMarginObj.left.isAuto ? 0.0 : m.left) +
+            (childMarginObj.right.isAuto ? 0.0 : m.right);
+        final double remaining = math.max(
+          0.0,
+          contentWidth - fixedHorizontal - child.size.width,
+        );
+        if (childMarginObj.left.isAuto && childMarginObj.right.isAuto) {
+          autoLeft = remaining / 2.0;
+        } else if (childMarginObj.left.isAuto) {
+          autoLeft = remaining;
+        }
+      }
+
+      childParentData.offset = Offset(xOffset + m.left + autoLeft, currentY);
       currentY += child.size.height;
-      maxChildWidth = math.max(maxChildWidth, child.size.width);
+      prevBottom = m.bottom;
+
       child = childParentData.nextSibling;
     }
 
-    double contentHeight = currentY - yOffset;
+    double contentHeight = (currentY - yOffset) + prevBottom;
 
     double targetHeight;
     if (_height is FixedSize) {
@@ -1218,12 +1424,7 @@ class RenderHtmlDiv extends RenderBox
       final HtmlBoxShadow s = _boxShadow[i];
       if (s.inset != inset) continue;
 
-      final Offset shadowOffset = s.offsetPercent == null
-          ? s.offset
-          : Offset(
-              borderBox.width * s.offsetPercent!.dx / 100.0,
-              borderBox.height * s.offsetPercent!.dy / 100.0,
-            );
+      final Offset shadowOffset = s.offset.resolveForSize(borderBox.size);
 
       final Paint paint = BoxShadow(
         color: s.color,
@@ -1345,10 +1546,13 @@ class RenderHtmlDiv extends RenderBox
         final double s = math.max(sx, sy);
         return Size(imageSize.width * s, imageSize.height * s);
       case HtmlBackgroundSizeType.explicit:
-        return Size(
-          size.width ?? imageSize.width,
-          size.height ?? imageSize.height,
-        );
+        final double w =
+            size.width?.resolvePx(reference: dstRectSize.width) ??
+            imageSize.width;
+        final double h =
+            size.height?.resolvePx(reference: dstRectSize.height) ??
+            imageSize.height;
+        return Size(w, h);
     }
   }
 
@@ -1416,10 +1620,11 @@ class RenderHtmlDiv extends RenderBox
     final Alignment a = bg.position.alignment;
     final double ax = (a.x + 1) / 2.0;
     final double ay = (a.y + 1) / 2.0;
+    final Offset posOffset = bg.position.offset.resolveForSize(rect.size);
     final double baseLeft =
-        rect.left + (rect.width - dstSize.width) * ax + bg.position.offset.dx;
+        rect.left + (rect.width - dstSize.width) * ax + posOffset.dx;
     final double baseTop =
-        rect.top + (rect.height - dstSize.height) * ay + bg.position.offset.dy;
+        rect.top + (rect.height - dstSize.height) * ay + posOffset.dy;
 
     final Rect src = Rect.fromLTWH(
       0,

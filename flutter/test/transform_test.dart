@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_yoga/html_div.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 void main() {
   testWidgets('HtmlDiv transform does not affect layout size', (
@@ -55,9 +54,9 @@ void main() {
             transform: HtmlTransform(
               originAlignment: Alignment.center,
               matrix: Matrix4.identity()
-                ..translate(24.0, 10.0)
+                ..translateByDouble(24.0, 10.0, 0.0, 1.0)
                 ..rotateZ(20 * math.pi / 180.0)
-                ..scale(1.05, 1.05),
+                ..scaleByDouble(1.05, 1.05, 1.0, 1.0),
             ),
             children: [
               GestureDetector(

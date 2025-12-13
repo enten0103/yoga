@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_yoga/html_div.dart';
-import 'package:vector_math/vector_math_64.dart' show Matrix4;
 
 class TransformPage extends StatelessWidget {
   const TransformPage({super.key});
@@ -29,7 +28,8 @@ class TransformPage extends StatelessWidget {
             child: _demo(
               label: 'translate(24, 10)',
               transform: HtmlTransform(
-                matrix: Matrix4.identity()..translate(24.0, 10.0),
+                matrix: Matrix4.identity()
+                  ..translateByDouble(24.0, 10.0, 0.0, 1.0),
               ),
             ),
           ),
@@ -40,7 +40,7 @@ class TransformPage extends StatelessWidget {
               label: 'scale(1.2) @ origin topLeft',
               transform: HtmlTransform(
                 originAlignment: Alignment.topLeft,
-                matrix: Matrix4.identity()..scale(1.2, 1.2),
+                matrix: Matrix4.identity()..scaleByDouble(1.2, 1.2, 1.0, 1.0),
               ),
             ),
           ),
@@ -51,7 +51,10 @@ class TransformPage extends StatelessWidget {
               label: 'originPercent(25%, 75%) + rotateZ(20°)',
               transform: HtmlTransform(
                 originAlignment: Alignment.topLeft,
-                originPercent: const Offset(25, 75),
+                originOffset: const HtmlLengthOffset(
+                  dx: HtmlLength.percent(25),
+                  dy: HtmlLength.percent(75),
+                ),
                 matrix: Matrix4.identity()..rotateZ(20 * math.pi / 180.0),
               ),
             ),

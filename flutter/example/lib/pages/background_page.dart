@@ -54,7 +54,6 @@ class BackgroundPage extends StatelessWidget {
                       size: HtmlBackgroundSize.auto(),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.topLeft,
-                        offset: Offset.zero,
                       ),
                     ),
                   ),
@@ -71,7 +70,10 @@ class BackgroundPage extends StatelessWidget {
                       size: HtmlBackgroundSize.auto(),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.center,
-                        offset: Offset(8, 4),
+                        offset: HtmlLengthOffset(
+                          dx: HtmlLength.px(8),
+                          dy: HtmlLength.px(4),
+                        ),
                       ),
                     ),
                   ),
@@ -85,10 +87,12 @@ class BackgroundPage extends StatelessWidget {
                       image: AssetImage(_smallAsset),
                       repeatX: HtmlBackgroundRepeat.space,
                       repeatY: HtmlBackgroundRepeat.round,
-                      size: HtmlBackgroundSize.explicit(width: 18, height: 18),
+                      size: HtmlBackgroundSize.explicit(
+                        width: HtmlLength.px(18),
+                        height: HtmlLength.px(18),
+                      ),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.topLeft,
-                        offset: Offset.zero,
                       ),
                     ),
                   ),
@@ -113,7 +117,6 @@ class BackgroundPage extends StatelessWidget {
                       size: HtmlBackgroundSize.contain(),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.center,
-                        offset: Offset.zero,
                       ),
                     ),
                   ),
@@ -130,7 +133,6 @@ class BackgroundPage extends StatelessWidget {
                       size: HtmlBackgroundSize.cover(),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.center,
-                        offset: Offset.zero,
                       ),
                     ),
                   ),
@@ -144,10 +146,12 @@ class BackgroundPage extends StatelessWidget {
                       image: AssetImage(_largeAsset),
                       repeatX: HtmlBackgroundRepeat.noRepeat,
                       repeatY: HtmlBackgroundRepeat.noRepeat,
-                      size: HtmlBackgroundSize.explicit(width: 160, height: 60),
+                      size: HtmlBackgroundSize.explicit(
+                        width: HtmlLength.px(160),
+                        height: HtmlLength.px(60),
+                      ),
                       position: HtmlBackgroundPosition(
                         alignment: Alignment.center,
-                        offset: Offset.zero,
                       ),
                     ),
                   ),
@@ -173,12 +177,11 @@ class BackgroundPage extends StatelessWidget {
                         repeatX: HtmlBackgroundRepeat.repeat,
                         repeatY: HtmlBackgroundRepeat.repeat,
                         size: HtmlBackgroundSize.explicit(
-                          width: 20,
-                          height: 20,
+                          width: HtmlLength.px(20),
+                          height: HtmlLength.px(20),
                         ),
                         position: HtmlBackgroundPosition(
                           alignment: Alignment.topLeft,
-                          offset: Offset.zero,
                         ),
                       ),
                     ),
@@ -201,12 +204,15 @@ class BackgroundPage extends StatelessWidget {
                         repeatX: HtmlBackgroundRepeat.repeat,
                         repeatY: HtmlBackgroundRepeat.repeat,
                         size: HtmlBackgroundSize.explicit(
-                          width: 18,
-                          height: 18,
+                          width: HtmlLength.px(18),
+                          height: HtmlLength.px(18),
                         ),
                         position: HtmlBackgroundPosition(
                           alignment: Alignment.topLeft,
-                          offset: Offset(6, 6),
+                          offset: HtmlLengthOffset(
+                            dx: HtmlLength.px(6),
+                            dy: HtmlLength.px(6),
+                          ),
                         ),
                       ),
                     ),

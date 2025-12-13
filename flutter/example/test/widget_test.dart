@@ -76,4 +76,18 @@ void main() {
 
     expect(find.widgetWithText(AppBar, 'HtmlDiv Transform 示例'), findsOneWidget);
   });
+
+  testWidgets('Home page navigates to Margin demo', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    expect(find.text('HtmlDiv Margin 示例'), findsOneWidget);
+
+    await tester.tap(find.text('HtmlDiv Margin 示例'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'HtmlDiv Margin 示例'), findsOneWidget);
+  });
 }

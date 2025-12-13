@@ -17,14 +17,14 @@ void main() {
             boxShadow: const [
               HtmlBoxShadow(
                 color: Color(0x33000000),
-                offset: Offset(0, 8),
+                offset: HtmlLengthOffset(dy: HtmlLength.px(8)),
                 blurRadius: 18,
                 spreadRadius: 2,
               ),
               HtmlBoxShadow(
                 inset: true,
                 color: Color(0x22000000),
-                offset: Offset(0, 4),
+                offset: HtmlLengthOffset(dy: HtmlLength.px(4)),
                 blurRadius: 10,
               ),
             ],
@@ -53,14 +53,17 @@ void main() {
       const <HtmlBoxShadow>[
         HtmlBoxShadow(
           color: Color(0x33000000),
-          offset: Offset(0, 10),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(10)),
           blurRadius: 22,
         ),
       ],
       const <HtmlBoxShadow>[
         HtmlBoxShadow(
           color: Color(0x33000000),
-          offsetPercent: Offset(10, 12),
+          offset: HtmlLengthOffset(
+            dx: HtmlLength.percent(10),
+            dy: HtmlLength.percent(12),
+          ),
           blurRadius: 18,
           spreadRadius: 1,
         ),
@@ -68,12 +71,12 @@ void main() {
       const <HtmlBoxShadow>[
         HtmlBoxShadow(
           color: Color(0x1F000000),
-          offset: Offset(0, 12),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(12)),
           blurRadius: 28,
         ),
         HtmlBoxShadow(
           color: Color(0x12000000),
-          offset: Offset(0, 2),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(2)),
           blurRadius: 6,
         ),
       ],
@@ -81,20 +84,20 @@ void main() {
         HtmlBoxShadow(
           inset: true,
           color: Color(0x55000000),
-          offset: Offset(0, 6),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(6)),
           blurRadius: 14,
         ),
       ],
       const <HtmlBoxShadow>[
         HtmlBoxShadow(
           color: Color(0x26000000),
-          offset: Offset(0, 10),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(10)),
           blurRadius: 22,
         ),
         HtmlBoxShadow(
           inset: true,
           color: Color(0x44000000),
-          offset: Offset(0, 6),
+          offset: HtmlLengthOffset(dy: HtmlLength.px(6)),
           blurRadius: 14,
         ),
       ],
