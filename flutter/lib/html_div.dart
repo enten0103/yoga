@@ -307,6 +307,56 @@ class HtmlMargin {
   }
 }
 
+// Padding (CSS-inspired model)
+//
+// Notes:
+// - Padding does not paint by itself.
+// - Padding affects layout inside the element (content box is inset).
+// - Percentage paddings are relative to the containing block width.
+class HtmlPadding {
+  final HtmlLength top;
+  final HtmlLength right;
+  final HtmlLength bottom;
+  final HtmlLength left;
+
+  const HtmlPadding({
+    this.top = const HtmlLength.px(0),
+    this.right = const HtmlLength.px(0),
+    this.bottom = const HtmlLength.px(0),
+    this.left = const HtmlLength.px(0),
+  });
+
+  const HtmlPadding.all(HtmlLength value)
+    : top = value,
+      right = value,
+      bottom = value,
+      left = value;
+
+  const HtmlPadding.only({
+    this.top = const HtmlLength.px(0),
+    this.right = const HtmlLength.px(0),
+    this.bottom = const HtmlLength.px(0),
+    this.left = const HtmlLength.px(0),
+  });
+
+  const HtmlPadding.symmetric({
+    HtmlLength vertical = const HtmlLength.px(0),
+    HtmlLength horizontal = const HtmlLength.px(0),
+  }) : top = vertical,
+       right = horizontal,
+       bottom = vertical,
+       left = horizontal;
+
+  EdgeInsets resolve({required double referenceWidth}) {
+    return EdgeInsets.fromLTRB(
+      left.resolvePx(reference: referenceWidth),
+      top.resolvePx(reference: referenceWidth),
+      right.resolvePx(reference: referenceWidth),
+      bottom.resolvePx(reference: referenceWidth),
+    );
+  }
+}
+
 // Background (CSS-inspired model)
 //
 // Minimal support:
@@ -720,6 +770,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlLength? lineHeight;
   final HtmlLength textIndent;
   final HtmlMargin? margin;
+  final HtmlPadding? padding;
   final HtmlBorder? border;
   final HtmlBorderRadius? borderRadius;
   final HtmlBoxSizing boxSizing;
@@ -748,6 +799,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.lineHeight,
     this.textIndent = const HtmlLength.px(0),
     this.margin,
+    this.padding,
     this.border,
     this.borderRadius,
     this.boxSizing = HtmlBoxSizing.contentBox,
@@ -779,6 +831,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       lineHeight: lineHeight,
       textIndent: textIndent,
       margin: margin,
+      padding: padding,
       border: border,
       borderRadius: borderRadius,
       background: background,
@@ -811,6 +864,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..lineHeight = lineHeight
       ..textIndent = textIndent
       ..margin = margin
+      ..padding = padding
       ..border = border
       ..borderRadius = borderRadius
       ..background = background
@@ -846,6 +900,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlLength? _lineHeight;
   HtmlLength _textIndent;
   HtmlMargin? _margin;
+  HtmlPadding? _padding;
   HtmlBorder? _border;
   HtmlBorderRadius? _borderRadius;
   HtmlBackground? _background;
@@ -867,6 +922,7 @@ class RenderHtmlDiv extends RenderBox
   Yoga? _yoga;
 
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
+  EdgeInsets _computedPadding = EdgeInsets.zero;
 
   RenderHtmlDiv({
     required HtmlSize width,
@@ -888,6 +944,7 @@ class RenderHtmlDiv extends RenderBox
     HtmlLength? lineHeight,
     HtmlLength textIndent = const HtmlLength.px(0),
     HtmlMargin? margin,
+    HtmlPadding? padding,
     HtmlBorder? border,
     HtmlBorderRadius? borderRadius,
     HtmlBackground? background,
@@ -914,6 +971,7 @@ class RenderHtmlDiv extends RenderBox
        _lineHeight = lineHeight,
        _textIndent = textIndent,
        _margin = margin,
+       _padding = padding,
        _border = border,
        _borderRadius = borderRadius,
        _background = background,
@@ -1168,6 +1226,7 @@ class RenderHtmlDiv extends RenderBox
     required double yOffset,
     required double availableBorderBoxHeight,
     required double borderVertical,
+    required double paddingVertical,
   }) {
     final Yoga yoga = _ensureYoga();
     final ffi.Pointer<ffi.Void> root = yoga.newNode();
@@ -1193,14 +1252,14 @@ class RenderHtmlDiv extends RenderBox
       if (_height is FixedSize) {
         final double h = (_height as FixedSize).value;
         final double contentH = _boxSizing == HtmlBoxSizing.borderBox
-            ? math.max(0.0, h - borderVertical)
+            ? math.max(0.0, h - borderVertical - paddingVertical)
             : h;
         yoga.setHeight(root, contentH);
       } else if (_height is PercentSize && constraints.hasBoundedHeight) {
         final double h =
             constraints.maxHeight * (_height as PercentSize).value / 100.0;
         final double contentH = _boxSizing == HtmlBoxSizing.borderBox
-            ? math.max(0.0, h - borderVertical)
+            ? math.max(0.0, h - borderVertical - paddingVertical)
             : h;
         yoga.setHeight(root, contentH);
       } else {
@@ -1320,7 +1379,10 @@ class RenderHtmlDiv extends RenderBox
       }
 
       final double availableContentHeight = availableBorderBoxHeight.isFinite
-          ? math.max(0.0, availableBorderBoxHeight - borderVertical)
+          ? math.max(
+              0.0,
+              availableBorderBoxHeight - borderVertical - paddingVertical,
+            )
           : double.nan;
 
       yoga.calculateLayout(
@@ -1387,6 +1449,14 @@ class RenderHtmlDiv extends RenderBox
   set margin(HtmlMargin? value) {
     if (_margin != value) {
       _margin = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlPadding? get padding => _padding;
+  set padding(HtmlPadding? value) {
+    if (_padding != value) {
+      _padding = value;
       markNeedsLayout();
     }
   }
@@ -1832,7 +1902,10 @@ class RenderHtmlDiv extends RenderBox
   @override
   double computeMinIntrinsicWidth(double height) {
     EdgeInsets borderW = _calculateBorderWidths(0);
-    double borderHorizontal = borderW.horizontal;
+    final EdgeInsets paddingW =
+        _padding?.resolve(referenceWidth: 0) ?? EdgeInsets.zero;
+    final double nonContentHorizontal =
+        borderW.horizontal + paddingW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
@@ -1854,16 +1927,19 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentW + borderHorizontal;
+      return contentW + nonContentHorizontal;
     } else {
-      return math.max(contentW, borderHorizontal);
+      return math.max(contentW, nonContentHorizontal);
     }
   }
 
   @override
   double computeMaxIntrinsicWidth(double height) {
     EdgeInsets borderW = _calculateBorderWidths(0);
-    double borderHorizontal = borderW.horizontal;
+    final EdgeInsets paddingW =
+        _padding?.resolve(referenceWidth: 0) ?? EdgeInsets.zero;
+    final double nonContentHorizontal =
+        borderW.horizontal + paddingW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
       contentW = (_width as FixedSize).value;
@@ -1885,22 +1961,25 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentW + borderHorizontal;
+      return contentW + nonContentHorizontal;
     } else {
-      return math.max(contentW, borderHorizontal);
+      return math.max(contentW, nonContentHorizontal);
     }
   }
 
   @override
   double computeMinIntrinsicHeight(double width) {
     EdgeInsets borderW = _calculateBorderWidths(width.isFinite ? width : 0);
-    double borderVertical = borderW.vertical;
+    final EdgeInsets paddingW =
+        _padding?.resolve(referenceWidth: width.isFinite ? width : 0) ??
+        EdgeInsets.zero;
+    final double nonContentVertical = borderW.vertical + paddingW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
     } else {
       final double referenceWidth = width.isFinite
-          ? math.max(0.0, width - borderW.horizontal)
+          ? math.max(0.0, width - borderW.horizontal - paddingW.horizontal)
           : 0.0;
 
       if (_display == HtmlDisplay.inline) {
@@ -1925,22 +2004,25 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentH + borderVertical;
+      return contentH + nonContentVertical;
     } else {
-      return math.max(contentH, borderVertical);
+      return math.max(contentH, nonContentVertical);
     }
   }
 
   @override
   double computeMaxIntrinsicHeight(double width) {
     EdgeInsets borderW = _calculateBorderWidths(width.isFinite ? width : 0);
-    double borderVertical = borderW.vertical;
+    final EdgeInsets paddingW =
+        _padding?.resolve(referenceWidth: width.isFinite ? width : 0) ??
+        EdgeInsets.zero;
+    final double nonContentVertical = borderW.vertical + paddingW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
       contentH = (_height as FixedSize).value;
     } else {
       final double referenceWidth = width.isFinite
-          ? math.max(0.0, width - borderW.horizontal)
+          ? math.max(0.0, width - borderW.horizontal - paddingW.horizontal)
           : 0.0;
 
       if (_display == HtmlDisplay.inline) {
@@ -1965,9 +2047,9 @@ class RenderHtmlDiv extends RenderBox
     }
 
     if (_boxSizing == HtmlBoxSizing.contentBox) {
-      return contentH + borderVertical;
+      return contentH + nonContentVertical;
     } else {
-      return math.max(contentH, borderVertical);
+      return math.max(contentH, nonContentVertical);
     }
   }
 
@@ -1977,8 +2059,13 @@ class RenderHtmlDiv extends RenderBox
         ? constraints.maxWidth
         : 0.0;
     _computedBorderWidths = _calculateBorderWidths(containerBorderBoxWidth);
+    _computedPadding =
+        _padding?.resolve(referenceWidth: containerBorderBoxWidth) ??
+        EdgeInsets.zero;
     final double borderHorizontal = _computedBorderWidths.horizontal;
     final double borderVertical = _computedBorderWidths.vertical;
+    final double paddingHorizontal = _computedPadding.horizontal;
+    final double paddingVertical = _computedPadding.vertical;
 
     double availableBorderBoxWidth = constraints.hasBoundedWidth
         ? constraints.maxWidth
@@ -1992,7 +2079,10 @@ class RenderHtmlDiv extends RenderBox
       availableSizingWidth = availableBorderBoxWidth;
     } else {
       availableSizingWidth = availableBorderBoxWidth.isFinite
-          ? math.max(0.0, availableBorderBoxWidth - borderHorizontal)
+          ? math.max(
+              0.0,
+              availableBorderBoxWidth - borderHorizontal - paddingHorizontal,
+            )
           : double.infinity;
     }
 
@@ -2103,16 +2193,16 @@ class RenderHtmlDiv extends RenderBox
 
     double borderBoxWidth = _boxSizing == HtmlBoxSizing.borderBox
         ? sizingWidth
-        : sizingWidth + borderHorizontal;
+        : sizingWidth + borderHorizontal + paddingHorizontal;
     borderBoxWidth = constraints.constrainWidth(borderBoxWidth);
 
     final double contentWidth = math.max(
       0.0,
-      borderBoxWidth - borderHorizontal,
+      borderBoxWidth - borderHorizontal - paddingHorizontal,
     );
 
-    double yOffset = _computedBorderWidths.top;
-    double xOffset = _computedBorderWidths.left;
+    double yOffset = _computedBorderWidths.top + _computedPadding.top;
+    double xOffset = _computedBorderWidths.left + _computedPadding.left;
     double currentY = yOffset;
     double prevBottom = 0;
 
@@ -2123,6 +2213,7 @@ class RenderHtmlDiv extends RenderBox
         yOffset: yOffset,
         availableBorderBoxHeight: availableBorderBoxHeight,
         borderVertical: borderVertical,
+        paddingVertical: paddingVertical,
       );
 
       double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
@@ -2140,7 +2231,7 @@ class RenderHtmlDiv extends RenderBox
       } else {
         // auto height depends on boxSizing.
         sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
-            ? (contentHeight + borderVertical)
+            ? (contentHeight + borderVertical + paddingVertical)
             : contentHeight;
       }
 
@@ -2151,7 +2242,7 @@ class RenderHtmlDiv extends RenderBox
       if (_boxSizing == HtmlBoxSizing.borderBox) {
         borderBoxHeight = sizingHeight;
       } else {
-        borderBoxHeight = sizingHeight + borderVertical;
+        borderBoxHeight = sizingHeight + borderVertical + paddingVertical;
       }
       borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
 

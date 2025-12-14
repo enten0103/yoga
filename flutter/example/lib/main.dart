@@ -12,6 +12,7 @@ import 'pages/border_image_page.dart';
 import 'pages/background_page.dart';
 import 'pages/box_shadow_page.dart';
 import 'pages/margin_page.dart';
+import 'pages/padding_page.dart';
 import 'pages/transform_page.dart';
 import 'pages/inline_page.dart';
 import 'pages/css_paint_order_page.dart';
@@ -143,6 +144,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const MarginPage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('HtmlDiv Padding 示例'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PaddingPage()),
             ),
           ),
           ListTile(

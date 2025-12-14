@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PaddingPage - HtmlDiv Padding 示例</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/padding_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .hint {
+            font-size: 13px;
+            color: rgba(0, 0, 0, 0.7);
+            margin: 0 0 8px;
+        }
+
+        .center {
+            display: flex;
+            justify-content: center;
+        }
+
+        .block-container {
+            width: 320px;
+            height: 140px;
+            border: 2px solid rgba(0, 0, 0, 0.13);
+            background: #f7f7f7;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .tile {
+            width: 120px;
+            height: 44px;
+            margin-top: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.13);
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 13px;
+            box-sizing: border-box;
+        }
+
+        .a {
+            background: #1976d2;
+        }
+
+        .b {
+            background: #2e7d32;
+        }
+
+        .flex-frame {
+            width: 320px;
+            height: 96px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: #f0f0f0;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .flex-tile {
+            width: 72px;
+            height: 44px;
+            margin: 8px;
+            display: grid;
+            place-items: center;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .fa {
+            background: #00897b;
+        }
+
+        .fb {
+            background: #3949ab;
+        }
+
+        .fc {
+            background: #f4511e;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>HtmlDiv Padding 示例（HTML/CSS 近似对照）</h1>
+
+        <h2>block：padding 影响子元素起始偏移与可用宽度</h2>
+
+        <div class="hint">无 padding</div>
+        <div class="center">
+            <div class="block-container">
+                <div class="tile a">Child A</div>
+                <div class="tile b">Child B</div>
+            </div>
+        </div>
+
+        <div class="hint" style="margin-top:16px;">padding: 24px</div>
+        <div class="center">
+            <div class="block-container" style="padding: 24px;">
+                <div class="tile a">Child A</div>
+                <div class="tile b">Child B</div>
+            </div>
+        </div>
+
+        <div class="hint" style="margin-top:16px;">padding: horizontal 10% / vertical 12px</div>
+        <div class="center">
+            <div class="block-container" style="padding: 12px 10%;">
+                <div class="tile a">Child A</div>
+                <div class="tile b">Child B</div>
+            </div>
+        </div>
+
+        <h2 style="margin-top:16px;">flex：容器 padding 会内缩布局区域</h2>
+
+        <div class="hint">无 padding</div>
+        <div class="center">
+            <div class="flex-frame">
+                <div class="flex-tile fa">A</div>
+                <div class="flex-tile fb">B</div>
+                <div class="flex-tile fc">C</div>
+            </div>
+        </div>
+
+        <div class="hint" style="margin-top:16px;">padding: 16px</div>
+        <div class="center">
+            <div class="flex-frame" style="padding: 16px;">
+                <div class="flex-tile fa">A</div>
+                <div class="flex-tile fb">B</div>
+                <div class="flex-tile fc">C</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
