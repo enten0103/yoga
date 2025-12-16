@@ -875,6 +875,52 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..imageConfiguration = createLocalImageConfiguration(context)
       ..boxSizing = boxSizing;
   }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+
+    properties.add(DiagnosticsProperty<HtmlSize>('width', width));
+    properties.add(DiagnosticsProperty<HtmlSize>('height', height));
+    properties.add(DiagnosticsProperty<HtmlSize?>('minWidth', minWidth));
+    properties.add(DiagnosticsProperty<HtmlSize?>('maxWidth', maxWidth));
+    properties.add(DiagnosticsProperty<HtmlSize?>('minHeight', minHeight));
+    properties.add(DiagnosticsProperty<HtmlSize?>('maxHeight', maxHeight));
+
+    properties.add(EnumProperty<HtmlDisplay>('display', display));
+    properties.add(
+      EnumProperty<HtmlFlexDirection>('flexDirection', flexDirection),
+    );
+    properties.add(
+      EnumProperty<HtmlJustifyContent>('justifyContent', justifyContent),
+    );
+    properties.add(EnumProperty<HtmlAlignItems>('alignItems', alignItems));
+    properties.add(EnumProperty<HtmlFlexWrap>('flexWrap', flexWrap));
+
+    properties.add(DoubleProperty('flexGrow', flexGrow));
+    properties.add(DoubleProperty('flexShrink', flexShrink));
+    properties.add(DiagnosticsProperty<HtmlLength>('flexBasis', flexBasis));
+    properties.add(EnumProperty<HtmlAlignSelf>('alignSelf', alignSelf));
+
+    properties.add(EnumProperty<HtmlTextAlign>('textAlign', textAlign));
+    properties.add(DiagnosticsProperty<HtmlLength?>('lineHeight', lineHeight));
+    properties.add(DiagnosticsProperty<HtmlLength>('textIndent', textIndent));
+
+    properties.add(DiagnosticsProperty<HtmlMargin?>('margin', margin));
+    properties.add(DiagnosticsProperty<HtmlPadding?>('padding', padding));
+    properties.add(DiagnosticsProperty<HtmlBorder?>('border', border));
+    properties.add(
+      DiagnosticsProperty<HtmlBorderRadius?>('borderRadius', borderRadius),
+    );
+    properties.add(EnumProperty<HtmlBoxSizing>('boxSizing', boxSizing));
+    properties.add(
+      DiagnosticsProperty<HtmlBackground?>('background', background),
+    );
+    properties.add(
+      DiagnosticsProperty<List<HtmlBoxShadow>>('boxShadow', boxShadow),
+    );
+    properties.add(DiagnosticsProperty<HtmlTransform?>('transform', transform));
+  }
 }
 
 class HtmlImage extends LeafRenderObjectWidget {
@@ -883,13 +929,17 @@ class HtmlImage extends LeafRenderObjectWidget {
   final Alignment alignment;
   final FilterQuality filterQuality;
 
-  /// CSS-like width/height.
+  /// CSS-like used width/height for the replaced element box.
   ///
-  /// - `auto` uses the intrinsic image size (subject to incoming constraints).
-  /// - `percent` resolves against the incoming constraint (maxWidth/maxHeight).
-  /// - If both width and height are specified, the box may stretch (like CSS).
-  final HtmlLength width;
-  final HtmlLength height;
+  /// Supported values:
+  /// - [FixedSize]
+  /// - [PercentSize] (resolves against the incoming maxWidth/maxHeight if bounded)
+  /// - [AutoSize]
+  ///
+  /// Any other [HtmlSize] (e.g. [FitContent]/[MinContent]/[MaxContent]) is
+  /// treated as the default: [AutoSize].
+  final HtmlSize width;
+  final HtmlSize height;
   final Size placeholderSize;
   final String? debugLabel;
   final TextStyle debugLabelTextStyle;
@@ -902,8 +952,8 @@ class HtmlImage extends LeafRenderObjectWidget {
     this.fit = BoxFit.contain,
     this.alignment = Alignment.center,
     this.filterQuality = FilterQuality.low,
-    this.width = const HtmlLength.auto(),
-    this.height = const HtmlLength.auto(),
+    this.width = const AutoSize(),
+    this.height = const AutoSize(),
     this.placeholderSize = const Size(0, 0),
     this.debugLabel,
     this.debugLabelTextStyle = const TextStyle(
@@ -953,6 +1003,36 @@ class HtmlImage extends LeafRenderObjectWidget {
   }
 
   @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+
+    properties.add(DiagnosticsProperty<ImageProvider>('image', image));
+    properties.add(EnumProperty<BoxFit>('fit', fit));
+    properties.add(DiagnosticsProperty<Alignment>('alignment', alignment));
+    properties.add(EnumProperty<FilterQuality>('filterQuality', filterQuality));
+
+    properties.add(DiagnosticsProperty<HtmlSize>('width', width));
+    properties.add(DiagnosticsProperty<HtmlSize>('height', height));
+    properties.add(
+      DiagnosticsProperty<Size>('placeholderSize', placeholderSize),
+    );
+
+    properties.add(StringProperty('debugLabel', debugLabel));
+    properties.add(
+      DiagnosticsProperty<TextStyle>(
+        'debugLabelTextStyle',
+        debugLabelTextStyle,
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<EdgeInsets>('debugLabelPadding', debugLabelPadding),
+    );
+    properties.add(
+      ColorProperty('debugLabelBackgroundColor', debugLabelBackgroundColor),
+    );
+  }
+
+  @override
   void didUnmountRenderObject(RenderHtmlImage renderObject) {}
 }
 
@@ -961,8 +1041,8 @@ class RenderHtmlImage extends RenderBox {
   BoxFit _fit;
   Alignment _alignment;
   FilterQuality _filterQuality;
-  HtmlLength _width;
-  HtmlLength _height;
+  HtmlSize _width;
+  HtmlSize _height;
   Size _placeholderSize;
   ImageConfiguration _imageConfiguration;
   ImageStream? _imageStream;
@@ -981,8 +1061,8 @@ class RenderHtmlImage extends RenderBox {
     required BoxFit fit,
     required Alignment alignment,
     required FilterQuality filterQuality,
-    required HtmlLength width,
-    required HtmlLength height,
+    required HtmlSize width,
+    required HtmlSize height,
     required Size placeholderSize,
     required String? debugLabel,
     required TextStyle debugLabelTextStyle,
@@ -1032,15 +1112,15 @@ class RenderHtmlImage extends RenderBox {
     markNeedsPaint();
   }
 
-  HtmlLength get width => _width;
-  set width(HtmlLength value) {
+  HtmlSize get width => _width;
+  set width(HtmlSize value) {
     if (_width == value) return;
     _width = value;
     markNeedsLayout();
   }
 
-  HtmlLength get height => _height;
-  set height(HtmlLength value) {
+  HtmlSize get height => _height;
+  set height(HtmlSize value) {
     if (_height == value) return;
     _height = value;
     markNeedsLayout();
@@ -1087,6 +1167,73 @@ class RenderHtmlImage extends RenderBox {
     if (_imageConfiguration == value) return;
     _imageConfiguration = value;
     _resolveImage();
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+
+    properties.add(DiagnosticsProperty<ImageProvider>('image', _image));
+    properties.add(EnumProperty<BoxFit>('fit', _fit));
+    properties.add(DiagnosticsProperty<Alignment>('alignment', _alignment));
+    properties.add(
+      EnumProperty<FilterQuality>('filterQuality', _filterQuality),
+    );
+
+    properties.add(DiagnosticsProperty<HtmlSize>('width', _width));
+    properties.add(DiagnosticsProperty<HtmlSize>('height', _height));
+    properties.add(
+      DiagnosticsProperty<Size>('placeholderSize', _placeholderSize),
+    );
+    properties.add(
+      DiagnosticsProperty<ImageConfiguration>(
+        'imageConfiguration',
+        _imageConfiguration,
+      ),
+    );
+
+    properties.add(StringProperty('debugLabel', _debugLabel));
+    properties.add(
+      DiagnosticsProperty<TextStyle>(
+        'debugLabelTextStyle',
+        _debugLabelTextStyle,
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<EdgeInsets>('debugLabelPadding', _debugLabelPadding),
+    );
+    properties.add(
+      ColorProperty('debugLabelBackgroundColor', _debugLabelBackgroundColor),
+    );
+
+    // Runtime state (not inputs, but useful for debugging)
+    properties.add(DoubleProperty('resolvedScale', _resolvedScale));
+    properties.add(
+      FlagProperty(
+        'hasResolvedImage',
+        value: _resolvedImage != null,
+        ifTrue: 'true',
+        ifFalse: 'false',
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<Size?>(
+        'resolvedImageLogicalSize',
+        _resolvedImage == null
+            ? null
+            : Size(
+                _resolvedImage!.width.toDouble() / _resolvedScale,
+                _resolvedImage!.height.toDouble() / _resolvedScale,
+              ),
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<Size?>('metadataLogicalSize', _metadataLogicalSize),
+    );
+    properties.add(IntProperty('sizeHintRequestId', _sizeHintRequestId));
+    properties.add(
+      DiagnosticsProperty<Object?>('imageStreamKey', _imageStream?.key),
+    );
   }
 
   @override
@@ -1311,29 +1458,23 @@ class RenderHtmlImage extends RenderBox {
   void performLayout() {
     final Size natural = _naturalLogicalSize();
 
-    double? resolvedW;
-    if (!_width.isAuto) {
-      if (_width.isPercent && !constraints.hasBoundedWidth) {
-        resolvedW = null;
-      } else {
-        final double reference = constraints.hasBoundedWidth
-            ? constraints.maxWidth
-            : natural.width;
-        resolvedW = _width.resolvePx(reference: reference);
+    double? resolveAxis(HtmlSize v, {required bool isWidthAxis}) {
+      if (v is FixedSize) return v.value;
+      if (v is PercentSize) {
+        if (isWidthAxis) {
+          if (!constraints.hasBoundedWidth) return null;
+          return constraints.maxWidth * v.value / 100.0;
+        }
+        if (!constraints.hasBoundedHeight) return null;
+        return constraints.maxHeight * v.value / 100.0;
       }
+
+      // AutoSize and any unsupported HtmlSize values.
+      return null;
     }
 
-    double? resolvedH;
-    if (!_height.isAuto) {
-      if (_height.isPercent && !constraints.hasBoundedHeight) {
-        resolvedH = null;
-      } else {
-        final double reference = constraints.hasBoundedHeight
-            ? constraints.maxHeight
-            : natural.height;
-        resolvedH = _height.resolvePx(reference: reference);
-      }
-    }
+    final double? resolvedW = resolveAxis(_width, isWidthAxis: true);
+    final double? resolvedH = resolveAxis(_height, isWidthAxis: false);
 
     final bool hasW = resolvedW != null && resolvedW.isFinite;
     final bool hasH = resolvedH != null && resolvedH.isFinite;
@@ -1532,6 +1673,80 @@ class RenderHtmlDiv extends RenderBox
        _transform = transform,
        _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+
+    properties.add(DiagnosticsProperty<HtmlSize>('width', _width));
+    properties.add(DiagnosticsProperty<HtmlSize>('height', _height));
+    properties.add(DiagnosticsProperty<HtmlSize?>('minWidth', _minWidth));
+    properties.add(DiagnosticsProperty<HtmlSize?>('maxWidth', _maxWidth));
+    properties.add(DiagnosticsProperty<HtmlSize?>('minHeight', _minHeight));
+    properties.add(DiagnosticsProperty<HtmlSize?>('maxHeight', _maxHeight));
+
+    properties.add(EnumProperty<HtmlDisplay>('display', _display));
+    properties.add(
+      EnumProperty<HtmlFlexDirection>('flexDirection', _flexDirection),
+    );
+    properties.add(
+      EnumProperty<HtmlJustifyContent>('justifyContent', _justifyContent),
+    );
+    properties.add(EnumProperty<HtmlAlignItems>('alignItems', _alignItems));
+    properties.add(EnumProperty<HtmlFlexWrap>('flexWrap', _flexWrap));
+
+    properties.add(DoubleProperty('flexGrow', _flexGrow));
+    properties.add(DoubleProperty('flexShrink', _flexShrink));
+    properties.add(DiagnosticsProperty<HtmlLength>('flexBasis', _flexBasis));
+    properties.add(EnumProperty<HtmlAlignSelf>('alignSelf', _alignSelf));
+
+    properties.add(EnumProperty<HtmlTextAlign>('textAlign', _textAlign));
+    properties.add(DiagnosticsProperty<HtmlLength?>('lineHeight', _lineHeight));
+    properties.add(DiagnosticsProperty<HtmlLength>('textIndent', _textIndent));
+
+    properties.add(DiagnosticsProperty<HtmlMargin?>('margin', _margin));
+    properties.add(DiagnosticsProperty<HtmlPadding?>('padding', _padding));
+    properties.add(DiagnosticsProperty<HtmlBorder?>('border', _border));
+    properties.add(
+      DiagnosticsProperty<HtmlBorderRadius?>('borderRadius', _borderRadius),
+    );
+    properties.add(EnumProperty<HtmlBoxSizing>('boxSizing', _boxSizing));
+    properties.add(
+      DiagnosticsProperty<HtmlBackground?>('background', _background),
+    );
+    properties.add(
+      DiagnosticsProperty<List<HtmlBoxShadow>>('boxShadow', _boxShadow),
+    );
+    properties.add(
+      DiagnosticsProperty<HtmlTransform?>('transform', _transform),
+    );
+    properties.add(
+      DiagnosticsProperty<ImageConfiguration>(
+        'imageConfiguration',
+        _imageConfiguration,
+      ),
+    );
+
+    // Runtime state (not inputs)
+    properties.add(IntProperty('childCount', childCount));
+    properties.add(
+      FlagProperty(
+        'hasYoga',
+        value: _yoga != null || _sharedYoga != null,
+        ifTrue: 'true',
+        ifFalse: 'false',
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<EdgeInsets>(
+        'computedBorderWidths',
+        _computedBorderWidths,
+      ),
+    );
+    properties.add(
+      DiagnosticsProperty<EdgeInsets>('computedPadding', _computedPadding),
+    );
+  }
 
   @override
   void attach(PipelineOwner owner) {

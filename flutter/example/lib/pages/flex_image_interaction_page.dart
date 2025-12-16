@@ -52,7 +52,6 @@ class FlexImageInteractionPage extends StatelessWidget {
     HtmlLength basis = const HtmlLength.auto(),
     HtmlSize width = const FixedSize(96),
     HtmlSize height = const FixedSize(72),
-    Size placeholderSize = const Size(16, 16),
   }) {
     return HtmlDiv(
       width: width,
@@ -71,10 +70,9 @@ class FlexImageInteractionPage extends StatelessWidget {
         HtmlImage(
           image: AssetImage(asset),
           fit: fit,
-          width: const HtmlLength.percent(100),
-          height: const HtmlLength.percent(100),
+          width: const PercentSize(100),
+          height: const PercentSize(100),
           debugLabel: label,
-          placeholderSize: placeholderSize,
         ),
       ],
     );
@@ -127,8 +125,6 @@ class FlexImageInteractionPage extends StatelessWidget {
                   basis: const HtmlLength.auto(),
                   width: const AutoSize(),
                   height: const AutoSize(),
-                  // test1.png intrinsic size: 621x621
-                  placeholderSize: const Size(621, 621),
                 ),
                 _imageBox(
                   label: 'grow=2 basis:auto',
@@ -138,7 +134,6 @@ class FlexImageInteractionPage extends StatelessWidget {
                   basis: const HtmlLength.auto(),
                   width: const AutoSize(),
                   height: const AutoSize(),
-                  placeholderSize: const Size(621, 621),
                 ),
                 _imageBox(
                   label: 'grow=1 basis:auto',
@@ -148,7 +143,6 @@ class FlexImageInteractionPage extends StatelessWidget {
                   basis: const HtmlLength.auto(),
                   width: const AutoSize(),
                   height: const AutoSize(),
-                  placeholderSize: const Size(621, 621),
                 ),
               ],
             ),
