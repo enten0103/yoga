@@ -106,4 +106,21 @@ void main() {
 
     expect(find.widgetWithText(AppBar, 'HtmlDiv Margin 示例'), findsOneWidget);
   });
+
+  testWidgets('Home page navigates to Flex × Image demo', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const MyApp());
+    await tester.pumpAndSettle();
+
+    final listFinder = find.byType(Scrollable);
+    final itemFinder = find.text('Flex × Image 交互示例');
+    await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
+    expect(itemFinder, findsOneWidget);
+
+    await tester.tap(itemFinder);
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(AppBar, 'Flex × Image 交互示例'), findsOneWidget);
+  });
 }

@@ -85,7 +85,47 @@ class ContentSizingDemoPage extends StatelessWidget {
               const SizedBox(height: 20),
 
               const Text(
-                '5. Nested MinContent',
+                '5. FitContent + maxWidth (Clamps smaller than available)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: 160,
+                child: Container(
+                  color: Colors.grey[200],
+                  child: HtmlDiv(
+                    width: const FitContent(),
+                    maxWidth: const FixedSize(80),
+                    height: const AutoSize(),
+                    border: HtmlBorder.all(color: Colors.teal),
+                    children: [const Text('Hello World This Is A Long String')],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              const Text(
+                '6. FitContent + minWidth (Still constrained by parent)',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: 100,
+                child: Container(
+                  color: Colors.grey[200],
+                  child: HtmlDiv(
+                    width: const FitContent(),
+                    minWidth: const FixedSize(180),
+                    height: const AutoSize(),
+                    border: HtmlBorder.all(color: Colors.brown),
+                    children: [const Text('Hello World This Is A Long String')],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              const Text(
+                '7. Nested MinContent',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),

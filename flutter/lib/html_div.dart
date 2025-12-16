@@ -2,8 +2,10 @@ import 'dart:ffi' as ffi;
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+import 'src/image_size_hint.dart' as image_size_hint;
 import 'src/yoga_ffi.dart';
 
 // 尺寸定义
@@ -875,6 +877,554 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   }
 }
 
+class HtmlImage extends LeafRenderObjectWidget {
+  final ImageProvider image;
+  final BoxFit fit;
+  final Alignment alignment;
+  final FilterQuality filterQuality;
+
+  /// CSS-like width/height.
+  ///
+  /// - `auto` uses the intrinsic image size (subject to incoming constraints).
+  /// - `percent` resolves against the incoming constraint (maxWidth/maxHeight).
+  /// - If both width and height are specified, the box may stretch (like CSS).
+  final HtmlLength width;
+  final HtmlLength height;
+  final Size placeholderSize;
+  final String? debugLabel;
+  final TextStyle debugLabelTextStyle;
+  final EdgeInsets debugLabelPadding;
+  final Color debugLabelBackgroundColor;
+
+  const HtmlImage({
+    super.key,
+    required this.image,
+    this.fit = BoxFit.contain,
+    this.alignment = Alignment.center,
+    this.filterQuality = FilterQuality.low,
+    this.width = const HtmlLength.auto(),
+    this.height = const HtmlLength.auto(),
+    this.placeholderSize = const Size(0, 0),
+    this.debugLabel,
+    this.debugLabelTextStyle = const TextStyle(
+      color: Color(0xFFFFFFFF),
+      fontSize: 11,
+    ),
+    this.debugLabelPadding = const EdgeInsets.symmetric(
+      horizontal: 6,
+      vertical: 4,
+    ),
+    this.debugLabelBackgroundColor = const Color(0x66000000),
+  });
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return RenderHtmlImage(
+      image: image,
+      fit: fit,
+      alignment: alignment,
+      filterQuality: filterQuality,
+      width: width,
+      height: height,
+      placeholderSize: placeholderSize,
+      debugLabel: debugLabel,
+      debugLabelTextStyle: debugLabelTextStyle,
+      debugLabelPadding: debugLabelPadding,
+      debugLabelBackgroundColor: debugLabelBackgroundColor,
+      imageConfiguration: createLocalImageConfiguration(context),
+    );
+  }
+
+  @override
+  void updateRenderObject(BuildContext context, RenderHtmlImage renderObject) {
+    renderObject
+      ..image = image
+      ..fit = fit
+      ..alignment = alignment
+      ..filterQuality = filterQuality
+      ..width = width
+      ..height = height
+      ..placeholderSize = placeholderSize
+      ..debugLabel = debugLabel
+      ..debugLabelTextStyle = debugLabelTextStyle
+      ..debugLabelPadding = debugLabelPadding
+      ..debugLabelBackgroundColor = debugLabelBackgroundColor
+      ..imageConfiguration = createLocalImageConfiguration(context);
+  }
+
+  @override
+  void didUnmountRenderObject(RenderHtmlImage renderObject) {}
+}
+
+class RenderHtmlImage extends RenderBox {
+  ImageProvider _image;
+  BoxFit _fit;
+  Alignment _alignment;
+  FilterQuality _filterQuality;
+  HtmlLength _width;
+  HtmlLength _height;
+  Size _placeholderSize;
+  ImageConfiguration _imageConfiguration;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
+  ui.Image? _resolvedImage;
+  double _resolvedScale = 1.0;
+  Size? _metadataLogicalSize;
+  int _sizeHintRequestId = 0;
+  String? _debugLabel;
+  TextStyle _debugLabelTextStyle;
+  EdgeInsets _debugLabelPadding;
+  Color _debugLabelBackgroundColor;
+
+  RenderHtmlImage({
+    required ImageProvider image,
+    required BoxFit fit,
+    required Alignment alignment,
+    required FilterQuality filterQuality,
+    required HtmlLength width,
+    required HtmlLength height,
+    required Size placeholderSize,
+    required String? debugLabel,
+    required TextStyle debugLabelTextStyle,
+    required EdgeInsets debugLabelPadding,
+    required Color debugLabelBackgroundColor,
+    required ImageConfiguration imageConfiguration,
+  }) : _image = image,
+       _fit = fit,
+       _alignment = alignment,
+       _filterQuality = filterQuality,
+       _width = width,
+       _height = height,
+       _placeholderSize = placeholderSize,
+       _debugLabel = debugLabel,
+       _debugLabelTextStyle = debugLabelTextStyle,
+       _debugLabelPadding = debugLabelPadding,
+       _debugLabelBackgroundColor = debugLabelBackgroundColor,
+       _imageConfiguration = imageConfiguration {
+    _resolveImage();
+  }
+
+  ImageProvider get image => _image;
+  set image(ImageProvider value) {
+    if (_image == value) return;
+    _image = value;
+    _resolveImage();
+  }
+
+  BoxFit get fit => _fit;
+  set fit(BoxFit value) {
+    if (_fit == value) return;
+    _fit = value;
+    markNeedsPaint();
+  }
+
+  Alignment get alignment => _alignment;
+  set alignment(Alignment value) {
+    if (_alignment == value) return;
+    _alignment = value;
+    markNeedsPaint();
+  }
+
+  FilterQuality get filterQuality => _filterQuality;
+  set filterQuality(FilterQuality value) {
+    if (_filterQuality == value) return;
+    _filterQuality = value;
+    markNeedsPaint();
+  }
+
+  HtmlLength get width => _width;
+  set width(HtmlLength value) {
+    if (_width == value) return;
+    _width = value;
+    markNeedsLayout();
+  }
+
+  HtmlLength get height => _height;
+  set height(HtmlLength value) {
+    if (_height == value) return;
+    _height = value;
+    markNeedsLayout();
+  }
+
+  Size get placeholderSize => _placeholderSize;
+  set placeholderSize(Size value) {
+    if (_placeholderSize == value) return;
+    _placeholderSize = value;
+    markNeedsLayout();
+    markNeedsPaint();
+  }
+
+  String? get debugLabel => _debugLabel;
+  set debugLabel(String? value) {
+    if (_debugLabel == value) return;
+    _debugLabel = value;
+    markNeedsPaint();
+  }
+
+  TextStyle get debugLabelTextStyle => _debugLabelTextStyle;
+  set debugLabelTextStyle(TextStyle value) {
+    if (_debugLabelTextStyle == value) return;
+    _debugLabelTextStyle = value;
+    markNeedsPaint();
+  }
+
+  EdgeInsets get debugLabelPadding => _debugLabelPadding;
+  set debugLabelPadding(EdgeInsets value) {
+    if (_debugLabelPadding == value) return;
+    _debugLabelPadding = value;
+    markNeedsPaint();
+  }
+
+  Color get debugLabelBackgroundColor => _debugLabelBackgroundColor;
+  set debugLabelBackgroundColor(Color value) {
+    if (_debugLabelBackgroundColor == value) return;
+    _debugLabelBackgroundColor = value;
+    markNeedsPaint();
+  }
+
+  ImageConfiguration get imageConfiguration => _imageConfiguration;
+  set imageConfiguration(ImageConfiguration value) {
+    if (_imageConfiguration == value) return;
+    _imageConfiguration = value;
+    _resolveImage();
+  }
+
+  @override
+  void dispose() {
+    _stopListeningToStream(clear: true);
+    // Invalidate any in-flight size-hint requests.
+    _sizeHintRequestId++;
+    super.dispose();
+  }
+
+  void _stopListeningToStream({required bool clear}) {
+    final ImageStream? stream = _imageStream;
+    final ImageStreamListener? listener = _imageStreamListener;
+    if (stream != null && listener != null) {
+      stream.removeListener(listener);
+    }
+    if (clear) {
+      _imageStream = null;
+      _imageStreamListener = null;
+    }
+  }
+
+  void _resolveImage() {
+    final ImageStream newStream = _image.resolve(_imageConfiguration);
+    if (_imageStream?.key == newStream.key) {
+      return;
+    }
+
+    _stopListeningToStream(clear: true);
+    _imageStream = newStream;
+    _metadataLogicalSize = null;
+    _resolveSizeHintForCurrentImage();
+
+    final ImageStreamListener listener = ImageStreamListener(
+      (ImageInfo info, bool _) {
+        _resolvedImage = info.image;
+        _resolvedScale = info.scale;
+        markNeedsLayout();
+        markNeedsPaint();
+      },
+      onError: (Object _, StackTrace? __) {
+        _resolvedImage = null;
+        _resolvedScale = 1.0;
+        markNeedsLayout();
+        markNeedsPaint();
+      },
+    );
+    _imageStreamListener = listener;
+    if (attached) {
+      newStream.addListener(listener);
+    }
+  }
+
+  Future<void> _resolveSizeHintForCurrentImage() async {
+    final int requestId = ++_sizeHintRequestId;
+    try {
+      final ImageProvider provider = image_size_hint.unwrapProvider(_image);
+      final Object key = await provider.obtainKey(_imageConfiguration);
+      if (requestId != _sizeHintRequestId) return;
+
+      Uint8List? bytes;
+      double scale = 1.0;
+
+      if (key is AssetBundleImageKey) {
+        final ByteData data = await key.bundle.load(key.name);
+        if (requestId != _sizeHintRequestId) return;
+        bytes = data.buffer.asUint8List();
+        scale = key.scale <= 0 ? 1.0 : key.scale;
+      } else {
+        bytes = await image_size_hint.tryLoadHeaderBytesForProvider(
+          provider,
+          maxBytes: 64 * 1024,
+        );
+        if (requestId != _sizeHintRequestId) return;
+        final double? s = image_size_hint.tryGetScaleForProvider(provider);
+        if (s != null && s > 0) scale = s;
+      }
+
+      if (bytes == null) return;
+      final Size? px = _tryParseImagePixelSize(bytes);
+      if (px == null) return;
+
+      _metadataLogicalSize = Size(px.width / scale, px.height / scale);
+      markNeedsLayout();
+      markNeedsPaint();
+    } catch (_) {
+      // Best-effort only. Keep placeholder sizing if anything fails.
+    }
+  }
+
+  static Size? _tryParseImagePixelSize(Uint8List bytes) {
+    // PNG: signature then IHDR width/height at bytes 16..23.
+    if (bytes.length >= 24 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47 &&
+        bytes[4] == 0x0D &&
+        bytes[5] == 0x0A &&
+        bytes[6] == 0x1A &&
+        bytes[7] == 0x0A) {
+      final int w =
+          (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
+      final int h =
+          (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+      if (w > 0 && h > 0) return Size(w.toDouble(), h.toDouble());
+      return null;
+    }
+
+    // JPEG: scan markers for SOF segments.
+    if (bytes.length >= 4 && bytes[0] == 0xFF && bytes[1] == 0xD8) {
+      int i = 2;
+      while (i + 3 < bytes.length) {
+        if (bytes[i] != 0xFF) {
+          i++;
+          continue;
+        }
+        int marker = bytes[i + 1];
+
+        // End of image / Start of scan: stop.
+        if (marker == 0xD9 || marker == 0xDA) break;
+
+        // Standalone markers without length.
+        if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
+          i += 2;
+          continue;
+        }
+
+        if (i + 3 >= bytes.length) break;
+        final int length = (bytes[i + 2] << 8) | bytes[i + 3];
+        if (length < 2) break;
+        if (i + 1 + length >= bytes.length) break;
+
+        final bool isSOF =
+            (marker >= 0xC0 && marker <= 0xC3) ||
+            (marker >= 0xC5 && marker <= 0xC7) ||
+            (marker >= 0xC9 && marker <= 0xCB) ||
+            (marker >= 0xCD && marker <= 0xCF);
+
+        if (isSOF && i + 8 < bytes.length) {
+          final int h = (bytes[i + 5] << 8) | bytes[i + 6];
+          final int w = (bytes[i + 7] << 8) | bytes[i + 8];
+          if (w > 0 && h > 0) return Size(w.toDouble(), h.toDouble());
+          return null;
+        }
+
+        i += 2 + length;
+      }
+    }
+
+    return null;
+  }
+
+  Size _naturalLogicalSize() {
+    final ui.Image? img = _resolvedImage;
+    if (img == null) {
+      final Size? hinted = _metadataLogicalSize;
+      if (hinted != null) {
+        return Size(
+          hinted.width.isFinite ? math.max(0.0, hinted.width) : 0.0,
+          hinted.height.isFinite ? math.max(0.0, hinted.height) : 0.0,
+        );
+      }
+      final double w = _placeholderSize.width;
+      final double h = _placeholderSize.height;
+      return Size(
+        w.isFinite ? math.max(0.0, w) : 0.0,
+        h.isFinite ? math.max(0.0, h) : 0.0,
+      );
+    }
+
+    final double scale = _resolvedScale <= 0 ? 1.0 : _resolvedScale;
+    return Size(img.width / scale, img.height / scale);
+  }
+
+  @override
+  void attach(PipelineOwner owner) {
+    super.attach(owner);
+    // Ensure we have a stream+listener and that it is attached.
+    if (_imageStream == null || _imageStreamListener == null) {
+      _resolveImage();
+      return;
+    }
+    _imageStream!.addListener(_imageStreamListener!);
+  }
+
+  @override
+  void detach() {
+    // Detach should stop listening but keep cached stream/listener so
+    // a re-attach can resume without losing the resolved image.
+    _stopListeningToStream(clear: false);
+    super.detach();
+  }
+
+  @override
+  double computeMinIntrinsicWidth(double height) {
+    final Size natural = _naturalLogicalSize();
+    if (!height.isFinite || height <= 0) return natural.width;
+    if (natural.height <= 0) return 0;
+    return height * (natural.width / natural.height);
+  }
+
+  @override
+  double computeMaxIntrinsicWidth(double height) {
+    return computeMinIntrinsicWidth(height);
+  }
+
+  @override
+  double computeMinIntrinsicHeight(double width) {
+    final Size natural = _naturalLogicalSize();
+    if (!width.isFinite || width <= 0) return natural.height;
+    if (natural.width <= 0) return 0;
+    return width * (natural.height / natural.width);
+  }
+
+  @override
+  double computeMaxIntrinsicHeight(double width) {
+    return computeMinIntrinsicHeight(width);
+  }
+
+  @override
+  void performLayout() {
+    final Size natural = _naturalLogicalSize();
+
+    double? resolvedW;
+    if (!_width.isAuto) {
+      if (_width.isPercent && !constraints.hasBoundedWidth) {
+        resolvedW = null;
+      } else {
+        final double reference = constraints.hasBoundedWidth
+            ? constraints.maxWidth
+            : natural.width;
+        resolvedW = _width.resolvePx(reference: reference);
+      }
+    }
+
+    double? resolvedH;
+    if (!_height.isAuto) {
+      if (_height.isPercent && !constraints.hasBoundedHeight) {
+        resolvedH = null;
+      } else {
+        final double reference = constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : natural.height;
+        resolvedH = _height.resolvePx(reference: reference);
+      }
+    }
+
+    final bool hasW = resolvedW != null && resolvedW.isFinite;
+    final bool hasH = resolvedH != null && resolvedH.isFinite;
+
+    if (hasW && hasH) {
+      // Both specified: allow stretching (CSS-like).
+      size = constraints.constrain(
+        Size(math.max(0.0, resolvedW), math.max(0.0, resolvedH)),
+      );
+      return;
+    }
+
+    if (hasW && !hasH) {
+      if (natural.width > 0 && natural.height > 0) {
+        final double h = resolvedW * (natural.height / natural.width);
+        size = constraints.constrain(
+          Size(math.max(0.0, resolvedW), math.max(0.0, h)),
+        );
+        return;
+      }
+    }
+
+    if (!hasW && hasH) {
+      if (natural.width > 0 && natural.height > 0) {
+        final double w = resolvedH * (natural.width / natural.height);
+        size = constraints.constrain(
+          Size(math.max(0.0, w), math.max(0.0, resolvedH)),
+        );
+        return;
+      }
+    }
+
+    // Both auto (or couldn't resolve): intrinsic size subject to constraints.
+    size = constraints.constrainSizeAndAttemptToPreserveAspectRatio(natural);
+  }
+
+  @override
+  bool hitTestSelf(Offset position) => true;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final Rect rect = offset & size;
+    final ui.Image? img = _resolvedImage;
+    if (img != null && size.isFinite && !size.isEmpty) {
+      paintImage(
+        canvas: context.canvas,
+        rect: rect,
+        image: img,
+        fit: _fit,
+        alignment: _alignment,
+        filterQuality: _filterQuality,
+      );
+    }
+
+    final String? label = _debugLabel;
+    if (label == null || label.isEmpty || size.isEmpty) return;
+
+    final TextPainter tp =
+        TextPainter(
+          text: TextSpan(text: label, style: _debugLabelTextStyle),
+          textDirection: TextDirection.ltr,
+          maxLines: 1,
+          ellipsis: '…',
+        )..layout(
+          maxWidth: math.max(0.0, size.width - _debugLabelPadding.horizontal),
+        );
+
+    final double boxW = math.min(
+      size.width,
+      tp.width + _debugLabelPadding.horizontal,
+    );
+    final double boxH = tp.height + _debugLabelPadding.vertical;
+    final Rect labelRect = Rect.fromLTWH(
+      rect.left + (size.width - boxW) / 2.0,
+      rect.bottom - boxH,
+      boxW,
+      boxH,
+    );
+
+    final Paint p = Paint()..color = _debugLabelBackgroundColor;
+    context.canvas.drawRect(labelRect, p);
+    tp.paint(
+      context.canvas,
+      Offset(
+        labelRect.left + _debugLabelPadding.left,
+        labelRect.top + _debugLabelPadding.top,
+      ),
+    );
+  }
+}
+
 class HtmlDivParentData extends ContainerBoxParentData<RenderBox> {}
 
 class RenderHtmlDiv extends RenderBox
@@ -920,6 +1470,9 @@ class RenderHtmlDiv extends RenderBox
   HtmlBoxSizing _boxSizing;
 
   Yoga? _yoga;
+
+  static Yoga? _sharedYoga;
+  static bool _sharedYogaUnavailable = false;
 
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
   EdgeInsets _computedPadding = EdgeInsets.zero;
@@ -1121,8 +1674,19 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
-  Yoga _ensureYoga() {
-    return _yoga ??= Yoga();
+  Yoga? _ensureYogaOrNull() {
+    if (_yoga != null) return _yoga;
+    if (_sharedYoga != null) return _yoga = _sharedYoga;
+    if (_sharedYogaUnavailable) return null;
+    try {
+      final Yoga yoga = Yoga();
+      _sharedYoga = yoga;
+      _yoga = yoga;
+      return yoga;
+    } catch (_) {
+      _sharedYogaUnavailable = true;
+      return null;
+    }
   }
 
   static int _toYGFlexDirection(HtmlFlexDirection v) {
@@ -1220,7 +1784,7 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
-  double _performFlexLayout({
+  double? _performFlexLayoutIfPossible({
     required double contentWidth,
     required double xOffset,
     required double yOffset,
@@ -1228,7 +1792,28 @@ class RenderHtmlDiv extends RenderBox
     required double borderVertical,
     required double paddingVertical,
   }) {
-    final Yoga yoga = _ensureYoga();
+    final Yoga? yoga = _ensureYogaOrNull();
+    if (yoga == null) return null;
+    return _performFlexLayoutWithYoga(
+      yoga: yoga,
+      contentWidth: contentWidth,
+      xOffset: xOffset,
+      yOffset: yOffset,
+      availableBorderBoxHeight: availableBorderBoxHeight,
+      borderVertical: borderVertical,
+      paddingVertical: paddingVertical,
+    );
+  }
+
+  double _performFlexLayoutWithYoga({
+    required Yoga yoga,
+    required double contentWidth,
+    required double xOffset,
+    required double yOffset,
+    required double availableBorderBoxHeight,
+    required double borderVertical,
+    required double paddingVertical,
+  }) {
     final ffi.Pointer<ffi.Void> root = yoga.newNode();
 
     final List<RenderBox> children = <RenderBox>[];
@@ -1270,14 +1855,39 @@ class RenderHtmlDiv extends RenderBox
           _flexDirection == HtmlFlexDirection.row ||
           _flexDirection == HtmlFlexDirection.rowReverse;
 
+      final double preMeasureMaxHeight = (() {
+        if (_height is FixedSize) {
+          final double h = (_height as FixedSize).value;
+          return _boxSizing == HtmlBoxSizing.borderBox
+              ? math.max(0.0, h - borderVertical - paddingVertical)
+              : h;
+        }
+        if (_height is PercentSize && availableBorderBoxHeight.isFinite) {
+          final double h =
+              availableBorderBoxHeight * (_height as PercentSize).value / 100.0;
+          return _boxSizing == HtmlBoxSizing.borderBox
+              ? math.max(0.0, h - borderVertical - paddingVertical)
+              : h;
+        }
+        if (availableBorderBoxHeight.isFinite) {
+          return math.max(
+            0.0,
+            availableBorderBoxHeight - borderVertical - paddingVertical,
+          );
+        }
+        return double.infinity;
+      })();
+
       for (final RenderBox c in children) {
         // Loose pre-layout for a measurable basis.
         c.layout(
           BoxConstraints(
             minWidth: 0,
-            maxWidth: contentWidth,
+            // For flex-basis:auto we want a content-based (intrinsic) main-axis
+            // measurement, not a stretched-to-container one.
+            maxWidth: mainAxisIsRow ? double.infinity : contentWidth,
             minHeight: 0,
-            maxHeight: double.infinity,
+            maxHeight: preMeasureMaxHeight,
           ),
           parentUsesSize: true,
         );
@@ -1338,13 +1948,18 @@ class RenderHtmlDiv extends RenderBox
         if (c is RenderHtmlDiv) {
           final HtmlSize w = c._width;
           final HtmlSize h = c._height;
+          final HtmlLength basis = c._flexBasis;
 
           if (mainAxisIsRow) {
             if (w is FixedSize || w is PercentSize) {
               _applyYogaSizeFromHtmlSize(yoga, node, isWidth: true, size: w);
             } else {
               yoga.setWidthAuto(node);
-              yoga.setFlexBasis(node, c.size.width);
+              // Only treat the measured main size as the basis when flex-basis is auto.
+              // Otherwise (e.g. flex-basis:0) keep the explicit basis already applied.
+              if (basis.isAuto) {
+                yoga.setFlexBasis(node, c.size.width);
+              }
             }
 
             if (_alignItems == HtmlAlignItems.stretch &&
@@ -1360,7 +1975,9 @@ class RenderHtmlDiv extends RenderBox
               _applyYogaSizeFromHtmlSize(yoga, node, isWidth: false, size: h);
             } else {
               yoga.setHeightAuto(node);
-              yoga.setFlexBasis(node, c.size.height);
+              if (basis.isAuto) {
+                yoga.setFlexBasis(node, c.size.height);
+              }
             }
 
             if (_alignItems == HtmlAlignItems.stretch &&
@@ -2207,7 +2824,7 @@ class RenderHtmlDiv extends RenderBox
     double prevBottom = 0;
 
     if (_display == HtmlDisplay.flex) {
-      final double contentHeight = _performFlexLayout(
+      final double? contentHeight = _performFlexLayoutIfPossible(
         contentWidth: contentWidth,
         xOffset: xOffset,
         yOffset: yOffset,
@@ -2216,39 +2833,72 @@ class RenderHtmlDiv extends RenderBox
         paddingVertical: paddingVertical,
       );
 
-      double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
-      double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
-      if (minH != null && maxH != null && maxH < minH) {
-        maxH = minH;
+      if (contentHeight != null) {
+        double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
+        double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
+        if (minH != null && maxH != null && maxH < minH) {
+          maxH = minH;
+        }
+
+        double sizingHeight;
+        if (_height is FixedSize) {
+          sizingHeight = (_height as FixedSize).value;
+        } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+          sizingHeight =
+              constraints.maxHeight * (_height as PercentSize).value / 100.0;
+        } else {
+          // auto height depends on boxSizing.
+          sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
+              ? (contentHeight + borderVertical + paddingVertical)
+              : contentHeight;
+        }
+
+        if (minH != null) sizingHeight = math.max(sizingHeight, minH);
+        if (maxH != null) sizingHeight = math.min(sizingHeight, maxH);
+
+        double borderBoxHeight;
+        if (_boxSizing == HtmlBoxSizing.borderBox) {
+          borderBoxHeight = sizingHeight;
+        } else {
+          borderBoxHeight = sizingHeight + borderVertical + paddingVertical;
+        }
+        borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
+
+        size = Size(borderBoxWidth, borderBoxHeight);
+        return;
       }
-
-      double sizingHeight;
-      if (_height is FixedSize) {
-        sizingHeight = (_height as FixedSize).value;
-      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
-        sizingHeight =
-            constraints.maxHeight * (_height as PercentSize).value / 100.0;
-      } else {
-        // auto height depends on boxSizing.
-        sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
-            ? (contentHeight + borderVertical + paddingVertical)
-            : contentHeight;
-      }
-
-      if (minH != null) sizingHeight = math.max(sizingHeight, minH);
-      if (maxH != null) sizingHeight = math.min(sizingHeight, maxH);
-
-      double borderBoxHeight;
-      if (_boxSizing == HtmlBoxSizing.borderBox) {
-        borderBoxHeight = sizingHeight;
-      } else {
-        borderBoxHeight = sizingHeight + borderVertical + paddingVertical;
-      }
-      borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
-
-      size = Size(borderBoxWidth, borderBoxHeight);
-      return;
     }
+
+    final double? childContentMaxHeight = (() {
+      double? borderBoxHeight;
+
+      if (_height is FixedSize) {
+        final double h = (_height as FixedSize).value;
+        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? h
+            : (h + borderVertical + paddingVertical);
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        final double h =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? h
+            : (h + borderVertical + paddingVertical);
+      } else if (constraints.hasBoundedHeight) {
+        borderBoxHeight = constraints.maxHeight;
+      } else {
+        return null;
+      }
+
+      final double constrainedBorderBoxHeight = constraints.constrainHeight(
+        borderBoxHeight,
+      );
+      final double contentH = math.max(
+        0.0,
+        constrainedBorderBoxHeight - borderVertical - paddingVertical,
+      );
+      if (!contentH.isFinite) return null;
+      return contentH;
+    })();
 
     bool inInlineRun = false;
     final List<RenderBox> lineChildren = <RenderBox>[];
@@ -2376,7 +3026,12 @@ class RenderHtmlDiv extends RenderBox
           availableWidth - m.horizontal,
         );
         child.layout(
-          BoxConstraints(maxWidth: childMaxWidth),
+          childContentMaxHeight == null
+              ? BoxConstraints(maxWidth: childMaxWidth)
+              : BoxConstraints(
+                  maxWidth: childMaxWidth,
+                  maxHeight: childContentMaxHeight,
+                ),
           parentUsesSize: true,
         );
 
@@ -2398,7 +3053,12 @@ class RenderHtmlDiv extends RenderBox
             newAvailableWidth - m.horizontal,
           );
           child.layout(
-            BoxConstraints(maxWidth: newChildMaxWidth),
+            childContentMaxHeight == null
+                ? BoxConstraints(maxWidth: newChildMaxWidth)
+                : BoxConstraints(
+                    maxWidth: newChildMaxWidth,
+                    maxHeight: childContentMaxHeight,
+                  ),
             parentUsesSize: true,
           );
           inlineBoxWidth = m.left + child.size.width + m.right;
@@ -2436,9 +3096,12 @@ class RenderHtmlDiv extends RenderBox
       currentY += collapsed;
 
       final double childMaxWidth = math.max(0.0, contentWidth - m.horizontal);
-      final BoxConstraints childConstraints = BoxConstraints(
-        maxWidth: childMaxWidth,
-      );
+      final BoxConstraints childConstraints = childContentMaxHeight == null
+          ? BoxConstraints(maxWidth: childMaxWidth)
+          : BoxConstraints(
+              maxWidth: childMaxWidth,
+              maxHeight: childContentMaxHeight,
+            );
       child.layout(childConstraints, parentUsesSize: true);
 
       double autoLeft = 0;

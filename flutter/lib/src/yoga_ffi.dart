@@ -374,23 +374,55 @@ class Yoga {
   late YGNodeLayoutGetDirection _ygNodeLayoutGetDirection;
   late YGNodeLayoutGetHadOverflow _ygNodeLayoutGetHadOverflow;
 
+  static DynamicLibrary _openFirstAvailable(List<String> candidates) {
+    Object? lastError;
+    for (final String candidate in candidates) {
+      try {
+        if (candidate.contains('\\') || candidate.contains('/')) {
+          final File f = File(candidate);
+          if (!f.existsSync()) {
+            continue;
+          }
+        }
+        return DynamicLibrary.open(candidate);
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (lastError != null) {
+      // Preserve the most recent platform error (often includes the Win32 code).
+      throw lastError;
+    }
+    throw ArgumentError('No library candidates provided');
+  }
+
+  static DynamicLibrary _openWindowsYogaLibrary() {
+    final String? envPath = Platform.environment['FLUTTER_YOGA_DLL_PATH'];
+
+    final List<String> candidates = <String>[
+      if (envPath != null && envPath.isNotEmpty) envPath,
+      // Typical runtime name (when the DLL is alongside the executable).
+      'flutter_yoga_plugin.dll',
+      // Common local build outputs (e.g. when running `flutter test` from a package/example).
+      'build/windows/x64/runner/Debug/flutter_yoga_plugin.dll',
+      'build/windows/x64/runner/Release/flutter_yoga_plugin.dll',
+      'build/windows/x64/plugins/flutter_yoga/Debug/flutter_yoga_plugin.dll',
+      'build/windows/x64/plugins/flutter_yoga/Release/flutter_yoga_plugin.dll',
+      // Fallback non-x64 folder layouts.
+      'build/windows/runner/Debug/flutter_yoga_plugin.dll',
+      'build/windows/runner/Release/flutter_yoga_plugin.dll',
+      'build/windows/plugins/flutter_yoga/Debug/flutter_yoga_plugin.dll',
+      'build/windows/plugins/flutter_yoga/Release/flutter_yoga_plugin.dll',
+    ];
+
+    return _openFirstAvailable(candidates);
+  }
+
   Yoga() {
     if (Platform.isAndroid) {
-      try {
-        _lib = DynamicLibrary.open('libyoga.so');
-      } catch (e) {
-        // ignore: avoid_print
-        print("Failed to load libyoga.so: $e");
-        rethrow;
-      }
+      _lib = DynamicLibrary.open('libyoga.so');
     } else if (Platform.isWindows) {
-      try {
-        _lib = DynamicLibrary.open('flutter_yoga_plugin.dll');
-      } catch (e) {
-        // ignore: avoid_print
-        print("Failed to load flutter_yoga_plugin.dll: $e");
-        rethrow;
-      }
+      _lib = _openWindowsYogaLibrary();
     } else {
       throw UnimplementedError('Platform not supported');
     }

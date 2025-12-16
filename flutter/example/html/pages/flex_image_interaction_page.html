@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FlexImageInteractionPage - Flex × Image（HTML/CSS 近似对照）</title>
+    <!-- 对应 Flutter: flutter/example/lib/pages/flex_image_interaction_page.dart -->
+    <style>
+        body {
+            margin: 0;
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+            background: #f4f4f4;
+            color: #111;
+        }
+
+        .page {
+            padding: 16px;
+            max-width: 980px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0 0 12px;
+        }
+
+        h2 {
+            font-size: 14px;
+            margin: 16px 0 8px;
+        }
+
+        .note {
+            font-size: 12px;
+            color: #444;
+            margin: 0 0 8px;
+        }
+
+        .frame {
+            width: 320px;
+            height: 120px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            background: #eee;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+        }
+
+        .frame.space-between {
+            justify-content: space-between;
+        }
+
+        .frame.stretch {
+            align-items: stretch;
+        }
+
+        .frame.wrap {
+            height: 220px;
+            align-items: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .frame.padded {
+            height: 140px;
+            padding: 16px;
+            justify-content: space-between;
+            align-items: stretch;
+        }
+
+        .tile {
+            width: 96px;
+            height: 72px;
+            margin: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.13);
+            background: #fff;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tile.w120 {
+            width: 120px;
+        }
+
+        .img {
+            width: 100%;
+            height: 100%;
+        }
+
+        .fit-contain {
+            object-fit: contain;
+        }
+
+        .fit-cover {
+            object-fit: cover;
+        }
+
+        .fit-fill {
+            object-fit: fill;
+        }
+
+        .label {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 0;
+            max-width: calc(100% - 12px);
+            padding: 4px 6px;
+            background: rgba(0, 0, 0, 0.4);
+            color: #fff;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            box-sizing: border-box;
+        }
+
+        .grow-tile {
+            height: 100%;
+            margin: 8px;
+            border: 1px solid rgba(0, 0, 0, 0.13);
+            background: #fff;
+            box-sizing: border-box;
+            position: relative;
+            overflow: hidden;
+            min-width: 0;
+        }
+
+        /* 用 width 模拟“basis:auto 时以内容/固有宽度作为基础” */
+        .basis-auto {
+            width: 96px;
+            flex-basis: auto;
+        }
+
+        /* basis=0：忽略固有宽度，按 grow 比例分配 */
+        .basis-0 {
+            flex-basis: 0;
+        }
+
+        .grow-1 {
+            flex-grow: 1;
+            flex-shrink: 1;
+        }
+
+        .grow-2 {
+            flex-grow: 2;
+            flex-shrink: 1;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="page">
+        <h1>Flex × Image 交互示例（HTML/CSS 近似对照）</h1>
+
+        <h2>1) 固定 item 尺寸下：object-fit 行为（contain/cover/fill）</h2>
+        <div class="frame space-between" style="height:112px;">
+            <div class="tile">
+                <img class="img fit-contain" src="../../assets/wallhaven.png" alt="contain" />
+                <div class="label">contain</div>
+            </div>
+            <div class="tile">
+                <img class="img fit-cover" src="../../assets/wallhaven.png" alt="cover" />
+                <div class="label">cover</div>
+            </div>
+            <div class="tile">
+                <img class="img fit-fill" src="../../assets/wallhaven.png" alt="fill" />
+                <div class="label">fill</div>
+            </div>
+        </div>
+
+        <h2>2) flex-grow + flex-basis：图片被约束后的裁切/留白</h2>
+        <p class="note">对比 basis:auto vs basis:0（类似 CSS flex: 1 1 auto vs 1 1 0）。</p>
+
+        <div class="frame stretch" style="height:120px;">
+            <div class="grow-tile grow-1 basis-auto">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=1 basis=auto" />
+                <div class="label">grow=1 basis:auto</div>
+            </div>
+            <div class="grow-tile grow-2 basis-auto">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=2 basis=auto" />
+                <div class="label">grow=2 basis:auto</div>
+            </div>
+            <div class="grow-tile grow-1 basis-auto">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=1 basis=auto" />
+                <div class="label">grow=1 basis:auto</div>
+            </div>
+        </div>
+
+        <div class="frame stretch" style="height:120px; margin-top: 8px;">
+            <div class="grow-tile grow-1 basis-0">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=1 basis=0" />
+                <div class="label">grow=1 basis=0</div>
+            </div>
+            <div class="grow-tile grow-2 basis-0">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=2 basis=0" />
+                <div class="label">grow=2 basis=0</div>
+            </div>
+            <div class="grow-tile grow-1 basis-0">
+                <img class="img fit-cover" src="../../assets/test1.png" alt="grow=1 basis=0" />
+                <div class="label">grow=1 basis=0</div>
+            </div>
+        </div>
+
+        <h2>3) wrap：多行换行时图片 item 的尺寸稳定性</h2>
+        <div class="frame wrap">
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/wallhaven.png" alt="tile 1" />
+                <div class="label">tile 1</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/test1.png" alt="tile 2" />
+                <div class="label">tile 2</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/wallhaven.png" alt="tile 3" />
+                <div class="label">tile 3</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/test1.png" alt="tile 4" />
+                <div class="label">tile 4</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/wallhaven.png" alt="tile 5" />
+                <div class="label">tile 5</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/test1.png" alt="tile 6" />
+                <div class="label">tile 6</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/wallhaven.png" alt="tile 7" />
+                <div class="label">tile 7</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/test1.png" alt="tile 8" />
+                <div class="label">tile 8</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/wallhaven.png" alt="tile 9" />
+                <div class="label">tile 9</div>
+            </div>
+            <div class="tile w120"><img class="img fit-cover" src="../../assets/test1.png" alt="tile 10" />
+                <div class="label">tile 10</div>
+            </div>
+        </div>
+
+        <h2>4) padding：容器内缩后，图片 item 的可用空间变化</h2>
+        <div class="frame padded">
+            <div class="grow-tile grow-1 basis-0">
+                <img class="img fit-cover" src="../../assets/wallhaven.png" alt="stretch + cover" />
+                <div class="label">stretch + cover</div>
+            </div>
+            <div class="grow-tile grow-1 basis-0">
+                <img class="img fit-contain" src="../../assets/wallhaven.png" alt="stretch + contain" />
+                <div class="label">stretch + contain</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
