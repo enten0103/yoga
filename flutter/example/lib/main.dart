@@ -19,6 +19,7 @@ import 'pages/css_paint_order_page.dart';
 import 'pages/min_max_size_page.dart';
 import 'pages/flex_layout_page.dart';
 import 'pages/flex_image_interaction_page.dart';
+import 'pages/jianjie_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -182,6 +183,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const CssPaintOrderPage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('简介页面复刻（HtmlDiv）'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const JianjiePage()),
             ),
           ),
         ],
