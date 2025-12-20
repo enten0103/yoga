@@ -16,20 +16,33 @@ class JianjiePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('简介（复刻）')),
-      body: SingleChildScrollView(
-        child: HtmlDiv(
-          // Mimic a simple document page.
-          padding: const HtmlPadding.symmetric(
-            horizontal: HtmlLength.px(24),
-            vertical: HtmlLength.px(16),
-          ),
-          children: const [
-            _TitleBlock('简介'),
-            _ParagraphBlock(_p1),
-            _ParagraphBlock(_p2),
-            _EmphasisBlock(_p3),
-          ],
+      body: HtmlDiv(
+        // Mimic a simple document page.
+        padding: const HtmlPadding.symmetric(
+          horizontal: HtmlLength.px(24),
+          vertical: HtmlLength.px(16),
         ),
+        children: [
+          HtmlDiv(
+            maxWidth: FitContent(),
+            margin: const HtmlMargin.only(
+              left: HtmlLength.auto(),
+              right: HtmlLength.auto(),
+            ),
+            padding: HtmlPadding.only(
+              left: HtmlLength.px(16),
+              right: HtmlLength.px(16),
+              top: HtmlLength.px(12),
+            ),
+            children: const [
+              HtmlDiv(children: [_TitleBlock('简介')]),
+              HtmlDiv(),
+              HtmlDiv(children: [_ParagraphBlock(_p1)]),
+              HtmlDiv(children: [_ParagraphBlock(_p2)]),
+              HtmlDiv(children: [_EmphasisBlock(_p3)]),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -42,11 +55,13 @@ class _TitleBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return HtmlDiv(
+      display: HtmlDisplay.inline,
       margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [
         Text(
           text,
           style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+          textAlign: TextAlign.center,
         ),
       ],
     );
@@ -60,10 +75,8 @@ class _ParagraphBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return HtmlDiv(
-      margin: const HtmlMargin.only(
-        bottom: HtmlLength.px(12),
-        top: HtmlLength.px(12),
-      ),
+      display: HtmlDisplay.inline,
+      margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [Text(text, style: const TextStyle(fontSize: 16, height: 1.7))],
     );
   }
@@ -76,10 +89,9 @@ class _EmphasisBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return HtmlDiv(
-      margin: const HtmlMargin.only(
-        bottom: HtmlLength.px(12),
-        top: HtmlLength.px(12),
-      ),
+      display: HtmlDisplay.inline,
+      lineHeight: HtmlLength.multiplier(1.5),
+      margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [
         Text(
           text,

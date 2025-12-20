@@ -1,40 +1,46 @@
 # Copilot instructions (Yoga repo)
 
+## Big picture (monorepo)
+- `yoga/`: C++20 flexbox layout engine (the source of truth).
+- Bindings/consumers:
+  - `flutter/`: Flutter plugin + HTML/CSS-like layout/rendering engine (Dart) backed by Yoga via FFI.
+  - `javascript/`: `yoga-layout` WebAssembly bindings (Emscripten + CMake; uses `just-scripts`).
+  - `java/`: Android/JNI bindings + Gradle build.
+- Tests + tooling:
+  - `tests/`: C++ unit tests (`yogatests`).
+  - `gentest/`: generates many layout tests from HTML fixtures.
+
+## Critical workflows
+- C++ unit tests:
+  - Windows: `unit_tests.bat [Debug|Release]` (builds `tests/build` then runs `yogatests.exe`).
+  - macOS/Linux: `./unit_tests [Debug|Release]`.
+  - VS Code debugging is wired via `.vscode/launch.json` + the “Build Unit Tests” task.
+- Generated tests (layout fixtures → expected results):
+  - Add fixtures under `gentest/fixtures/`.
+  - From repo root: `yarn install`, then `yarn gentest` (uses Selenium/Chrome to render fixtures).
+
 ## Focus: `flutter/` (team priority)
-- The `flutter/` folder is a Flutter plugin package; the main value is the HTML/CSS-like layout & rendering engine implemented in Dart and backed by Yoga via FFI.
 - Public surface:
   - `flutter/lib/flutter_yoga.dart` exports `flutter/lib/html_div.dart`.
-  - `flutter/lib/html_div.dart` defines the `library;` and composes the implementation via `part` files.
+  - `flutter/lib/html_div.dart` declares `library;` and composes implementation via `part` files.
+- Architecture/conventions:
+  - Models in `flutter/lib/src/html_div/models/*`, re-exported by `flutter/lib/src/html_div/models/models.dart`.
+    - Use `HtmlLength` / `HtmlLengthOffset` for px/%/auto values.
+    - Percent margin/padding resolves against containing block width.
+  - Widgets in `flutter/lib/src/html_div/widgets.dart` (`HtmlDiv`, `HtmlImage`) map 1:1 to render object inputs.
+  - Render behavior is split into `flutter/lib/src/html_div/renders/*` (layout/paint/hit-test/image streams).
+  - Add a CSS-like feature using the existing flow: model → `HtmlDiv`/`updateRenderObject` → `RenderHtmlDiv` field+setter → behavior in the relevant `part`; use `markNeedsLayout()` vs `markNeedsPaint()` like neighboring setters.
+- Flutter commands:
+  - Tests: `cd flutter && flutter test`.
+  - Example app: `cd flutter/example && flutter run` (shortcut: `yarn windows`).
 
-## Flutter architecture (how code is organized)
-- Widgets live in `flutter/lib/src/html_div/widgets.dart` (`HtmlDiv`, `HtmlImage`) and map 1:1 to the render object inputs.
-- Value models live in `flutter/lib/src/html_div/models/*` and are re-exported by `flutter/lib/src/html_div/models/models.dart`.
-  - Use `HtmlLength` / `HtmlLengthOffset` for px/%/auto and 2D offsets (`models/length.dart`).
-  - Margin/padding percent resolves against containing block width (`models/margin_padding.dart`).
-- Rendering/layout is split by concern into `flutter/lib/src/html_div/renders/*`:
-  - Yoga layout: `renders/html_div_layout_yoga.dart` (tries a shared `Yoga()` instance; disables Yoga if unavailable).
-  - Paint: border/background/box-shadow (`renders/html_div_*_paint.dart`).
-  - Transform hit testing: `renders/html_div_transform_hit_test.dart`.
-  - Image stream lifecycle: `renders/html_div_image_streams.dart`.
-
-## Flutter workflows
-- Run Flutter unit/widget tests: `cd flutter && flutter test` (tests live in `flutter/test/*_test.dart`).
-- Run the example app: `cd flutter/example && flutter run` (repo root shortcut: `yarn windows`).
-
-## FFI + platform notes (important for Windows dev)
-- The Yoga FFI layer is `flutter/lib/src/yoga_ffi.dart`.
+## Flutter FFI + Windows notes
+- Yoga FFI is in `flutter/lib/src/yoga_ffi.dart`.
   - Android loads `libyoga.so`.
-  - Windows loads `flutter_yoga_plugin.dll` and also checks common build output paths.
-  - You can override the DLL location via env var `FLUTTER_YOGA_DLL_PATH`.
-  - Other platforms currently throw `UnimplementedError('Platform not supported')` (higher layers may fall back by marking Yoga unavailable).
+  - Windows loads `flutter_yoga_plugin.dll` and checks common local build output paths.
+  - Override DLL path via `FLUTTER_YOGA_DLL_PATH`.
+  - Other platforms currently throw `UnimplementedError('Platform not supported')` (higher layers may disable Yoga and continue).
 
-## Conventions for adding/changing features
-- Add a CSS-like capability by following the existing “model -> widget -> render” flow:
-  1) Add/extend a model in `flutter/lib/src/html_div/models/` and export it from `models/models.dart`.
-  2) Thread it through `HtmlDiv` (constructor + `updateRenderObject`) and store it on `RenderHtmlDiv`.
-  3) Implement behavior in the appropriate render `part` file; use `markNeedsLayout()` vs `markNeedsPaint()` consistently with existing setters.
-  4) Add/adjust tests under `flutter/test/` (see `background_test.dart`, `margin_test.dart`, `border_image_test.dart`).
-- Image provider quirks: header-byte probing and scale hints go through `flutter/lib/src/image_size_hint.dart` with conditional IO/web implementations; update both sides if adding provider support.
-
-## When you must touch the C++ core
-- Only change `yoga/` if the Flutter FFI boundary requires it; C++ unit tests are under `tests/` and runnable via `unit_tests.bat` / `./unit_tests`.
+## JavaScript/WASM notes
+- `javascript/` uses `just.config.cjs` to fetch/activate Emscripten into `javascript/.emsdk`, then runs CMake builds.
+- `yoga-layout` users must manually free nodes/configs created via `Yoga.*.create()` (see `javascript/README.md`).

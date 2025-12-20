@@ -645,12 +645,14 @@ class RenderHtmlDiv extends RenderBox
         }
         final double available = math.max(0.0, width - currentLineIndent);
         final double childMaxWidth = math.max(0.0, available - m.horizontal);
-        final double childWidth = child.getMaxIntrinsicWidth(double.infinity);
-        final double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
-        final double baselineDistance =
-            child.getDistanceToBaseline(TextBaseline.alphabetic) ?? childHeight;
+        double childWidth = child.getMaxIntrinsicWidth(double.infinity);
+        childWidth = math.min(childWidth, childMaxWidth);
+        double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
+        // Intrinsic sizing must not call `getDistanceToBaseline` because the
+        // child is not laid out yet (Flutter asserts in debug). We approximate
+        // CSS inline formatting here using a baseline-at-bottom model.
 
-        final double inlineBoxWidth = childWidth + m.horizontal;
+        double inlineBoxWidth = childWidth + m.horizontal;
         if (inlineX > 0 && inlineX + inlineBoxWidth > available) {
           currentY += flushLine();
           inlineX = 0;
@@ -658,11 +660,28 @@ class RenderHtmlDiv extends RenderBox
           lineDescent = 0;
           indentApplied = true;
           currentLineIndent = 0;
+
+          // Recompute with the new line's available width. This mirrors the
+          // real layout path, where a child may wrap internally depending on
+          // the maxWidth constraint.
+          final double newAvailable = math.max(0.0, width - currentLineIndent);
+          final double newChildMaxWidth = math.max(
+            0.0,
+            newAvailable - m.horizontal,
+          );
+          childWidth = math.min(
+            child.getMaxIntrinsicWidth(double.infinity),
+            newChildMaxWidth,
+          );
+          childHeight = child.getMaxIntrinsicHeight(newChildMaxWidth);
+          inlineBoxWidth = childWidth + m.horizontal;
         }
 
         inlineX += inlineBoxWidth;
-        final double ascent = m.top + baselineDistance;
-        final double descent = (childHeight - baselineDistance) + m.bottom;
+        // Baseline-at-bottom => ascent accounts for full height; descent is
+        // just the bottom margin.
+        final double ascent = m.top + childHeight;
+        final double descent = m.bottom;
         lineAscent = math.max(lineAscent, ascent);
         lineDescent = math.max(lineDescent, descent);
 

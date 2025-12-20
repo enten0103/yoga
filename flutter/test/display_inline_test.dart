@@ -1,8 +1,191 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_yoga/html_div.dart';
 
+class _IntrinsicHeightRecorder extends SingleChildRenderObjectWidget {
+  const _IntrinsicHeightRecorder({super.key, super.child});
+
+  @override
+  _RenderIntrinsicHeightRecorder createRenderObject(BuildContext context) {
+    return _RenderIntrinsicHeightRecorder();
+  }
+}
+
+class _RenderIntrinsicHeightRecorder extends RenderProxyBox {
+  double? recordedMaxIntrinsicHeight;
+
+  @override
+  void performLayout() {
+    if (child == null) {
+      size = constraints.smallest;
+      recordedMaxIntrinsicHeight = 0;
+      return;
+    }
+
+    child!.layout(constraints, parentUsesSize: true);
+    size = child!.size;
+
+    // Record intrinsics during layout so Flutter's debug asserts allow
+    // baseline queries within intrinsic computations.
+    recordedMaxIntrinsicHeight = child!.getMaxIntrinsicHeight(size.width);
+  }
+}
+
 void main() {
+  test('HtmlLength.multiplier scales reference in resolvePx', () {
+    expect(const HtmlLength.multiplier(1.3).resolvePx(reference: 10), 13);
+    expect(const HtmlLength.multiplier(0).resolvePx(reference: 10), 0);
+  });
+
+  testWidgets('lineHeight supports unitless multipliers', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(200),
+            height: const AutoSize(),
+            lineHeight: const HtmlLength.multiplier(2),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(50),
+                height: FixedSize(20),
+              ),
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(50),
+                height: FixedSize(10),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    // Natural line height is max child height = 20; multiplier(2) => 40.
+    expect(rootSize.height, equals(40));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('lineHeight multiplier applies per wrapped line', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(160),
+            height: const AutoSize(),
+            lineHeight: const HtmlLength.multiplier(2),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              // Each child is 90px wide; only one fits per 160px line.
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(90),
+                height: FixedSize(20),
+              ),
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(90),
+                height: FixedSize(10),
+              ),
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(90),
+                height: FixedSize(30),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    // Natural per-line heights: 20, 10, 30.
+    // multiplier(2) => 40 + 20 + 60 = 120.
+    expect(rootSize.height, equals(120));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('lineHeight percent matches multiplier semantics', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(200),
+            height: const AutoSize(),
+            lineHeight: const HtmlLength.percent(200),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(50),
+                height: FixedSize(20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    // Natural line height = 20; 200% => 40.
+    expect(rootSize.height, equals(40));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('lineHeight fixed px overrides natural line height', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(200),
+            height: const AutoSize(),
+            lineHeight: const HtmlLength.px(50),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(50),
+                height: FixedSize(20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    expect(rootSize.height, equals(50));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('inline children flow horizontally and wrap', (
     WidgetTester tester,
   ) async {
@@ -302,6 +485,75 @@ void main() {
     expect(parent.size.height, equals(60));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'inline maxIntrinsicHeight matches layout height when wrapping (percent line-height)',
+    (WidgetTester tester) async {
+      // Regression test for `_inlineIntrinsicHeight`: when a child wraps to the
+      // next line (e.g. due to text-indent on the first line), the intrinsic
+      // height computation must re-evaluate the child's height under the new
+      // maxWidth, otherwise line-height (percent) can diverge from real layout.
+      const Key subjectKey = ValueKey('subject');
+      const Key recorderKey = ValueKey('recorder');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 200,
+              child: _IntrinsicHeightRecorder(
+                key: recorderKey,
+                child: HtmlDiv(
+                  key: subjectKey,
+                  display: HtmlDisplay.inline,
+                  width: const FixedSize(200),
+                  height: const AutoSize(),
+                  textIndent: const HtmlLength.px(80),
+                  lineHeight: const HtmlLength.percent(200),
+                  children: const [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      width: FixedSize(119),
+                      height: FixedSize(10),
+                    ),
+                    Text(
+                      key: ValueKey('text'),
+                      'word word word word word',
+                      softWrap: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final RenderBox subject = tester.renderObject(find.byKey(subjectKey));
+      final RenderBox textBox = tester.renderObject(
+        find.byKey(const ValueKey('text')),
+      );
+
+      // Ensure the text is sensitive to the width (wraps differently).
+      final double textH120 = textBox.getMaxIntrinsicHeight(120);
+      final double textH200 = textBox.getMaxIntrinsicHeight(200);
+      expect(textH120, greaterThan(textH200));
+
+      final _RenderIntrinsicHeightRecorder recorder = tester.renderObject(
+        find.byKey(recorderKey),
+      );
+
+      expect(recorder.recordedMaxIntrinsicHeight, isNotNull);
+      expect(
+        (recorder.recordedMaxIntrinsicHeight! - subject.size.height).abs(),
+        lessThan(0.01),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('text-indent shifts first inline line start (px)', (
     WidgetTester tester,
