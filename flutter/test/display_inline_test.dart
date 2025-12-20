@@ -186,6 +186,80 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('nested lineHeight does not shrink line boxes', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(200),
+            height: const AutoSize(),
+            // Smaller than the natural height of the inline child.
+            lineHeight: const HtmlLength.px(24),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: FixedSize(50),
+                height: FixedSize(30),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    // lineHeight is a minimum; it must not shrink below natural (30).
+    expect(rootSize.height, equals(30));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nested larger child lineHeight determines final height', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(200),
+            height: const AutoSize(),
+            // Parent minimum smaller than child's computed line height.
+            lineHeight: const HtmlLength.px(24),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                // Child creates its own line boxes and sets a larger minimum.
+                lineHeight: HtmlLength.px(40),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    width: FixedSize(50),
+                    height: FixedSize(20),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
+    expect(rootSize.height, equals(40));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('inline children flow horizontally and wrap', (
     WidgetTester tester,
   ) async {

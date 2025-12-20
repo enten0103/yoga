@@ -631,7 +631,7 @@ class RenderHtmlDiv extends RenderBox
       if (lineHeight == null || lineHeight.isAuto) return natural;
       final double target = lineHeight.resolvePx(reference: natural);
       if (!target.isFinite) return natural;
-      return math.max(0.0, target);
+      return math.max(natural, math.max(0.0, target));
     }
 
     RenderBox? child = firstChild;
@@ -1117,6 +1117,10 @@ class RenderHtmlDiv extends RenderBox
       if (lh == null || lh.isAuto) return (ascent, descent);
       final double target = lh.resolvePx(reference: natural);
       if (!target.isFinite) return (ascent, descent);
+      // Follow CSS-like semantics for this engine: `lineHeight` specifies the
+      // minimum line box height. Never shrink below the natural height,
+      // otherwise nested line-heights can cause overlap.
+      if (target <= natural) return (ascent, descent);
       final double delta = target - natural;
       final double half = delta / 2.0;
       return (math.max(0.0, ascent + half), math.max(0.0, descent + half));

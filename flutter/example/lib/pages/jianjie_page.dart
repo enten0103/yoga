@@ -35,11 +35,23 @@ class JianjiePage extends StatelessWidget {
               top: HtmlLength.px(12),
             ),
             children: const [
-              HtmlDiv(children: [_TitleBlock('简介')]),
+              HtmlDiv(
+                lineHeight: HtmlLength.px(24),
+                children: [_TitleBlock('简介')],
+              ),
               HtmlDiv(),
-              HtmlDiv(children: [_ParagraphBlock(_p1)]),
-              HtmlDiv(children: [_ParagraphBlock(_p2)]),
-              HtmlDiv(children: [_EmphasisBlock(_p3)]),
+              HtmlDiv(
+                lineHeight: HtmlLength.px(24),
+                children: [_ParagraphBlock(_p1)],
+              ),
+              HtmlDiv(
+                lineHeight: HtmlLength.px(24),
+                children: [_ParagraphBlock(_p2)],
+              ),
+              HtmlDiv(
+                lineHeight: HtmlLength.px(24),
+                children: [_EmphasisBlock(_p3)],
+              ),
             ],
           ),
         ],
@@ -90,7 +102,7 @@ class _EmphasisBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return HtmlDiv(
       display: HtmlDisplay.inline,
-      lineHeight: HtmlLength.multiplier(1.5),
+      lineHeight: HtmlLength.px(24),
       margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [
         Text(
