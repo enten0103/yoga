@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Line-Height Strut / Baseline</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+            padding: 16px;
+        }
+
+        .box {
+            border: 1px solid #333;
+            padding: 12px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .title {
+            font-weight: 600;
+            margin: 0 0 8px 0;
+        }
+
+        .row {
+            margin-bottom: 20px;
+        }
+
+        .nested {
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        .small {
+            font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="row">
+        <div class="title">parent line-height: 24px; nested span line-height: 40px</div>
+        <div class="box" style="line-height: 24px;">
+            <span class="small">prefix </span>
+            <span class="nested" style="line-height: 40px;">NESTED</span>
+            <span class="small"> suffix AaBbCc 中英混排 baseline 对齐测试。The quick brown fox jumps.</span>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="title">parent line-height: 2; small font-size=12 => 24px</div>
+        <div class="box" style="line-height: 2;">
+            <span class="small">prefix </span>
+            <span class="nested" style="line-height: 24px;">NESTED</span>
+            <span class="small"> suffix AaBbCc 中英混排 baseline 对齐测试。The quick brown fox jumps.</span>
+        </div>
+    </div>
+</body>
+
+</html>

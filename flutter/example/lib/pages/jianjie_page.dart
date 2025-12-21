@@ -25,6 +25,8 @@ class JianjiePage extends StatelessWidget {
         children: [
           HtmlDiv(
             maxWidth: FitContent(),
+
+            lineHeight: HtmlLength.multiplier(1.3),
             margin: const HtmlMargin.only(
               left: HtmlLength.auto(),
               right: HtmlLength.auto(),
@@ -68,6 +70,7 @@ class _TitleBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return HtmlDiv(
       display: HtmlDisplay.inline,
+      lineHeight: HtmlLength.px(24),
       margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [
         Text(
@@ -88,6 +91,7 @@ class _ParagraphBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return HtmlDiv(
       display: HtmlDisplay.inline,
+      lineHeight: HtmlLength.px(24),
       margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [Text(text, style: const TextStyle(fontSize: 16, height: 1.7))],
     );

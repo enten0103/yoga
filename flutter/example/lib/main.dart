@@ -20,6 +20,7 @@ import 'pages/min_max_size_page.dart';
 import 'pages/flex_layout_page.dart';
 import 'pages/flex_image_interaction_page.dart';
 import 'pages/jianjie_page.dart';
+import 'pages/strut_baseline_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -190,6 +191,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const JianjiePage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('Line-Height Strut / Baseline'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StrutBaselinePage()),
             ),
           ),
         ],

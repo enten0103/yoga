@@ -91,6 +91,8 @@ class RenderHtmlDiv extends RenderBox
   EdgeInsets _computedBorderWidths = EdgeInsets.zero;
   EdgeInsets _computedPadding = EdgeInsets.zero;
 
+  double? _lastLineBaselineFromTop;
+
   RenderHtmlDiv({
     required HtmlSize width,
     required HtmlSize height,
@@ -420,6 +422,96 @@ class RenderHtmlDiv extends RenderBox
     return HtmlDisplay.block;
   }
 
+  static const double _kDefaultStrutFontSize = 16.0;
+  static const double _kStrutAscentRatio = 0.8;
+
+  static double? _tryExtractFontSizeFromInlineSpan(InlineSpan span) {
+    double? found;
+    void visit(InlineSpan s) {
+      if (found != null) return;
+      if (s is TextSpan) {
+        final double? fontSize = s.style?.fontSize;
+        if (fontSize != null && fontSize.isFinite && fontSize > 0) {
+          found = fontSize;
+          return;
+        }
+        final List<InlineSpan>? children = s.children;
+        if (children != null) {
+          for (final InlineSpan child in children) {
+            visit(child);
+            if (found != null) return;
+          }
+        }
+      }
+    }
+
+    visit(span);
+    return found;
+  }
+
+  static double? _tryExtractFontSizeFromRenderBox(RenderBox box) {
+    if (box is RenderParagraph) {
+      final InlineSpan span = box.text;
+      return _tryExtractFontSizeFromInlineSpan(span);
+    }
+    if (box is RenderHtmlDiv) {
+      // If this is a transparent wrapper, peek into its inline/text children.
+      return _estimateStrutFontSizeFromChildren(box.firstChild);
+    }
+    return null;
+  }
+
+  static double _estimateStrutFontSizeFromChildren(RenderBox? firstChild) {
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final double? size = _tryExtractFontSizeFromRenderBox(child);
+      if (size != null && size.isFinite && size > 0) return size;
+      child = (child.parentData as HtmlDivParentData).nextSibling;
+    }
+    return _kDefaultStrutFontSize;
+  }
+
+  static (double ascent, double descent) _computeLineHeightStrut(
+    RenderBox? firstChild,
+    HtmlLength? lineHeight,
+  ) {
+    // We only apply the CSS-like strut model when line-height is explicitly
+    // set; for `auto`/unset we keep the existing behavior to avoid changing
+    // layout for non-text content.
+    if (lineHeight == null || lineHeight.isAuto) return (0.0, 0.0);
+
+    final double fontSize = _estimateStrutFontSizeFromChildren(firstChild);
+    double computedLineHeight;
+    switch (lineHeight.unit) {
+      case HtmlLengthUnit.px:
+        computedLineHeight = lineHeight.value;
+        break;
+      case HtmlLengthUnit.multiplier:
+        computedLineHeight = fontSize * lineHeight.value;
+        break;
+      case HtmlLengthUnit.percent:
+        computedLineHeight = fontSize * lineHeight.value / 100.0;
+        break;
+      case HtmlLengthUnit.auto:
+        computedLineHeight = fontSize * 1.2;
+        break;
+    }
+
+    if (!computedLineHeight.isFinite || computedLineHeight <= 0) {
+      return (0.0, 0.0);
+    }
+
+    final double fontAscent = fontSize * _kStrutAscentRatio;
+    final double fontDescent = math.max(0.0, fontSize - fontAscent);
+    final double leading = computedLineHeight - fontSize;
+    final double halfLeading = leading / 2.0;
+
+    // Distribute leading above/below the baseline around the font box.
+    final double ascent = math.max(0.0, fontAscent + halfLeading);
+    final double descent = math.max(0.0, fontDescent + halfLeading);
+    return (ascent, descent);
+  }
+
   static bool _hasInlineContent(RenderHtmlDiv div) {
     RenderBox? child = div.firstChild;
     while (child != null) {
@@ -535,8 +627,13 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   double? computeDistanceToActualBaseline(TextBaseline baseline) {
-    // CSS inline-block baseline is the bottom margin edge by default.
-    // We approximate this by using the bottom edge of the border box.
+    // CSS inline-block baseline: if the box has in-flow line boxes, use the
+    // baseline of the last line box; otherwise use the bottom margin edge.
+    // We approximate bottom margin edge by using the bottom edge of our box.
+    final double? last = _lastLineBaselineFromTop;
+    if (_display == HtmlDisplay.inline && last != null && last.isFinite) {
+      return last;
+    }
     return size.height;
   }
 
@@ -625,13 +722,16 @@ class RenderHtmlDiv extends RenderBox
     double lineAscent = 0;
     double lineDescent = 0;
 
+    final (double strutAscent, double strutDescent) = _computeLineHeightStrut(
+      firstChild,
+      lineHeight,
+    );
+
     double flushLine() {
-      final double natural = lineAscent + lineDescent;
-      if (natural <= 0) return 0;
-      if (lineHeight == null || lineHeight.isAuto) return natural;
-      final double target = lineHeight.resolvePx(reference: natural);
-      if (!target.isFinite) return natural;
-      return math.max(natural, math.max(0.0, target));
+      if (lineAscent + lineDescent <= 0) return 0;
+      final double finalAscent = math.max(lineAscent, strutAscent);
+      final double finalDescent = math.max(lineDescent, strutDescent);
+      return finalAscent + finalDescent;
     }
 
     RenderBox? child = firstChild;
@@ -645,12 +745,43 @@ class RenderHtmlDiv extends RenderBox
         }
         final double available = math.max(0.0, width - currentLineIndent);
         final double childMaxWidth = math.max(0.0, available - m.horizontal);
-        double childWidth = child.getMaxIntrinsicWidth(double.infinity);
-        childWidth = math.min(childWidth, childMaxWidth);
-        double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
-        // Intrinsic sizing must not call `getDistanceToBaseline` because the
-        // child is not laid out yet (Flutter asserts in debug). We approximate
-        // CSS inline formatting here using a baseline-at-bottom model.
+        (double w, double h, double baseline) measure(
+          RenderBox box,
+          double maxWidth,
+        ) {
+          if (box is RenderParagraph) {
+            final RenderParagraph p = box;
+            final TextPainter painter = TextPainter(
+              text: p.text,
+              textAlign: p.textAlign,
+              textDirection: p.textDirection,
+              textScaler: p.textScaler,
+              maxLines: p.maxLines,
+              locale: p.locale,
+              strutStyle: p.strutStyle,
+              textWidthBasis: p.textWidthBasis,
+              textHeightBehavior: p.textHeightBehavior,
+            )..layout(maxWidth: maxWidth);
+
+            final double h = painter.height;
+            final double baseline = painter.computeDistanceToActualBaseline(
+              TextBaseline.alphabetic,
+            );
+            return (painter.width, h, baseline.clamp(0.0, h));
+          }
+
+          final double w = math.min(
+            box.getMaxIntrinsicWidth(double.infinity),
+            maxWidth,
+          );
+          final double h = box.getMaxIntrinsicHeight(maxWidth);
+          // Baseline-at-bottom for non-text.
+          return (w, h, h);
+        }
+
+        final RenderBox childBox = child;
+        var (double childWidth, double childHeight, double baselineDistance) =
+            measure(childBox, childMaxWidth);
 
         double inlineBoxWidth = childWidth + m.horizontal;
         if (inlineX > 0 && inlineX + inlineBoxWidth > available) {
@@ -669,19 +800,17 @@ class RenderHtmlDiv extends RenderBox
             0.0,
             newAvailable - m.horizontal,
           );
-          childWidth = math.min(
-            child.getMaxIntrinsicWidth(double.infinity),
-            newChildMaxWidth,
-          );
-          childHeight = child.getMaxIntrinsicHeight(newChildMaxWidth);
+          final measured = measure(childBox, newChildMaxWidth);
+          childWidth = measured.$1;
+          childHeight = measured.$2;
+          baselineDistance = measured.$3;
           inlineBoxWidth = childWidth + m.horizontal;
         }
 
         inlineX += inlineBoxWidth;
-        // Baseline-at-bottom => ascent accounts for full height; descent is
-        // just the bottom margin.
-        final double ascent = m.top + childHeight;
-        final double descent = m.bottom;
+        final double ascent = m.top + baselineDistance;
+        final double descent =
+            m.bottom + math.max(0.0, childHeight - baselineDistance);
         lineAscent = math.max(lineAscent, ascent);
         lineDescent = math.max(lineDescent, descent);
 
@@ -1017,6 +1146,8 @@ class RenderHtmlDiv extends RenderBox
     double currentY = yOffset;
     double prevBottom = 0;
 
+    _lastLineBaselineFromTop = null;
+
     if (_display == HtmlDisplay.flex) {
       final double? contentHeight = _performFlexLayoutIfPossible(
         contentWidth: contentWidth,
@@ -1107,32 +1238,16 @@ class RenderHtmlDiv extends RenderBox
     bool indentApplied = false;
     double currentLineIndent = 0;
 
-    (double ascent, double descent) applyLineHeight(
-      double ascent,
-      double descent,
-    ) {
-      final double natural = ascent + descent;
-      if (natural <= 0) return (ascent, descent);
-      final HtmlLength? lh = _lineHeight;
-      if (lh == null || lh.isAuto) return (ascent, descent);
-      final double target = lh.resolvePx(reference: natural);
-      if (!target.isFinite) return (ascent, descent);
-      // Follow CSS-like semantics for this engine: `lineHeight` specifies the
-      // minimum line box height. Never shrink below the natural height,
-      // otherwise nested line-heights can cause overlap.
-      if (target <= natural) return (ascent, descent);
-      final double delta = target - natural;
-      final double half = delta / 2.0;
-      return (math.max(0.0, ascent + half), math.max(0.0, descent + half));
-    }
+    final (double strutAscent, double strutDescent) = _computeLineHeightStrut(
+      firstChild,
+      _lineHeight,
+    );
 
     double flushLine({required bool isLastLine}) {
       if (lineChildren.isEmpty) return 0;
 
-      final (double finalAscent, double finalDescent) = applyLineHeight(
-        lineAscent,
-        lineDescent,
-      );
+      final double finalAscent = math.max(lineAscent, strutAscent);
+      final double finalDescent = math.max(lineDescent, strutDescent);
 
       final double lineHeight = finalAscent + finalDescent;
       final double availableWidth = math.max(
@@ -1155,6 +1270,7 @@ class RenderHtmlDiv extends RenderBox
       }
 
       final double baselineY = currentY + finalAscent;
+      _lastLineBaselineFromTop = baselineY;
       for (int i = 0; i < lineChildren.length; i++) {
         final RenderBox c = lineChildren[i];
         final HtmlDivParentData pd = c.parentData as HtmlDivParentData;

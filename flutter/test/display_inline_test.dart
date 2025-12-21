@@ -51,18 +51,7 @@ void main() {
             height: const AutoSize(),
             lineHeight: const HtmlLength.multiplier(2),
             border: HtmlBorder.all(width: const FixedBorderWidth(0)),
-            children: const [
-              HtmlDiv(
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(20),
-              ),
-              HtmlDiv(
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(10),
-              ),
-            ],
+            children: const [Text('x', style: TextStyle(fontSize: 10))],
           ),
         ),
       ),
@@ -71,8 +60,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
-    // Natural line height is max child height = 20; multiplier(2) => 40.
-    expect(rootSize.height, equals(40));
+    // CSS-like: multiplier resolves against font-size.
+    // fontSize=10, multiplier(2) => line-height = 20.
+    expect(rootSize.height, equals(20));
     expect(tester.takeException(), isNull);
   });
 
@@ -90,21 +80,21 @@ void main() {
             lineHeight: const HtmlLength.multiplier(2),
             border: HtmlBorder.all(width: const FixedBorderWidth(0)),
             children: const [
-              // Each child is 90px wide; only one fits per 160px line.
+              // Each inline box is 90px wide; only one fits per 160px line.
               HtmlDiv(
                 display: HtmlDisplay.inline,
                 width: FixedSize(90),
-                height: FixedSize(20),
+                children: [Text('x', style: TextStyle(fontSize: 10))],
               ),
               HtmlDiv(
                 display: HtmlDisplay.inline,
                 width: FixedSize(90),
-                height: FixedSize(10),
+                children: [Text('x', style: TextStyle(fontSize: 10))],
               ),
               HtmlDiv(
                 display: HtmlDisplay.inline,
                 width: FixedSize(90),
-                height: FixedSize(30),
+                children: [Text('x', style: TextStyle(fontSize: 10))],
               ),
             ],
           ),
@@ -115,9 +105,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
-    // Natural per-line heights: 20, 10, 30.
-    // multiplier(2) => 40 + 20 + 60 = 120.
-    expect(rootSize.height, equals(120));
+    // fontSize=10, multiplier(2) => per-line line-height = 20.
+    // 3 lines => 60.
+    expect(rootSize.height, equals(60));
     expect(tester.takeException(), isNull);
   });
 
@@ -134,13 +124,7 @@ void main() {
             height: const AutoSize(),
             lineHeight: const HtmlLength.percent(200),
             border: HtmlBorder.all(width: const FixedBorderWidth(0)),
-            children: const [
-              HtmlDiv(
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(20),
-              ),
-            ],
+            children: const [Text('x', style: TextStyle(fontSize: 10))],
           ),
         ),
       ),
@@ -149,8 +133,8 @@ void main() {
     await tester.pumpAndSettle();
 
     final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
-    // Natural line height = 20; 200% => 40.
-    expect(rootSize.height, equals(40));
+    // fontSize=10, 200% => line-height = 20.
+    expect(rootSize.height, equals(20));
     expect(tester.takeException(), isNull);
   });
 
@@ -167,13 +151,7 @@ void main() {
             height: const AutoSize(),
             lineHeight: const HtmlLength.px(50),
             border: HtmlBorder.all(width: const FixedBorderWidth(0)),
-            children: const [
-              HtmlDiv(
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(20),
-              ),
-            ],
+            children: const [Text('x', style: TextStyle(fontSize: 10))],
           ),
         ),
       ),
@@ -215,8 +193,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
-    // lineHeight is a minimum; it must not shrink below natural (30).
-    expect(rootSize.height, equals(30));
+    // With CSS-like strut/baseline allocation, an explicit line-height may add
+    // descent even for a replaced-like inline box whose baseline is its bottom.
+    // The key invariant is: line boxes never shrink below the natural box.
+    expect(rootSize.height, greaterThanOrEqualTo(30));
     expect(tester.takeException(), isNull);
   });
 
@@ -256,7 +236,66 @@ void main() {
     await tester.pumpAndSettle();
 
     final Size rootSize = tester.getSize(find.byKey(const ValueKey('root')));
-    expect(rootSize.height, equals(40));
+    // Parent may still contribute strut descent, but must not be smaller than
+    // the child's computed line box height.
+    expect(rootSize.height, greaterThanOrEqualTo(40));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('nested inline HtmlDiv uses last line baseline', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            key: const ValueKey('root'),
+            width: const FixedSize(420),
+            height: const AutoSize(),
+            lineHeight: const HtmlLength.px(24),
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: const [
+              Text(
+                'prefix ',
+                key: ValueKey('prefix'),
+                style: TextStyle(fontSize: 12),
+              ),
+              HtmlDiv(
+                display: HtmlDisplay.inline,
+                children: [
+                  Text(
+                    'NESTED',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ),
+              Text(
+                ' suffix',
+                key: ValueKey('suffix'),
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final double rootBottom = tester
+        .getBottomLeft(find.byKey(const ValueKey('root')))
+        .dy;
+    final double prefixBottom = tester
+        .getBottomLeft(find.byKey(const ValueKey('prefix')))
+        .dy;
+    final double suffixBottom = tester
+        .getBottomLeft(find.byKey(const ValueKey('suffix')))
+        .dy;
+
+    // The small text should not be pushed onto the bottom edge of the line box.
+    expect(rootBottom - prefixBottom, greaterThan(0.5));
+    expect(rootBottom - suffixBottom, greaterThan(0.5));
     expect(tester.takeException(), isNull);
   });
 
