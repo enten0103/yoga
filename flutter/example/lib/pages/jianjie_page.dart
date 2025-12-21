@@ -43,14 +43,20 @@ class JianjiePage extends StatelessWidget {
               ),
               HtmlDiv(),
               HtmlDiv(
+                padding: HtmlPadding.only(
+                  left: HtmlLength.px(12),
+                  bottom: HtmlLength.px(2),
+                ),
                 lineHeight: HtmlLength.px(24),
                 children: [_ParagraphBlock(_p1)],
               ),
               HtmlDiv(
+                padding: HtmlPadding.only(left: HtmlLength.px(12)),
                 lineHeight: HtmlLength.px(24),
                 children: [_ParagraphBlock(_p2)],
               ),
               HtmlDiv(
+                padding: HtmlPadding.only(left: HtmlLength.px(12)),
                 lineHeight: HtmlLength.px(24),
                 children: [_EmphasisBlock(_p3)],
               ),

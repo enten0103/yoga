@@ -1465,7 +1465,7 @@ class RenderHtmlDiv extends RenderBox
     } else {
       // auto height depends on boxSizing.
       sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
-          ? (contentHeight + borderVertical)
+          ? (contentHeight + borderVertical + paddingVertical)
           : contentHeight;
     }
 
@@ -1476,7 +1476,7 @@ class RenderHtmlDiv extends RenderBox
     if (_boxSizing == HtmlBoxSizing.borderBox) {
       borderBoxHeight = sizingHeight;
     } else {
-      borderBoxHeight = sizingHeight + borderVertical;
+      borderBoxHeight = sizingHeight + borderVertical + paddingVertical;
     }
     borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
 

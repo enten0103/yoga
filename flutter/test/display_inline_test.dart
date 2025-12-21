@@ -1012,4 +1012,126 @@ void main() {
     expect(parent.size.height, greaterThanOrEqualTo(36));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'block vertical padding contributes to auto height (content-box)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: HtmlDiv(
+              width: FixedSize(200),
+              height: AutoSize(),
+              children: [
+                HtmlDiv(
+                  key: ValueKey('padded'),
+                  padding: HtmlPadding.only(
+                    top: HtmlLength.px(10),
+                    bottom: HtmlLength.px(20),
+                  ),
+                  children: [
+                    SizedBox(key: ValueKey('inner'), width: 40, height: 30),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Size paddedSize = tester.getSize(
+        find.byKey(const ValueKey('padded')),
+      );
+      expect(paddedSize.height, equals(60));
+
+      final Offset paddedTop = tester.getTopLeft(
+        find.byKey(const ValueKey('padded')),
+      );
+      final Offset innerTop = tester.getTopLeft(
+        find.byKey(const ValueKey('inner')),
+      );
+      expect(innerTop.dy - paddedTop.dy, equals(10));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'block vertical padding contributes to auto height (border-box)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: HtmlDiv(
+              width: FixedSize(200),
+              height: AutoSize(),
+              children: [
+                HtmlDiv(
+                  key: ValueKey('padded'),
+                  boxSizing: HtmlBoxSizing.borderBox,
+                  padding: HtmlPadding.only(
+                    top: HtmlLength.px(10),
+                    bottom: HtmlLength.px(20),
+                  ),
+                  children: [
+                    SizedBox(key: ValueKey('inner'), width: 40, height: 30),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Size paddedSize = tester.getSize(
+        find.byKey(const ValueKey('padded')),
+      );
+      expect(paddedSize.height, equals(60));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('block bottom padding prevents following siblings overlap', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: HtmlDiv(
+            width: FixedSize(200),
+            height: AutoSize(),
+            children: [
+              HtmlDiv(
+                key: ValueKey('padded'),
+                padding: HtmlPadding.only(
+                  top: HtmlLength.px(10),
+                  bottom: HtmlLength.px(20),
+                ),
+                children: [
+                  SizedBox(key: ValueKey('inner'), width: 40, height: 30),
+                ],
+              ),
+              SizedBox(key: ValueKey('after'), width: 10, height: 5),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Rect innerRect = tester.getRect(find.byKey(const ValueKey('inner')));
+    final Rect afterRect = tester.getRect(find.byKey(const ValueKey('after')));
+
+    // The following sibling should start after the padded box's padding-bottom.
+    // innerRect.bottom is at padding-top + child height; add padding-bottom.
+    expect(afterRect.top, closeTo(innerRect.bottom + 20, 0.001));
+    expect(tester.takeException(), isNull);
+  });
 }
