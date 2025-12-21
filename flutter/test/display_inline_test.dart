@@ -765,26 +765,29 @@ void main() {
       Directionality(
         textDirection: TextDirection.ltr,
         child: Center(
-          child: HtmlDiv(
-            key: const ValueKey('parentIndentPercent'),
-            width: const FixedSize(200),
-            height: const AutoSize(),
-            textIndent: const HtmlLength.percent(10),
-            textAlign: HtmlTextAlign.center,
-            children: const [
-              HtmlDiv(
-                key: ValueKey('a'),
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(20),
-              ),
-              HtmlDiv(
-                key: ValueKey('b'),
-                display: HtmlDisplay.inline,
-                width: FixedSize(50),
-                height: FixedSize(20),
-              ),
-            ],
+          child: SizedBox(
+            width: 200,
+            child: HtmlDiv(
+              key: const ValueKey('parentIndentPercent'),
+              width: const FixedSize(200),
+              height: const AutoSize(),
+              textIndent: const HtmlLength.percent(10),
+              textAlign: HtmlTextAlign.center,
+              children: const [
+                HtmlDiv(
+                  key: ValueKey('a'),
+                  display: HtmlDisplay.inline,
+                  width: FixedSize(50),
+                  height: FixedSize(20),
+                ),
+                HtmlDiv(
+                  key: ValueKey('b'),
+                  display: HtmlDisplay.inline,
+                  width: FixedSize(50),
+                  height: FixedSize(20),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -801,6 +804,262 @@ void main() {
     expect(aTop.dx - parentTop.dx, equals(60));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'text-indent percent resolves against containing block width (not reduced by padding)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: HtmlDiv(
+              width: const FixedSize(200),
+              height: const AutoSize(),
+              children: const [
+                HtmlDiv(
+                  key: ValueKey('subjectIndentPercentPadding'),
+                  width: FixedSize(200),
+                  height: AutoSize(),
+                  boxSizing: HtmlBoxSizing.borderBox,
+                  padding: HtmlPadding.symmetric(horizontal: HtmlLength.px(20)),
+                  textIndent: HtmlLength.percent(10),
+                  children: [
+                    HtmlDiv(
+                      key: ValueKey('a'),
+                      display: HtmlDisplay.inline,
+                      width: FixedSize(50),
+                      height: FixedSize(20),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Offset subjectTop = tester.getTopLeft(
+        find.byKey(const ValueKey('subjectIndentPercentPadding')),
+      );
+      final Offset aTop = tester.getTopLeft(find.byKey(const ValueKey('a')));
+
+      // containing block width = 200, indent = 10% => 20.
+      // plus padding-left=20 => local start should be 40.
+      expect(aTop.dx - subjectTop.dx, equals(40));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('text-indent percent can cause wrapping on the first line only', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: SizedBox(
+            width: 100,
+            child: HtmlDiv(
+              key: ValueKey('parentIndentPercentWrap'),
+              width: FixedSize(100),
+              height: AutoSize(),
+              textIndent: HtmlLength.percent(50),
+              children: [
+                HtmlDiv(
+                  key: ValueKey('first'),
+                  display: HtmlDisplay.inline,
+                  width: FixedSize(40),
+                  height: FixedSize(20),
+                ),
+                HtmlDiv(
+                  key: ValueKey('second'),
+                  display: HtmlDisplay.inline,
+                  width: FixedSize(40),
+                  height: FixedSize(20),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Offset parentTop = tester.getTopLeft(
+      find.byKey(const ValueKey('parentIndentPercentWrap')),
+    );
+    final Offset firstTop = tester.getTopLeft(
+      find.byKey(const ValueKey('first')),
+    );
+    final Offset secondTop = tester.getTopLeft(
+      find.byKey(const ValueKey('second')),
+    );
+
+    // width=100, indent=50% => 50.
+    expect(firstTop.dx - parentTop.dx, equals(50));
+    // Second wraps and should not be indented.
+    expect(secondTop.dy, greaterThan(firstTop.dy));
+    expect(secondTop.dx - parentTop.dx, equals(0));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'text-indent percent interacts with padding and wrapping (border-box)',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 200,
+              child: HtmlDiv(
+                key: ValueKey('parentIndentPercentPaddingWrap'),
+                width: FixedSize(200),
+                height: AutoSize(),
+                boxSizing: HtmlBoxSizing.borderBox,
+                padding: HtmlPadding.symmetric(horizontal: HtmlLength.px(20)),
+                textIndent: HtmlLength.percent(50),
+                children: [
+                  HtmlDiv(
+                    key: ValueKey('first'),
+                    display: HtmlDisplay.inline,
+                    width: FixedSize(50),
+                    height: FixedSize(20),
+                  ),
+                  HtmlDiv(
+                    key: ValueKey('second'),
+                    display: HtmlDisplay.inline,
+                    width: FixedSize(50),
+                    height: FixedSize(20),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Offset parentTop = tester.getTopLeft(
+        find.byKey(const ValueKey('parentIndentPercentPaddingWrap')),
+      );
+      final Offset firstTop = tester.getTopLeft(
+        find.byKey(const ValueKey('first')),
+      );
+      final Offset secondTop = tester.getTopLeft(
+        find.byKey(const ValueKey('second')),
+      );
+
+      // containing block width=200, indent=50% => 100.
+      // plus padding-left=20 => first local start should be 120.
+      expect(firstTop.dx - parentTop.dx, equals(120));
+      // Second wraps and should start at padding-left.
+      expect(secondTop.dy, greaterThan(firstTop.dy));
+      expect(secondTop.dx - parentTop.dx, equals(20));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('text-indent supports negative values (px)', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Center(
+          child: SizedBox(
+            width: 200,
+            child: HtmlDiv(
+              key: ValueKey('parentIndentNegative'),
+              width: FixedSize(200),
+              height: AutoSize(),
+              textIndent: HtmlLength.px(-20),
+              children: [
+                HtmlDiv(
+                  key: ValueKey('a'),
+                  display: HtmlDisplay.inline,
+                  width: FixedSize(50),
+                  height: FixedSize(20),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    final Offset parentTop = tester.getTopLeft(
+      find.byKey(const ValueKey('parentIndentNegative')),
+    );
+    final Offset aTop = tester.getTopLeft(find.byKey(const ValueKey('a')));
+    expect(aTop.dx - parentTop.dx, equals(-20));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'inline maxIntrinsicHeight matches layout height when wrapping (percent text-indent + padding)',
+    (WidgetTester tester) async {
+      const Key subjectKey = ValueKey('subjectIndentPercentPaddingIntrinsic');
+      const Key recorderKey = ValueKey('recorderIndentPercentPaddingIntrinsic');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 200,
+              child: _IntrinsicHeightRecorder(
+                key: recorderKey,
+                child: HtmlDiv(
+                  key: subjectKey,
+                  display: HtmlDisplay.inline,
+                  width: const FixedSize(200),
+                  height: const AutoSize(),
+                  boxSizing: HtmlBoxSizing.borderBox,
+                  padding: const HtmlPadding.symmetric(
+                    horizontal: HtmlLength.px(20),
+                  ),
+                  textIndent: const HtmlLength.percent(50),
+                  children: const [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      width: FixedSize(50),
+                      height: FixedSize(10),
+                    ),
+                    Text(
+                      key: ValueKey('text'),
+                      'word word word word word',
+                      softWrap: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final RenderBox subject = tester.renderObject(find.byKey(subjectKey));
+      final _RenderIntrinsicHeightRecorder recorder = tester.renderObject(
+        find.byKey(recorderKey),
+      );
+
+      expect(recorder.recordedMaxIntrinsicHeight, isNotNull);
+      expect(
+        (recorder.recordedMaxIntrinsicHeight! - subject.size.height).abs(),
+        lessThan(0.01),
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('FitContent inline clamps to available width and wraps inside', (
     WidgetTester tester,

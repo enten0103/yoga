@@ -710,10 +710,13 @@ class RenderHtmlDiv extends RenderBox
     double width,
     HtmlLength? lineHeight,
     HtmlLength textIndent,
+    double indentReferenceWidth,
   ) {
     if (!width.isFinite || width <= 0) return 0;
 
-    final double indentPx = textIndent.resolvePx(reference: width);
+    final double indentPx = textIndent.isPercent
+        ? textIndent.resolvePx(reference: indentReferenceWidth)
+        : textIndent.resolvePx(reference: width);
     bool indentApplied = false;
     double currentLineIndent = 0;
 
@@ -928,6 +931,7 @@ class RenderHtmlDiv extends RenderBox
           referenceWidth,
           _lineHeight,
           _textIndent,
+          width.isFinite ? width : 0.0,
         );
       } else {
         double prevBottom = 0;
@@ -971,6 +975,7 @@ class RenderHtmlDiv extends RenderBox
           referenceWidth,
           _lineHeight,
           _textIndent,
+          width.isFinite ? width : 0.0,
         );
       } else {
         double prevBottom = 0;
@@ -1234,7 +1239,11 @@ class RenderHtmlDiv extends RenderBox
     double lineAscent = 0;
     double lineDescent = 0;
 
-    final double indentPx = _textIndent.resolvePx(reference: contentWidth);
+    final double indentPx = _textIndent.isPercent
+        ? (availableBorderBoxWidth.isFinite
+              ? _textIndent.resolvePx(reference: availableBorderBoxWidth)
+              : 0.0)
+        : _textIndent.resolvePx(reference: contentWidth);
     bool indentApplied = false;
     double currentLineIndent = 0;
 
