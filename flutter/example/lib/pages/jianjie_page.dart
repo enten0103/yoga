@@ -36,29 +36,57 @@ class JianjiePage extends StatelessWidget {
               right: HtmlLength.px(16),
               top: HtmlLength.px(12),
             ),
-            children: const [
+            children: [
               HtmlDiv(
                 lineHeight: HtmlLength.px(24),
-                children: [_TitleBlock('简介')],
+                children: const [_TitleBlock('简介')],
               ),
               HtmlDiv(),
+
+              // Paragraph blocks (p-like): HtmlDiv as the element node,
+              // HtmlText as the text node.
               HtmlDiv(
+                display: HtmlDisplay.block,
                 padding: HtmlPadding.only(
                   left: HtmlLength.px(12),
                   bottom: HtmlLength.px(2),
                 ),
                 lineHeight: HtmlLength.px(24),
-                children: [_ParagraphBlock(_p1)],
+                margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
+                children: [
+                  HtmlText(
+                    _p1,
+                    style: const TextStyle(fontSize: 16, height: 1.7),
+                  ),
+                ],
               ),
               HtmlDiv(
+                display: HtmlDisplay.block,
                 padding: HtmlPadding.only(left: HtmlLength.px(12)),
                 lineHeight: HtmlLength.px(24),
-                children: [_ParagraphBlock(_p2)],
+                margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
+                children: [
+                  HtmlText(
+                    _p2,
+                    style: const TextStyle(fontSize: 16, height: 1.7),
+                  ),
+                ],
               ),
               HtmlDiv(
+                display: HtmlDisplay.block,
                 padding: HtmlPadding.only(left: HtmlLength.px(12)),
                 lineHeight: HtmlLength.px(24),
-                children: [_EmphasisBlock(_p3)],
+                margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
+                children: [
+                  HtmlText(
+                    _p3,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.7,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -75,53 +103,14 @@ class _TitleBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return HtmlDiv(
-      display: HtmlDisplay.inline,
+      display: HtmlDisplay.block,
+      textAlign: HtmlTextAlign.center,
       lineHeight: HtmlLength.px(24),
       margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
       children: [
-        Text(
+        HtmlText(
           text,
           style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700),
-          textAlign: TextAlign.center,
-        ),
-      ],
-    );
-  }
-}
-
-class _ParagraphBlock extends StatelessWidget {
-  final String text;
-  const _ParagraphBlock(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return HtmlDiv(
-      display: HtmlDisplay.inline,
-      lineHeight: HtmlLength.px(24),
-      margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
-      children: [Text(text, style: const TextStyle(fontSize: 16, height: 1.7))],
-    );
-  }
-}
-
-class _EmphasisBlock extends StatelessWidget {
-  final String text;
-  const _EmphasisBlock(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return HtmlDiv(
-      display: HtmlDisplay.inline,
-      lineHeight: HtmlLength.px(24),
-      margin: const HtmlMargin.only(bottom: HtmlLength.px(12)),
-      children: [
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            height: 1.7,
-            fontWeight: FontWeight.w700,
-          ),
         ),
       ],
     );

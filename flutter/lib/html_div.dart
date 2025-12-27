@@ -27,6 +27,10 @@ part 'src/html_div/widgets.dart';
 
 // Public render objects
 part 'src/html_div/renders/html_image.dart';
+part 'src/html_div/renders/html_text.dart';
+
+// Public measurement helpers
+part 'src/html_div/text_measure.dart';
 
 // RenderHtmlDiv functional areas
 part 'src/html_div/renders/html_div_border_paint.dart';
@@ -40,6 +44,18 @@ part 'src/html_div/renders/html_div_layout_yoga.dart';
 // The rest of RenderHtmlDiv implementation continues below.
 
 class HtmlDivParentData extends ContainerBoxParentData<RenderBox> {}
+
+class _ParagraphRun {
+  _ParagraphRun({
+    required this.painter,
+    required this.offset,
+    required this.height,
+  });
+
+  final TextPainter painter;
+  final Offset offset;
+  final double height;
+}
 
 class RenderHtmlDiv extends RenderBox
     with
@@ -63,6 +79,10 @@ class RenderHtmlDiv extends RenderBox
   HtmlTextAlign _textAlign;
   HtmlLength? _lineHeight;
   HtmlLength _textIndent;
+
+  // Ephemeral, px indent passed from a parent block container to a transparent
+  // inline wrapper, so text-indent can apply to nested inline content.
+  final double _inheritedFirstLineIndentPx = 0.0;
   HtmlMargin? _margin;
   HtmlPadding? _padding;
   HtmlBorder? _border;
@@ -92,6 +112,18 @@ class RenderHtmlDiv extends RenderBox
   EdgeInsets _computedPadding = EdgeInsets.zero;
 
   double? _lastLineBaselineFromTop;
+
+  // When display != flex, we use a paragraph-style inline formatter powered by
+  // TextPainter + placeholder spans (WidgetSpan-like). This provides much more
+  // browser-like wrapping and baseline behavior than the legacy line-assembly
+  // algorithm.
+  bool _usingParagraphInlineLayout = false;
+  TextPainter? _paragraphTextPainter;
+  final List<RenderBox> _paragraphPlaceholderChildren = <RenderBox>[];
+  Offset _paragraphContentOffset = Offset.zero;
+
+  // Paragraph runs for block layout (each corresponds to a contiguous inline-run).
+  final List<_ParagraphRun> _paragraphRuns = <_ParagraphRun>[];
 
   RenderHtmlDiv({
     required HtmlSize width,
@@ -148,6 +180,368 @@ class RenderHtmlDiv extends RenderBox
        _transform = transform,
        _imageConfiguration = imageConfiguration,
        _boxSizing = boxSizing;
+
+  static final RegExp _breakAllWhitespaceRegExp = RegExp(r'\s');
+
+  String _breakAllTextIfNeeded(String s) {
+    // Prefer normal whitespace wrapping when there are break opportunities.
+    // For long unbroken runs, add zero-width break points so trailing text
+    // can still consume remaining line space (CSS-like break-all).
+    if (s.length <= 1) return s;
+    if (s.contains(_breakAllWhitespaceRegExp)) return s;
+    if (s.contains('\u200B')) return s;
+    return s.characters.join('\u200B');
+  }
+
+  _ParagraphRun _layoutParagraphRun({
+    required List<RenderBox> runChildren,
+    required double contentWidth,
+    required double xOffset,
+    required double yTop,
+    required double? childContentMaxHeight,
+    required double firstLineIndentPx,
+  }) {
+    RenderHtmlText? findFirstTextInSubtree(RenderBox root) {
+      if (root is RenderHtmlText) return root;
+      if (root is RenderHtmlDiv) {
+        RenderBox? c = root.firstChild;
+        while (c != null) {
+          final RenderHtmlText? found = findFirstTextInSubtree(c);
+          if (found != null) return found;
+          final HtmlDivParentData pd = c.parentData as HtmlDivParentData;
+          c = pd.nextSibling;
+        }
+      }
+      return null;
+    }
+
+    RenderHtmlText? findFirstTextInRun() {
+      for (final RenderBox c in runChildren) {
+        final RenderHtmlText? t = findFirstTextInSubtree(c);
+        if (t != null) return t;
+      }
+      return null;
+    }
+
+    final RenderHtmlText? firstText = findFirstTextInRun();
+    final TextDirection textDirection =
+        firstText?.textDirection ?? TextDirection.ltr;
+
+    final TextStyle defaultStyle = firstText?.style ?? const TextStyle();
+
+    final TextScaler textScaler = firstText?.textScaler ?? TextScaler.noScaling;
+    final Locale? locale = firstText?.locale;
+    final TextWidthBasis textWidthBasis =
+        firstText?.textWidthBasis ?? TextWidthBasis.parent;
+    final TextHeightBehavior? textHeightBehavior =
+        firstText?.textHeightBehavior;
+    final int? maxLines = firstText?.maxLines;
+
+    StrutStyle? strutStyle = firstText?.strutStyle;
+    if (_lineHeight != null) {
+      final double baseFontSize = defaultStyle.fontSize ?? 14.0;
+      final double lhPx = _lineHeight!.resolvePx(reference: baseFontSize);
+      if (lhPx.isFinite && lhPx > 0) {
+        strutStyle = StrutStyle(
+          fontSize: baseFontSize,
+          height: lhPx / baseFontSize,
+          forceStrutHeight: true,
+        );
+      }
+    }
+
+    final TextAlign textAlign = switch (_textAlign) {
+      HtmlTextAlign.start => TextAlign.start,
+      HtmlTextAlign.center => TextAlign.center,
+      HtmlTextAlign.end => TextAlign.end,
+      HtmlTextAlign.justify => TextAlign.justify,
+    };
+
+    final List<InlineSpan> spanChildren = <InlineSpan>[];
+    final List<PlaceholderDimensions> placeholderDims =
+        <PlaceholderDimensions>[];
+    final List<RenderBox> placeholderChildren = <RenderBox>[];
+    final List<EdgeInsets> placeholderMargins = <EdgeInsets>[];
+    final List<(RenderHtmlText child, int start, int end)> textSegments =
+        <(RenderHtmlText, int, int)>[];
+
+    int paragraphOffset = 0;
+
+    if (firstLineIndentPx > 0) {
+      spanChildren.add(
+        const WidgetSpan(
+          child: SizedBox.shrink(),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+        ),
+      );
+      placeholderDims.add(
+        PlaceholderDimensions(
+          size: Size(firstLineIndentPx, 0),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          baselineOffset: 0,
+        ),
+      );
+      paragraphOffset += 1;
+    }
+
+    final BoxConstraints baseConstraints = childContentMaxHeight == null
+        ? BoxConstraints(maxWidth: contentWidth)
+        : BoxConstraints(
+            maxWidth: contentWidth,
+            maxHeight: childContentMaxHeight,
+          );
+
+    for (final RenderBox child in runChildren) {
+      final HtmlDivParentData pd = child.parentData as HtmlDivParentData;
+
+      if (child is RenderHtmlText) {
+        child.setPaintDisabledByParentParagraph(true);
+        child.clearParagraphBaselineOverrides();
+        child.setParagraphDebugLineCount(null);
+
+        child.layout(baseConstraints, parentUsesSize: true);
+
+        final String paragraphText = _breakAllTextIfNeeded(child.data);
+        final int start = paragraphOffset;
+        final int end = start + paragraphText.length;
+        textSegments.add((child, start, end));
+        paragraphOffset = end;
+
+        spanChildren.add(
+          TextSpan(
+            text: paragraphText,
+            style: child.style,
+            semanticsLabel: child.semanticsLabel,
+          ),
+        );
+        // We'll set pd.offset after paragraph layout.
+        pd.offset = const Offset(-1e9, -1e9);
+      } else {
+        final EdgeInsets m = _resolveChildMargin(child, contentWidth);
+        final double childMaxWidth = math.max(0.0, contentWidth - m.horizontal);
+        final BoxConstraints childConstraints = childContentMaxHeight == null
+            ? BoxConstraints(maxWidth: childMaxWidth)
+            : BoxConstraints(
+                maxWidth: childMaxWidth,
+                maxHeight: childContentMaxHeight,
+              );
+        child.layout(childConstraints, parentUsesSize: true);
+
+        placeholderChildren.add(child);
+        placeholderMargins.add(m);
+        spanChildren.add(
+          const WidgetSpan(
+            child: SizedBox.shrink(),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+          ),
+        );
+        placeholderDims.add(
+          PlaceholderDimensions(
+            size: Size(
+              child.size.width + m.horizontal,
+              child.size.height + m.vertical,
+            ),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            baselineOffset: m.top + child.size.height,
+          ),
+        );
+        paragraphOffset += 1;
+        // Placeholder children will be positioned by inlinePlaceholderBoxes.
+      }
+    }
+
+    final TextPainter painter = TextPainter(
+      text: TextSpan(children: spanChildren, style: defaultStyle),
+      textAlign: textAlign,
+      textDirection: textDirection,
+      textScaler: textScaler,
+      maxLines: maxLines,
+      locale: locale,
+      textWidthBasis: textWidthBasis,
+      textHeightBehavior: textHeightBehavior,
+      strutStyle: strutStyle,
+    );
+    painter.setPlaceholderDimensions(placeholderDims);
+    painter.layout(
+      maxWidth: contentWidth.isFinite ? contentWidth : double.infinity,
+    );
+
+    final List<LineMetrics> metrics = painter.computeLineMetrics();
+
+    // If this paragraph run is only a single HtmlText (plus optional indent placeholder),
+    // we can directly expose the paragraph's line count via the text render box for tests.
+    if (textSegments.length == 1 && placeholderChildren.isEmpty) {
+      textSegments.first.$1.setParagraphDebugLineCount(metrics.length);
+    }
+
+    double lineStartOffsetX(int lineIndex) {
+      if (metrics.isEmpty) return 0.0;
+      final LineMetrics m = metrics[lineIndex.clamp(0, metrics.length - 1)];
+      final double lineWidth = m.width;
+      final bool isRtl = textDirection == TextDirection.rtl;
+
+      double alignOffset;
+      switch (textAlign) {
+        case TextAlign.center:
+          alignOffset = (contentWidth - lineWidth) / 2.0;
+          break;
+        case TextAlign.right:
+          alignOffset = contentWidth - lineWidth;
+          break;
+        case TextAlign.left:
+          alignOffset = 0.0;
+          break;
+        case TextAlign.end:
+          alignOffset = isRtl ? 0.0 : (contentWidth - lineWidth);
+          break;
+        case TextAlign.start:
+          alignOffset = isRtl ? (contentWidth - lineWidth) : 0.0;
+          break;
+        case TextAlign.justify:
+          alignOffset = 0.0;
+          break;
+      }
+
+      // Support negative text-indent by shifting the first formatted line.
+      // Positive indent is represented via the leading placeholder.
+      if (lineIndex == 0 && firstLineIndentPx < 0) {
+        alignOffset += firstLineIndentPx;
+      }
+
+      return alignOffset;
+    }
+
+    // In mixed inline paragraphs that include placeholders (WidgetSpan-like),
+    // some engines treat a leading placeholder as a paragraph-left padding,
+    // effectively shifting ALL lines. We want CSS-like semantics:
+    // - positive text-indent affects only the first formatted line
+    // - subsequent lines should not be shifted
+    double positiveIndentCorrectionForLine(int lineIndex) {
+      if (firstLineIndentPx <= 0) return 0.0;
+      // Only needed for mixed paragraphs that include BOTH text and
+      // placeholders. Placeholder-only paragraphs already behave correctly.
+      if (textSegments.isEmpty || placeholderChildren.isEmpty) return 0.0;
+      return lineIndex == 0 ? 0.0 : -firstLineIndentPx;
+    }
+
+    int findLineIndexForBox(TextBox b) {
+      if (metrics.isEmpty) return 0;
+      final double y = (b.top + b.bottom) / 2.0;
+      for (int i = 0; i < metrics.length; i++) {
+        final LineMetrics m = metrics[i];
+        final double top = m.baseline - m.ascent;
+        final double bottom = m.baseline + m.descent;
+        if (y >= top - 0.01 && y <= bottom + 0.01) return i;
+      }
+      int best = 0;
+      double bestDist = double.infinity;
+      for (int i = 0; i < metrics.length; i++) {
+        final double dist = (metrics[i].baseline - y).abs();
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = i;
+        }
+      }
+      return best;
+    }
+
+    final List<TextBox>? boxes = painter.inlinePlaceholderBoxes;
+    if (boxes != null) {
+      int boxIndex = 0;
+      if (firstLineIndentPx > 0) {
+        boxIndex++;
+      }
+      for (int i = 0; i < placeholderChildren.length; i++) {
+        final RenderBox ph = placeholderChildren[i];
+        final EdgeInsets m = placeholderMargins[i];
+        final HtmlDivParentData pd = ph.parentData as HtmlDivParentData;
+        final TextBox b = boxes[boxIndex++];
+        final int lineIndex = findLineIndexForBox(b);
+        final double lineLeft = lineStartOffsetX(lineIndex);
+        final double indentCorrection = positiveIndentCorrectionForLine(
+          lineIndex,
+        );
+        pd.offset = Offset(
+          xOffset + lineLeft + b.left + indentCorrection + m.left,
+          yTop + b.top + m.top,
+        );
+      }
+    }
+
+    for (final (RenderHtmlText t, int start, int end) in textSegments) {
+      final HtmlDivParentData pd = t.parentData as HtmlDivParentData;
+      if (start == end) {
+        pd.offset = Offset(xOffset, yTop);
+        continue;
+      }
+
+      final List<TextBox> tBoxes = painter.getBoxesForSelection(
+        TextSelection(baseOffset: start, extentOffset: end),
+      );
+      if (tBoxes.isEmpty) {
+        final Offset caret = painter.getOffsetForCaret(
+          TextPosition(offset: start),
+          Rect.zero,
+        );
+        pd.offset = Offset(xOffset + caret.dx, yTop + caret.dy);
+        continue;
+      }
+
+      Rect r = tBoxes.first.toRect().shift(
+        Offset(
+          lineStartOffsetX(findLineIndexForBox(tBoxes.first)) +
+              positiveIndentCorrectionForLine(
+                findLineIndexForBox(tBoxes.first),
+              ),
+          0,
+        ),
+      );
+      for (int i = 1; i < tBoxes.length; i++) {
+        final TextBox tb = tBoxes[i];
+        final int lineIndex = findLineIndexForBox(tb);
+        final double lineLeft = lineStartOffsetX(lineIndex);
+        final double indentCorrection = positiveIndentCorrectionForLine(
+          lineIndex,
+        );
+        r = r.expandToInclude(
+          tb.toRect().shift(Offset(lineLeft + indentCorrection, 0)),
+        );
+      }
+
+      final int firstLine = findLineIndexForBox(tBoxes.first);
+      final int lastLine = findLineIndexForBox(tBoxes.last);
+      final double firstBaselineFromTop = metrics.isEmpty
+          ? 0.0
+          : metrics[firstLine].baseline - r.top;
+      final double lastBaselineFromTop = metrics.isEmpty
+          ? 0.0
+          : metrics[lastLine].baseline - r.top;
+      t.setParagraphBaselineOverrides(
+        firstLineBaselineFromTop: firstBaselineFromTop,
+        lastLineBaselineFromTop: lastBaselineFromTop,
+      );
+      pd.offset = Offset(xOffset + r.left, yTop + r.top);
+    }
+
+    double runHeight = painter.height;
+    if (textSegments.isEmpty && placeholderDims.isNotEmpty) {
+      double maxPlaceholderHeight = 0.0;
+      for (final PlaceholderDimensions d in placeholderDims) {
+        maxPlaceholderHeight = math.max(maxPlaceholderHeight, d.size.height);
+      }
+      runHeight = math.max(runHeight, maxPlaceholderHeight);
+    }
+
+    return _ParagraphRun(
+      painter: painter,
+      offset: Offset(xOffset, yTop),
+      height: runHeight,
+    );
+  }
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
@@ -419,6 +813,8 @@ class RenderHtmlDiv extends RenderBox
     if (child is RenderHtmlDiv) return child._display;
     // Treat plain text as inline-level content by default (CSS-like).
     if (child is RenderParagraph) return HtmlDisplay.inline;
+    if (child is RenderHtmlText) return HtmlDisplay.inline;
+    if (child is RenderHtmlImage) return HtmlDisplay.inline;
     return HtmlDisplay.block;
   }
 
@@ -842,6 +1238,153 @@ class RenderHtmlDiv extends RenderBox
     return currentY;
   }
 
+  double _inlineParagraphIntrinsicHeight(
+    double contentWidth,
+    double borderBoxWidth,
+  ) {
+    if (!contentWidth.isFinite || contentWidth <= 0) return 0;
+
+    final TextDirection textDirection = (() {
+      RenderBox? c = firstChild;
+      while (c != null) {
+        if (c is RenderHtmlText) return c.textDirection;
+        c = (c.parentData as HtmlDivParentData).nextSibling;
+      }
+      return TextDirection.ltr;
+    })();
+
+    final TextStyle defaultStyle = (() {
+      RenderBox? c = firstChild;
+      while (c != null) {
+        if (c is RenderHtmlText) return c.style ?? const TextStyle();
+        c = (c.parentData as HtmlDivParentData).nextSibling;
+      }
+      return const TextStyle();
+    })();
+
+    final double indentPx = _textIndent.isPercent
+        ? _textIndent.resolvePx(reference: borderBoxWidth)
+        : _textIndent.resolvePx(reference: contentWidth);
+
+    StrutStyle? strutStyle;
+    if (_lineHeight != null) {
+      final double baseFontSize = defaultStyle.fontSize ?? 14.0;
+      final double lhPx = _lineHeight!.resolvePx(reference: baseFontSize);
+      if (lhPx.isFinite && lhPx > 0) {
+        strutStyle = StrutStyle(
+          fontSize: baseFontSize,
+          height: lhPx / baseFontSize,
+          forceStrutHeight: true,
+        );
+      }
+    }
+
+    final TextAlign textAlign = switch (_textAlign) {
+      HtmlTextAlign.start => TextAlign.start,
+      HtmlTextAlign.center => TextAlign.center,
+      HtmlTextAlign.end => TextAlign.end,
+      HtmlTextAlign.justify => TextAlign.justify,
+    };
+
+    final List<InlineSpan> spanChildren = <InlineSpan>[];
+    final List<PlaceholderDimensions> placeholderDims =
+        <PlaceholderDimensions>[];
+    bool hasText = false;
+
+    if (indentPx > 0) {
+      spanChildren.add(
+        const WidgetSpan(
+          child: SizedBox.shrink(),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+        ),
+      );
+      placeholderDims.add(
+        PlaceholderDimensions(
+          size: Size(indentPx, 0),
+          alignment: PlaceholderAlignment.baseline,
+          baseline: TextBaseline.alphabetic,
+          baselineOffset: 0,
+        ),
+      );
+    }
+
+    RenderBox? child = firstChild;
+    while (child != null) {
+      final HtmlDisplay d = _readChildHtmlDisplay(child);
+      if (d != HtmlDisplay.inline) {
+        // Mixed flow: preserve existing intrinsic behavior.
+        return _inlineIntrinsicHeight(
+          firstChild,
+          contentWidth,
+          _lineHeight,
+          _textIndent,
+          borderBoxWidth,
+        );
+      }
+
+      if (child is RenderHtmlText) {
+        hasText = true;
+        final String paragraphText = _breakAllTextIfNeeded(child.data);
+        spanChildren.add(
+          TextSpan(
+            text: paragraphText,
+            style: child.style,
+            semanticsLabel: child.semanticsLabel,
+          ),
+        );
+      } else {
+        final EdgeInsets m = _resolveChildMargin(child, contentWidth);
+        final double childMaxWidth = math.max(0.0, contentWidth - m.horizontal);
+        final double w = math.min(
+          child.getMaxIntrinsicWidth(double.infinity),
+          childMaxWidth,
+        );
+        final double h = child.getMaxIntrinsicHeight(childMaxWidth);
+
+        spanChildren.add(
+          const WidgetSpan(
+            child: SizedBox.shrink(),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+          ),
+        );
+        placeholderDims.add(
+          PlaceholderDimensions(
+            size: Size(w + m.horizontal, h + m.vertical),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            baselineOffset: m.top + h,
+          ),
+        );
+      }
+
+      child = (child.parentData as HtmlDivParentData).nextSibling;
+    }
+
+    final TextPainter painter = TextPainter(
+      text: TextSpan(children: spanChildren, style: defaultStyle),
+      textAlign: textAlign,
+      textDirection: textDirection,
+      textWidthBasis: TextWidthBasis.parent,
+      strutStyle: strutStyle,
+    );
+    painter.setPlaceholderDimensions(placeholderDims);
+    painter.layout(
+      maxWidth: contentWidth.isFinite ? contentWidth : double.infinity,
+    );
+
+    double height = painter.height;
+    if (!hasText && placeholderDims.isNotEmpty) {
+      double maxPlaceholderHeight = 0.0;
+      for (final PlaceholderDimensions d in placeholderDims) {
+        maxPlaceholderHeight = math.max(maxPlaceholderHeight, d.size.height);
+      }
+      height = math.max(height, maxPlaceholderHeight);
+    }
+    return height;
+  }
+
   @override
   double computeMinIntrinsicWidth(double height) {
     EdgeInsets borderW = _calculateBorderWidths(0);
@@ -926,11 +1469,8 @@ class RenderHtmlDiv extends RenderBox
           : 0.0;
 
       if (_display == HtmlDisplay.inline) {
-        contentH = _inlineIntrinsicHeight(
-          firstChild,
+        contentH = _inlineParagraphIntrinsicHeight(
           referenceWidth,
-          _lineHeight,
-          _textIndent,
           width.isFinite ? width : 0.0,
         );
       } else {
@@ -970,11 +1510,8 @@ class RenderHtmlDiv extends RenderBox
           : 0.0;
 
       if (_display == HtmlDisplay.inline) {
-        contentH = _inlineIntrinsicHeight(
-          firstChild,
+        contentH = _inlineParagraphIntrinsicHeight(
           referenceWidth,
-          _lineHeight,
-          _textIndent,
           width.isFinite ? width : 0.0,
         );
       } else {
@@ -1146,12 +1683,358 @@ class RenderHtmlDiv extends RenderBox
       borderBoxWidth - borderHorizontal - paddingHorizontal,
     );
 
+    final double? childContentMaxHeight = (() {
+      double? borderBoxHeight;
+
+      if (_height is FixedSize) {
+        final double h = (_height as FixedSize).value;
+        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? h
+            : (h + borderVertical + paddingVertical);
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        final double h =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? h
+            : (h + borderVertical + paddingVertical);
+      } else if (constraints.hasBoundedHeight) {
+        borderBoxHeight = constraints.maxHeight;
+      } else {
+        return null;
+      }
+
+      final double constrainedBorderBoxHeight = constraints.constrainHeight(
+        borderBoxHeight,
+      );
+      final double contentH = math.max(
+        0.0,
+        constrainedBorderBoxHeight - borderVertical - paddingVertical,
+      );
+      if (!contentH.isFinite) return null;
+      return contentH;
+    })();
+
     double yOffset = _computedBorderWidths.top + _computedPadding.top;
     double xOffset = _computedBorderWidths.left + _computedPadding.left;
     double currentY = yOffset;
     double prevBottom = 0;
 
     _lastLineBaselineFromTop = null;
+
+    // Inline-only switch: for display:inline, optionally use a TextPainter-based
+    // paragraph formatter with placeholder spans.
+    //
+    // IMPORTANT: This intentionally does NOT replace the block formatting
+    // implementation (margin collapsing/stacking/inline runs inside blocks).
+    //
+    if (_display == HtmlDisplay.inline) {
+      _usingParagraphInlineLayout = true;
+      _paragraphPlaceholderChildren.clear();
+
+      final TextDirection textDirection = (() {
+        // Prefer the first HtmlText child's direction if available.
+        RenderBox? c = firstChild;
+        while (c != null) {
+          if (c is RenderHtmlText) return c.textDirection;
+          c = (c.parentData as HtmlDivParentData).nextSibling;
+        }
+        return TextDirection.ltr;
+      })();
+
+      // Compute indent: prefer own textIndent; otherwise allow inherited indent
+      // to flow through transparent wrappers.
+      final double ownIndentPx = _textIndent.isPercent
+          ? _textIndent.resolvePx(reference: availableBorderBoxWidth)
+          : _textIndent.resolvePx(reference: contentWidth);
+      final double indentPx = ownIndentPx != 0.0
+          ? ownIndentPx
+          : _inheritedFirstLineIndentPx;
+
+      final List<InlineSpan> spanChildren = <InlineSpan>[];
+      final List<PlaceholderDimensions> placeholderDims =
+          <PlaceholderDimensions>[];
+      final List<EdgeInsets> placeholderMargins = <EdgeInsets>[];
+
+      // Track text ranges for each RenderHtmlText so we can map back to
+      // per-child offsets and baseline overrides.
+      final List<(RenderHtmlText child, int start, int end)> textSegments =
+          <(RenderHtmlText, int, int)>[];
+      int paragraphOffset = 0;
+
+      // text-indent: model it as a leading placeholder box, which naturally
+      // affects only the first formatted line.
+      if (indentPx > 0) {
+        spanChildren.add(
+          const WidgetSpan(
+            child: SizedBox.shrink(),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+          ),
+        );
+        placeholderDims.add(
+          PlaceholderDimensions(
+            size: Size(indentPx, 0),
+            alignment: PlaceholderAlignment.baseline,
+            baseline: TextBaseline.alphabetic,
+            baselineOffset: 0,
+          ),
+        );
+        // Placeholders occupy one character in the paragraph's plain text.
+        paragraphOffset += 1;
+      }
+
+      // Infer a paragraph base style from the first HtmlText child. This keeps
+      // behavior consistent with the existing engine where HtmlText already
+      // carries an effective (merged) TextStyle.
+      final TextStyle defaultStyle = (() {
+        RenderBox? c = firstChild;
+        while (c != null) {
+          if (c is RenderHtmlText) return c.style ?? const TextStyle();
+          c = (c.parentData as HtmlDivParentData).nextSibling;
+        }
+        return const TextStyle();
+      })();
+
+      StrutStyle? strutStyle;
+      if (_lineHeight != null) {
+        final double baseFontSize = defaultStyle.fontSize ?? 14.0;
+        final double lhPx = _lineHeight!.resolvePx(reference: baseFontSize);
+        if (lhPx.isFinite && lhPx > 0) {
+          strutStyle = StrutStyle(
+            fontSize: baseFontSize,
+            height: lhPx / baseFontSize,
+            forceStrutHeight: true,
+          );
+        }
+      }
+
+      // Build spans and layout placeholder children.
+      RenderBox? child = firstChild;
+      while (child != null) {
+        final HtmlDivParentData pd = child.parentData as HtmlDivParentData;
+
+        if (child is RenderHtmlText) {
+          // Keep the child laid out for debug/measurement parity, but it will
+          // not be painted/positioned by itself in paragraph mode.
+          child.layout(
+            childContentMaxHeight == null
+                ? BoxConstraints(maxWidth: contentWidth)
+                : BoxConstraints(
+                    maxWidth: contentWidth,
+                    maxHeight: childContentMaxHeight,
+                  ),
+            parentUsesSize: true,
+          );
+          // We'll position this child based on its glyph boxes after the
+          // unified paragraph is laid out.
+
+          final String paragraphText = _breakAllTextIfNeeded(child.data);
+
+          final int start = paragraphOffset;
+          final int end = start + paragraphText.length;
+          textSegments.add((child, start, end));
+          paragraphOffset = end;
+
+          spanChildren.add(
+            TextSpan(
+              text: paragraphText,
+              style: child.style,
+              semanticsLabel: child.semanticsLabel,
+            ),
+          );
+        } else {
+          // Any non-text RenderBox participates as a placeholder (WidgetSpan).
+          final EdgeInsets m = _resolveChildMargin(child, contentWidth);
+          final double childMaxWidth = math.max(
+            0.0,
+            contentWidth - m.horizontal,
+          );
+          child.layout(
+            childContentMaxHeight == null
+                ? BoxConstraints(maxWidth: childMaxWidth)
+                : BoxConstraints(
+                    maxWidth: childMaxWidth,
+                    maxHeight: childContentMaxHeight,
+                  ),
+            parentUsesSize: true,
+          );
+
+          _paragraphPlaceholderChildren.add(child);
+          placeholderMargins.add(m);
+          spanChildren.add(
+            const WidgetSpan(
+              child: SizedBox.shrink(),
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+            ),
+          );
+          placeholderDims.add(
+            PlaceholderDimensions(
+              size: Size(
+                child.size.width + m.horizontal,
+                child.size.height + m.vertical,
+              ),
+              alignment: PlaceholderAlignment.baseline,
+              baseline: TextBaseline.alphabetic,
+              // Baseline-at-bottom for non-text boxes.
+              baselineOffset: m.top + child.size.height,
+            ),
+          );
+          // Placeholders occupy one character in the paragraph's plain text.
+          paragraphOffset += 1;
+        }
+
+        child = pd.nextSibling;
+      }
+
+      final TextAlign textAlign = switch (_textAlign) {
+        HtmlTextAlign.start => TextAlign.start,
+        HtmlTextAlign.center => TextAlign.center,
+        HtmlTextAlign.end => TextAlign.end,
+        HtmlTextAlign.justify => TextAlign.justify,
+      };
+
+      final TextPainter painter = TextPainter(
+        text: TextSpan(children: spanChildren, style: defaultStyle),
+        textAlign: textAlign,
+        textDirection: textDirection,
+        textWidthBasis: TextWidthBasis.parent,
+        strutStyle: strutStyle,
+      );
+      painter.setPlaceholderDimensions(placeholderDims);
+      painter.layout(
+        maxWidth: contentWidth.isFinite ? contentWidth : double.infinity,
+      );
+      _paragraphTextPainter = painter;
+      _paragraphContentOffset = Offset(xOffset, yOffset);
+
+      // Position placeholder children.
+      final List<TextBox>? boxes = painter.inlinePlaceholderBoxes;
+      if (boxes != null) {
+        int boxIndex = 0;
+        if (indentPx > 0) {
+          // Skip indent placeholder.
+          boxIndex++;
+        }
+        for (int i = 0; i < _paragraphPlaceholderChildren.length; i++) {
+          final RenderBox ph = _paragraphPlaceholderChildren[i];
+          final EdgeInsets m = placeholderMargins[i];
+          final HtmlDivParentData pd = ph.parentData as HtmlDivParentData;
+          final TextBox b = boxes[boxIndex++];
+          pd.offset = Offset(
+            xOffset + b.left + m.left,
+            yOffset + b.top + m.top,
+          );
+        }
+      }
+
+      // Position text children and provide baseline overrides derived from the
+      // unified paragraph layout.
+      final List<LineMetrics> metrics = painter.computeLineMetrics();
+      int findLineIndexForBox(TextBox b) {
+        final double y = (b.top + b.bottom) / 2.0;
+        for (int i = 0; i < metrics.length; i++) {
+          final LineMetrics m = metrics[i];
+          final double top = m.baseline - m.ascent;
+          final double bottom = m.baseline + m.descent;
+          if (y >= top - 0.01 && y <= bottom + 0.01) return i;
+        }
+        // Fallback: closest baseline.
+        int best = 0;
+        double bestDist = double.infinity;
+        for (int i = 0; i < metrics.length; i++) {
+          final double dist = (metrics[i].baseline - y).abs();
+          if (dist < bestDist) {
+            bestDist = dist;
+            best = i;
+          }
+        }
+        return best;
+      }
+
+      for (final (RenderHtmlText t, int start, int end) in textSegments) {
+        final HtmlDivParentData pd = t.parentData as HtmlDivParentData;
+        // Clear any stale overrides first.
+        t.clearParagraphBaselineOverrides();
+
+        if (start == end) {
+          pd.offset = Offset(xOffset, yOffset);
+          continue;
+        }
+
+        final List<TextBox> tBoxes = painter.getBoxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: end),
+        );
+        if (tBoxes.isEmpty || metrics.isEmpty) {
+          // Best-effort: place at caret.
+          final Offset caret = painter.getOffsetForCaret(
+            TextPosition(offset: start),
+            Rect.zero,
+          );
+          pd.offset = Offset(xOffset + caret.dx, yOffset + caret.dy);
+          continue;
+        }
+
+        Rect r = tBoxes.first.toRect();
+        for (int i = 1; i < tBoxes.length; i++) {
+          r = r.expandToInclude(tBoxes[i].toRect());
+        }
+
+        final TextBox firstBox = tBoxes.first;
+        final TextBox lastBox = tBoxes.last;
+        final int firstLine = findLineIndexForBox(firstBox);
+        final int lastLine = findLineIndexForBox(lastBox);
+        final double firstBaselineFromTop = metrics[firstLine].baseline - r.top;
+        final double lastBaselineFromTop = metrics[lastLine].baseline - r.top;
+        t.setParagraphBaselineOverrides(
+          firstLineBaselineFromTop: firstBaselineFromTop,
+          lastLineBaselineFromTop: lastBaselineFromTop,
+        );
+
+        pd.offset = Offset(xOffset + r.left, yOffset + r.top);
+      }
+
+      // Record last-line baseline for baseline queries.
+      if (metrics.isNotEmpty) {
+        _lastLineBaselineFromTop = yOffset + metrics.last.baseline;
+      }
+
+      final double contentHeight = painter.height;
+
+      double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
+      double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
+      if (minH != null && maxH != null && maxH < minH) {
+        maxH = minH;
+      }
+
+      double sizingHeight;
+      if (_height is FixedSize) {
+        sizingHeight = (_height as FixedSize).value;
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        sizingHeight =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+      } else {
+        sizingHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? (contentHeight + borderVertical + paddingVertical)
+            : contentHeight;
+      }
+
+      if (minH != null) sizingHeight = math.max(sizingHeight, minH);
+      if (maxH != null) sizingHeight = math.min(sizingHeight, maxH);
+
+      double borderBoxHeight;
+      if (_boxSizing == HtmlBoxSizing.borderBox) {
+        borderBoxHeight = sizingHeight;
+      } else {
+        borderBoxHeight = sizingHeight + borderVertical + paddingVertical;
+      }
+      borderBoxHeight = constraints.constrainHeight(borderBoxHeight);
+
+      size = Size(borderBoxWidth, borderBoxHeight);
+      return;
+    }
+
+    _usingParagraphInlineLayout = false;
 
     if (_display == HtmlDisplay.flex) {
       final double? contentHeight = _performFlexLayoutIfPossible(
@@ -1199,117 +2082,17 @@ class RenderHtmlDiv extends RenderBox
       }
     }
 
-    final double? childContentMaxHeight = (() {
-      double? borderBoxHeight;
+    _paragraphRuns.clear();
 
-      if (_height is FixedSize) {
-        final double h = (_height as FixedSize).value;
-        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
-            ? h
-            : (h + borderVertical + paddingVertical);
-      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
-        final double h =
-            constraints.maxHeight * (_height as PercentSize).value / 100.0;
-        borderBoxHeight = _boxSizing == HtmlBoxSizing.borderBox
-            ? h
-            : (h + borderVertical + paddingVertical);
-      } else if (constraints.hasBoundedHeight) {
-        borderBoxHeight = constraints.maxHeight;
-      } else {
-        return null;
-      }
-
-      final double constrainedBorderBoxHeight = constraints.constrainHeight(
-        borderBoxHeight,
-      );
-      final double contentH = math.max(
-        0.0,
-        constrainedBorderBoxHeight - borderVertical - paddingVertical,
-      );
-      if (!contentH.isFinite) return null;
-      return contentH;
-    })();
-
-    bool inInlineRun = false;
-    final List<RenderBox> lineChildren = <RenderBox>[];
-    final List<EdgeInsets> lineMargins = <EdgeInsets>[];
-    final List<double> lineBaselines = <double>[];
-    final List<double> lineXs = <double>[];
-    double lineUsedWidth = 0;
-    double lineAscent = 0;
-    double lineDescent = 0;
-
-    final double indentPx = _textIndent.isPercent
+    final double ownIndentPx = _textIndent.isPercent
         ? (availableBorderBoxWidth.isFinite
               ? _textIndent.resolvePx(reference: availableBorderBoxWidth)
               : 0.0)
         : _textIndent.resolvePx(reference: contentWidth);
+    final double indentPx = ownIndentPx != 0.0
+        ? ownIndentPx
+        : _inheritedFirstLineIndentPx;
     bool indentApplied = false;
-    double currentLineIndent = 0;
-
-    final (double strutAscent, double strutDescent) = _computeLineHeightStrut(
-      firstChild,
-      _lineHeight,
-    );
-
-    double flushLine({required bool isLastLine}) {
-      if (lineChildren.isEmpty) return 0;
-
-      final double finalAscent = math.max(lineAscent, strutAscent);
-      final double finalDescent = math.max(lineDescent, strutDescent);
-
-      final double lineHeight = finalAscent + finalDescent;
-      final double availableWidth = math.max(
-        0.0,
-        contentWidth - currentLineIndent,
-      );
-      final double extraSpace = math.max(0.0, availableWidth - lineUsedWidth);
-
-      double startShift = 0;
-      double gapExtra = 0;
-
-      if (_textAlign == HtmlTextAlign.center) {
-        startShift = extraSpace / 2.0;
-      } else if (_textAlign == HtmlTextAlign.end) {
-        startShift = extraSpace;
-      } else if (_textAlign == HtmlTextAlign.justify &&
-          !isLastLine &&
-          lineChildren.length > 1) {
-        gapExtra = extraSpace / (lineChildren.length - 1);
-      }
-
-      final double baselineY = currentY + finalAscent;
-      _lastLineBaselineFromTop = baselineY;
-      for (int i = 0; i < lineChildren.length; i++) {
-        final RenderBox c = lineChildren[i];
-        final HtmlDivParentData pd = c.parentData as HtmlDivParentData;
-        final EdgeInsets m = lineMargins[i];
-        final double baselineDistance = lineBaselines[i];
-        final double childTop = baselineY - baselineDistance;
-        final double childLeft =
-            xOffset +
-            currentLineIndent +
-            startShift +
-            lineXs[i] +
-            (gapExtra * i) +
-            m.left;
-        pd.offset = Offset(childLeft, childTop);
-      }
-
-      lineChildren.clear();
-      lineMargins.clear();
-      lineBaselines.clear();
-      lineXs.clear();
-      lineUsedWidth = 0;
-      lineAscent = 0;
-      lineDescent = 0;
-
-      if (!indentApplied) {
-        indentApplied = true;
-      }
-      currentLineIndent = 0;
-      return lineHeight;
-    }
 
     RenderBox? child = firstChild;
     while (child != null) {
@@ -1320,97 +2103,39 @@ class RenderHtmlDiv extends RenderBox
       final bool isInline = childDisplay == HtmlDisplay.inline;
 
       if (isInline) {
-        if (!inInlineRun) {
-          // Inline content does not participate in margin collapsing.
-          currentY += prevBottom;
-          prevBottom = 0;
-          inInlineRun = true;
-          lineChildren.clear();
-          lineMargins.clear();
-          lineBaselines.clear();
-          lineXs.clear();
-          lineUsedWidth = 0;
-          lineAscent = 0;
-          lineDescent = 0;
-          currentLineIndent = indentApplied ? 0.0 : indentPx;
-        }
-
-        if (lineChildren.isEmpty) {
-          currentLineIndent = indentApplied ? 0.0 : indentPx;
-        }
-
-        final EdgeInsets m = _resolveChildMargin(child, contentWidth);
-        final double availableWidth = math.max(
-          0.0,
-          contentWidth - currentLineIndent,
-        );
-        final double childMaxWidth = math.max(
-          0.0,
-          availableWidth - m.horizontal,
-        );
-        child.layout(
-          childContentMaxHeight == null
-              ? BoxConstraints(maxWidth: childMaxWidth)
-              : BoxConstraints(
-                  maxWidth: childMaxWidth,
-                  maxHeight: childContentMaxHeight,
-                ),
-          parentUsesSize: true,
-        );
-
-        double inlineBoxWidth = m.left + child.size.width + m.right;
-        double wrapWidth = math.max(0.0, contentWidth - currentLineIndent);
-        if (lineUsedWidth > 0 && lineUsedWidth + inlineBoxWidth > wrapWidth) {
-          currentY += flushLine(isLastLine: false);
-
-          // New line may have different available width (e.g. first line had indent).
-          if (lineChildren.isEmpty) {
-            currentLineIndent = indentApplied ? 0.0 : indentPx;
-          }
-          final double newAvailableWidth = math.max(
-            0.0,
-            contentWidth - currentLineIndent,
-          );
-          final double newChildMaxWidth = math.max(
-            0.0,
-            newAvailableWidth - m.horizontal,
-          );
-          child.layout(
-            childContentMaxHeight == null
-                ? BoxConstraints(maxWidth: newChildMaxWidth)
-                : BoxConstraints(
-                    maxWidth: newChildMaxWidth,
-                    maxHeight: childContentMaxHeight,
-                  ),
-            parentUsesSize: true,
-          );
-          inlineBoxWidth = m.left + child.size.width + m.right;
-          wrapWidth = newAvailableWidth;
-        }
-
-        final double baselineDistance =
-            child.getDistanceToBaseline(TextBaseline.alphabetic) ??
-            child.size.height;
-        final double ascent = m.top + baselineDistance;
-        final double descent =
-            (child.size.height - baselineDistance) + m.bottom;
-        lineAscent = math.max(lineAscent, ascent);
-        lineDescent = math.max(lineDescent, descent);
-
-        lineChildren.add(child);
-        lineMargins.add(m);
-        lineBaselines.add(baselineDistance);
-        lineXs.add(lineUsedWidth);
-        lineUsedWidth += inlineBoxWidth;
-
-        child = childParentData.nextSibling;
-        continue;
-      }
-
-      if (inInlineRun) {
-        currentY += flushLine(isLastLine: true);
-        inInlineRun = false;
+        // Inline content does not participate in margin collapsing.
+        currentY += prevBottom;
         prevBottom = 0;
+
+        // Collect a contiguous inline run.
+        final List<RenderBox> runChildren = <RenderBox>[];
+        RenderBox? c = child;
+        while (c != null && _readChildHtmlDisplay(c) == HtmlDisplay.inline) {
+          runChildren.add(c);
+          c = (c.parentData as HtmlDivParentData).nextSibling;
+        }
+
+        // First-line-only indent for the first inline formatted line.
+        final double firstLineIndentPx = indentApplied ? 0.0 : indentPx;
+        final _ParagraphRun run = _layoutParagraphRun(
+          runChildren: runChildren,
+          contentWidth: contentWidth,
+          xOffset: xOffset,
+          yTop: currentY,
+          childContentMaxHeight: childContentMaxHeight,
+          firstLineIndentPx: firstLineIndentPx,
+        );
+        _paragraphRuns.add(run);
+
+        final List<LineMetrics> runMetrics = run.painter.computeLineMetrics();
+        if (runMetrics.isNotEmpty) {
+          _lastLineBaselineFromTop = currentY + runMetrics.last.baseline;
+        }
+
+        currentY += run.height;
+        indentApplied = true;
+        child = c;
+        continue;
       }
 
       final HtmlMargin? childMarginObj = _readChildHtmlMargin(child);
@@ -1449,12 +2174,6 @@ class RenderHtmlDiv extends RenderBox
       prevBottom = m.bottom;
 
       child = childParentData.nextSibling;
-    }
-
-    if (inInlineRun) {
-      currentY += flushLine(isLastLine: true);
-      inInlineRun = false;
-      prevBottom = 0;
     }
 
     final double contentHeight = (currentY - yOffset) + prevBottom;
@@ -1515,7 +2234,19 @@ class RenderHtmlDiv extends RenderBox
         _paintMixedBorder(context, offset);
       }
     }
-    // Paint order policy:
+    if (_usingParagraphInlineLayout) {
+      final TextPainter? p = _paragraphTextPainter;
+      if (p != null) {
+        p.paint(context.canvas, offset + _paragraphContentOffset);
+      }
+      for (final RenderBox child in _paragraphPlaceholderChildren) {
+        final HtmlDivParentData pd = child.parentData! as HtmlDivParentData;
+        context.paintChild(child, offset + pd.offset);
+      }
+      return;
+    }
+
+    // Legacy paint order policy:
     // - Paint all block-level children first.
     // - Then paint all inline-level children (on top), to match typical HTML expectations
     //   when inline content overlaps block backgrounds due to negative margins.
@@ -1536,6 +2267,12 @@ class RenderHtmlDiv extends RenderBox
         context.paintChild(child, childParentData.offset + offset);
       }
       child = childParentData.nextSibling;
+    }
+
+    // Paint unified paragraph text for inline runs after block backgrounds.
+    final Canvas canvas = context.canvas;
+    for (final _ParagraphRun run in _paragraphRuns) {
+      run.painter.paint(canvas, offset + run.offset);
     }
 
     child = firstChild;
@@ -1576,6 +2313,21 @@ class RenderHtmlDiv extends RenderBox
 
   @override
   bool hitTestChildren(BoxHitTestResult result, {required Offset position}) {
+    if (_usingParagraphInlineLayout) {
+      for (int i = _paragraphPlaceholderChildren.length - 1; i >= 0; i--) {
+        final RenderBox child = _paragraphPlaceholderChildren[i];
+        final HtmlDivParentData pd = child.parentData! as HtmlDivParentData;
+        final bool isHit = result.addWithPaintOffset(
+          offset: pd.offset,
+          position: position,
+          hitTest: (BoxHitTestResult result, Offset transformed) {
+            return child.hitTest(result, position: transformed);
+          },
+        );
+        if (isHit) return true;
+      }
+      return false;
+    }
     if (_display == HtmlDisplay.flex) {
       return defaultHitTestChildren(result, position: position);
     }

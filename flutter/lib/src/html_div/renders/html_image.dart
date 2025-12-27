@@ -7,6 +7,8 @@ class RenderHtmlImage extends RenderBox {
   FilterQuality _filterQuality;
   HtmlSize _width;
   HtmlSize _height;
+  Size? _naturalPixelSize;
+  double _naturalPixelScale;
   Size _placeholderSize;
   ImageConfiguration _imageConfiguration;
   ImageStream? _imageStream;
@@ -27,6 +29,8 @@ class RenderHtmlImage extends RenderBox {
     required FilterQuality filterQuality,
     required HtmlSize width,
     required HtmlSize height,
+    required Size? naturalPixelSize,
+    required double naturalPixelScale,
     required Size placeholderSize,
     required String? debugLabel,
     required TextStyle debugLabelTextStyle,
@@ -39,6 +43,8 @@ class RenderHtmlImage extends RenderBox {
        _filterQuality = filterQuality,
        _width = width,
        _height = height,
+       _naturalPixelSize = naturalPixelSize,
+       _naturalPixelScale = naturalPixelScale,
        _placeholderSize = placeholderSize,
        _debugLabel = debugLabel,
        _debugLabelTextStyle = debugLabelTextStyle,
@@ -87,6 +93,21 @@ class RenderHtmlImage extends RenderBox {
   set height(HtmlSize value) {
     if (_height == value) return;
     _height = value;
+    markNeedsLayout();
+  }
+
+  Size? get naturalPixelSize => _naturalPixelSize;
+  set naturalPixelSize(Size? value) {
+    if (_naturalPixelSize == value) return;
+    _naturalPixelSize = value;
+    // Natural size participates in both layout and intrinsics.
+    markNeedsLayout();
+  }
+
+  double get naturalPixelScale => _naturalPixelScale;
+  set naturalPixelScale(double value) {
+    if (_naturalPixelScale == value) return;
+    _naturalPixelScale = value;
     markNeedsLayout();
   }
 
@@ -146,6 +167,10 @@ class RenderHtmlImage extends RenderBox {
 
     properties.add(DiagnosticsProperty<HtmlSize>('width', _width));
     properties.add(DiagnosticsProperty<HtmlSize>('height', _height));
+    properties.add(
+      DiagnosticsProperty<Size?>('naturalPixelSize', _naturalPixelSize),
+    );
+    properties.add(DoubleProperty('naturalPixelScale', _naturalPixelScale));
     properties.add(
       DiagnosticsProperty<Size>('placeholderSize', _placeholderSize),
     );
@@ -229,7 +254,9 @@ class RenderHtmlImage extends RenderBox {
     _stopListeningToStream(clear: true);
     _imageStream = newStream;
     _metadataLogicalSize = null;
-    _resolveSizeHintForCurrentImage();
+    if (_naturalPixelSize == null) {
+      _resolveSizeHintForCurrentImage();
+    }
 
     final ImageStreamListener listener = ImageStreamListener(
       (ImageInfo info, bool _) {
@@ -352,6 +379,19 @@ class RenderHtmlImage extends RenderBox {
   }
 
   Size _naturalLogicalSize() {
+    final Size? providedPx = _naturalPixelSize;
+    if (providedPx != null) {
+      final double scale = _naturalPixelScale <= 0 ? 1.0 : _naturalPixelScale;
+      return Size(
+        (providedPx.width / scale).isFinite
+            ? math.max(0.0, providedPx.width / scale)
+            : 0.0,
+        (providedPx.height / scale).isFinite
+            ? math.max(0.0, providedPx.height / scale)
+            : 0.0,
+      );
+    }
+
     final ui.Image? img = _resolvedImage;
     if (img == null) {
       final Size? hinted = _metadataLogicalSize;

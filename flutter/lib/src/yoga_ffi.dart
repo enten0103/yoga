@@ -729,8 +729,7 @@ class Yoga {
           )
           .asFunction();
     } catch (e) {
-      // ignore: avoid_print
-      print("Failed to lookup symbols: $e");
+      stderr.writeln('Failed to lookup symbols: $e');
       rethrow;
     }
   }

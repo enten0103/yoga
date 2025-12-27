@@ -138,6 +138,717 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  group('measureTextLineCount vs RenderHtmlText.debugLineCount', () {
+    Future<int> actualLineCount(
+      WidgetTester tester, {
+      required String text,
+      required TextStyle style,
+      required double width,
+      required double indentPx,
+      bool wrapInTransparentInlineWrapper = false,
+      TextDirection textDirection = TextDirection.ltr,
+      TextAlign textAlign = TextAlign.start,
+      TextScaler textScaler = TextScaler.noScaling,
+      TextWidthBasis textWidthBasis = TextWidthBasis.parent,
+      TextHeightBehavior? textHeightBehavior,
+      StrutStyle? strutStyle,
+      Locale? locale,
+      int? maxLines,
+    }) async {
+      final Key hostKey = ValueKey(
+        'host_${width}_${indentPx}_${wrapInTransparentInlineWrapper ? 'w' : 'd'}_${maxLines ?? 'n'}',
+      );
+      final Key textKey = ValueKey('text_${hostKey.toString()}');
+
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: textDirection,
+          child: Center(
+            child: SizedBox(
+              width: width,
+              child: HtmlDiv(
+                key: hostKey,
+                width: FixedSize(width),
+                height: const AutoSize(),
+                textIndent: HtmlLength.px(indentPx),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    children: [
+                      if (wrapInTransparentInlineWrapper)
+                        HtmlDiv(
+                          display: HtmlDisplay.inline,
+                          width: const AutoSize(),
+                          height: const AutoSize(),
+                          children: [
+                            HtmlText(
+                              text,
+                              key: textKey,
+                              style: style,
+                              textAlign: textAlign,
+                              textScaler: textScaler,
+                              textWidthBasis: textWidthBasis,
+                              textHeightBehavior: textHeightBehavior,
+                              strutStyle: strutStyle,
+                              locale: locale,
+                              maxLines: maxLines,
+                            ),
+                          ],
+                        )
+                      else
+                        HtmlText(
+                          text,
+                          key: textKey,
+                          style: style,
+                          textAlign: textAlign,
+                          textScaler: textScaler,
+                          textWidthBasis: textWidthBasis,
+                          textHeightBehavior: textHeightBehavior,
+                          strutStyle: strutStyle,
+                          locale: locale,
+                          maxLines: maxLines,
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final RenderHtmlText r = tester.renderObject(find.byKey(textKey));
+      return r.debugLineCount;
+    }
+
+    testWidgets('no indent: basic English wrapping matches', (tester) async {
+      const String text = 'word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: 0,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: 0,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('positive indent: first-line-only indent matches', (
+      tester,
+    ) async {
+      const String text = 'word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 60;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('indent larger than width: still stable and matches', (
+      tester,
+    ) async {
+      const String text = 'word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 80;
+      const double indent = 200;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+      expect(measured, greaterThanOrEqualTo(1));
+    });
+
+    testWidgets('negative indent: matches', (tester) async {
+      const String text = 'word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = -20;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets(
+      'short text fits one line even with indent: matches (no split)',
+      (tester) async {
+        const String text = '短句用于单行高度测试。';
+        const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+        const double width = 600;
+        const double indent = 32;
+
+        final int actual = await actualLineCount(
+          tester,
+          text: text,
+          style: style,
+          width: width,
+          indentPx: indent,
+        );
+        final int measured = measureTextLineCount(
+          text: text,
+          style: style,
+          maxWidth: width,
+          firstLineIndentPx: indent,
+          textDirection: TextDirection.ltr,
+        );
+        expect(measured, equals(1));
+        expect(measured, equals(actual));
+      },
+    );
+
+    testWidgets('transparent wrapper delegation: matches', (tester) async {
+      const String text = 'word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 220;
+      const double indent = 60;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        wrapInTransparentInlineWrapper: true,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('CJK widow adjustment: matches', (tester) async {
+      // 这个用例尽量触发“尾巴过短”调整：无空格、较大 indent、较窄宽度。
+      const String text = '学期末的脚步渐渐逼近。伽耶即将参加入学考试，我们则要面对音乐祭的最后准备工作。';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 180;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+      expect(measured, greaterThan(1));
+    });
+
+    testWidgets('ordinal rule "，第" adjustment: matches', (tester) async {
+      // 触发 “，第” 规则：尽量构造让断点落在“第”附近。
+      const String text = '激情四溢的恋爱合奏，第四集！';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 140;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('maxLines is respected: matches', (tester) async {
+      const String text = 'word word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 120;
+      const double indent = 40;
+      const int maxLines = 2;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        maxLines: maxLines,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        maxLines: maxLines,
+      );
+      expect(measured, equals(actual));
+      expect(measured, lessThanOrEqualTo(maxLines));
+    });
+
+    testWidgets('RTL direction: matches', (tester) async {
+      const String text = 'مرحبا بك في عالم الاختبارات البرمجية';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 180;
+      const double indent = 48;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        textDirection: TextDirection.rtl,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.rtl,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('TextScaler > 1: matches', (tester) async {
+      const String text = 'word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 180;
+      const double indent = 36;
+      final TextScaler scaler = TextScaler.linear(1.4);
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        textScaler: scaler,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('emoji / surrogate pairs: matches', (tester) async {
+      const String text = '😀😀😀😀😀😀😀😀😀😀😀😀😀😀😀';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 140;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('mixed CJK + Latin + spaces: matches', (tester) async {
+      const String text = '今天 meeting at 10:30，大家准时到。';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('leading/trailing spaces: matches', (tester) async {
+      const String text = '   word word word word   ';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 140;
+      const double indent = 24;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('explicit newline: matches', (tester) async {
+      const String text = '第一行\n第二行 第二行 第二行';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('maxLines=1 with indent: matches', (tester) async {
+      const String text = 'word word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 120;
+      const double indent = 40;
+      const int maxLines = 1;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        maxLines: maxLines,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        maxLines: maxLines,
+      );
+      expect(measured, equals(actual));
+      expect(measured, equals(1));
+    });
+
+    testWidgets('TextWidthBasis.longestLine: matches', (tester) async {
+      const String text = 'short\nthis is a much much longer line\nmid';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 200;
+      const double indent = 40;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        textWidthBasis: TextWidthBasis.longestLine,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        textWidthBasis: TextWidthBasis.longestLine,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('TextHeightBehavior: matches', (tester) async {
+      const String text = 'word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 32;
+      const TextHeightBehavior behavior = TextHeightBehavior(
+        applyHeightToFirstAscent: false,
+        applyHeightToLastDescent: false,
+      );
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        textHeightBehavior: behavior,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        textHeightBehavior: behavior,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('StrutStyle(forceStrutHeight): matches', (tester) async {
+      const String text = 'word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.2);
+      const double width = 160;
+      const double indent = 32;
+      const StrutStyle strut = StrutStyle(
+        fontSize: 16,
+        height: 1.0,
+        forceStrutHeight: true,
+      );
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        strutStyle: strut,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        strutStyle: strut,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('TextAlign.center: matches', (tester) async {
+      const String text = 'word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 36;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        textAlign: TextAlign.center,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        textAlign: TextAlign.center,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('ZWJ emoji sequence: matches', (tester) async {
+      const String text =
+          '👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 140;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('combining marks: matches', (tester) async {
+      const String text =
+          'e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 120;
+      const double indent = 24;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('long unbroken Latin token (no spaces): matches', (
+      tester,
+    ) async {
+      const String text =
+          'supercalifragilisticexpialidocioussupercalifragilisticexpialidocioussupercalifragilisticexpialidocious';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('tabs + multiple spaces: matches', (tester) async {
+      const String text = 'word\tword  word   word\tword';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 160;
+      const double indent = 32;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+      );
+      expect(measured, equals(actual));
+    });
+
+    testWidgets('maxLines=2 + negative indent: matches', (tester) async {
+      const String text = 'word word word word word word word word word';
+      const TextStyle style = TextStyle(fontSize: 16, height: 1.7);
+      const double width = 120;
+      const double indent = -24;
+      const int maxLines = 2;
+
+      final int actual = await actualLineCount(
+        tester,
+        text: text,
+        style: style,
+        width: width,
+        indentPx: indent,
+        maxLines: maxLines,
+      );
+      final int measured = measureTextLineCount(
+        text: text,
+        style: style,
+        maxWidth: width,
+        firstLineIndentPx: indent,
+        textDirection: TextDirection.ltr,
+        maxLines: maxLines,
+      );
+      expect(measured, equals(actual));
+      expect(measured, lessThanOrEqualTo(maxLines));
+    });
+  });
+
   testWidgets('lineHeight fixed px overrides natural line height', (
     WidgetTester tester,
   ) async {
@@ -1115,6 +1826,370 @@ void main() {
     expect(inner2Top.dy, greaterThan(inner1Top.dy));
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'CJK paragraph total height increases when wrapping (1 vs 2 vs 3 lines) under text-indent',
+    (WidgetTester tester) async {
+      const Key subjectKey = ValueKey('subject');
+      const String text = '这是一个用于验证段落总高度随折行增加的中文字符串没有空格为了便于测试。';
+
+      Future<double> heightAt(int w) async {
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: SizedBox(
+                width: w.toDouble(),
+                child: HtmlDiv(
+                  key: subjectKey,
+                  width: FixedSize(w.toDouble()),
+                  height: const AutoSize(),
+                  textIndent: const HtmlLength.px(32),
+                  lineHeight: const HtmlLength.px(24),
+                  children: const [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      children: [
+                        HtmlText(
+                          text,
+                          style: TextStyle(fontSize: 16, height: 1.7),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+        final Size s = tester.getSize(find.byKey(subjectKey));
+        expect(s.width, equals(w.toDouble()));
+        return s.height;
+      }
+
+      const int wide = 500;
+      const int narrow = 60;
+
+      final double hWide = await heightAt(wide);
+      final double hNarrow = await heightAt(narrow);
+      expect(hNarrow, greaterThan(hWide + 0.5));
+
+      Future<bool> wraps2Plus(int w) async {
+        final double h = await heightAt(w);
+        return h > hWide + 0.5;
+      }
+
+      // Find the smallest width where it becomes a single line.
+      int lo = narrow;
+      int hi = wide;
+      while (lo < hi) {
+        final int mid = (lo + hi) >> 1;
+        if (await wraps2Plus(mid)) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      final int wNoWrap = lo;
+      expect(wNoWrap, greaterThan(narrow));
+
+      final double h1 = await heightAt(wNoWrap);
+      final double h2 = await heightAt(wNoWrap - 1);
+      expect(h2, greaterThan(h1 + 0.5));
+
+      // Now locate a width that produces 3+ lines (roughly >=2.5x the 1-line height).
+      Future<bool> wraps3Plus(int w) async {
+        final double h = await heightAt(w);
+        return h >= h1 * 2.5;
+      }
+
+      lo = narrow;
+      hi = wNoWrap - 1;
+      while (lo < hi) {
+        final int mid = (lo + hi) >> 1;
+        if (await wraps3Plus(mid)) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      final int wNo3Wrap = lo;
+      expect(wNo3Wrap, greaterThan(narrow));
+
+      final double h3 = await heightAt(wNo3Wrap - 1);
+      expect(h3, greaterThan(h2 + 0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'text-indent should not create extra blank line height when text fits on one line',
+    (WidgetTester tester) async {
+      // Short enough to fit on one line even after applying a first-line indent.
+      const String text = '短句用于单行高度测试。';
+
+      Future<double> heightAt({required bool indent}) async {
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: SizedBox(
+                width: 600,
+                child: HtmlDiv(
+                  key: ValueKey(indent ? 'indent' : 'noIndent'),
+                  width: const FixedSize(600),
+                  height: const AutoSize(),
+                  textIndent: indent
+                      ? const HtmlLength.px(32)
+                      : const HtmlLength.px(0),
+                  lineHeight: const HtmlLength.px(24),
+                  children: const [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      children: [
+                        HtmlText(
+                          text,
+                          style: TextStyle(fontSize: 16, height: 1.7),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+        return tester
+            .getSize(find.byKey(ValueKey(indent ? 'indent' : 'noIndent')))
+            .height;
+      }
+
+      final double hNoIndent = await heightAt(indent: false);
+      final double hIndent = await heightAt(indent: true);
+
+      // In a sufficiently wide container, indent should not force a second
+      // (empty) line box. Height should remain essentially the same.
+      expect((hIndent - hNoIndent).abs(), lessThan(0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'text-indent can delegate through a transparent inline wrapper and force wrapper width to full line width',
+    (WidgetTester tester) async {
+      // 这个用例覆盖：父容器把首行缩进委托给透明 wrapper（RenderHtmlDiv），
+      // 并在该 layout 周期内强制 wrapper 用整行 contentWidth 测量，避免 shrink-to-fit 触发异常折行。
+      const Key parentKey = ValueKey('parentIndentWrapperWidth');
+      const Key wrapperKey = ValueKey('wrapper');
+      const Key textKey = ValueKey('text');
+
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 300,
+              child: HtmlDiv(
+                key: parentKey,
+                width: FixedSize(300),
+                height: AutoSize(),
+                textIndent: HtmlLength.px(32),
+                lineHeight: HtmlLength.px(24),
+                children: [
+                  HtmlDiv(
+                    key: wrapperKey,
+                    display: HtmlDisplay.inline,
+                    width: AutoSize(),
+                    height: AutoSize(),
+                    children: [
+                      HtmlText(
+                        'word word word word word',
+                        key: textKey,
+                        style: TextStyle(fontSize: 16, height: 1.7),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final RenderBox wrapper = tester.renderObject(find.byKey(wrapperKey));
+      // 关键断言：委托缩进时 wrapper 会被强制为整行宽度。
+      expect(wrapper.size.width, equals(300));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'transparent inline wrapper remains shrink-to-fit when there is no text-indent',
+    (WidgetTester tester) async {
+      // 对比用例：没有缩进时，inline wrapper 仍应保持 shrink-to-fit，而不是被强制拉伸。
+      const Key wrapperKey = ValueKey('wrapperNoIndent');
+
+      await tester.pumpWidget(
+        const Directionality(
+          textDirection: TextDirection.ltr,
+          child: Center(
+            child: SizedBox(
+              width: 300,
+              child: HtmlDiv(
+                width: FixedSize(300),
+                height: AutoSize(),
+                textIndent: HtmlLength.px(0),
+                lineHeight: HtmlLength.px(24),
+                children: [
+                  HtmlDiv(
+                    key: wrapperKey,
+                    display: HtmlDisplay.inline,
+                    width: AutoSize(),
+                    height: AutoSize(),
+                    children: [HtmlText('hi', style: TextStyle(fontSize: 16))],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final RenderBox wrapper = tester.renderObject(find.byKey(wrapperKey));
+      expect(wrapper.size.width, lessThan(300));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'text-indent delegated to wrapper should not create extra height when text fits on one line',
+    (WidgetTester tester) async {
+      // 覆盖：缩进被委托给 wrapper 的场景下，短文本依然只占一行高度。
+      const String text = '短句用于单行高度测试。';
+
+      Future<double> heightAt({required bool indent}) async {
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: SizedBox(
+                width: 600,
+                child: HtmlDiv(
+                  key: ValueKey(indent ? 'indentWrapper' : 'noIndentWrapper'),
+                  width: const FixedSize(600),
+                  height: const AutoSize(),
+                  textIndent: indent
+                      ? const HtmlLength.px(32)
+                      : const HtmlLength.px(0),
+                  lineHeight: const HtmlLength.px(24),
+                  children: [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      width: const AutoSize(),
+                      height: const AutoSize(),
+                      children: const [
+                        HtmlText(
+                          text,
+                          style: TextStyle(fontSize: 16, height: 1.7),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+        return tester
+            .getSize(
+              find.byKey(
+                ValueKey(indent ? 'indentWrapper' : 'noIndentWrapper'),
+              ),
+            )
+            .height;
+      }
+
+      final double hNoIndent = await heightAt(indent: false);
+      final double hIndent = await heightAt(indent: true);
+      expect((hIndent - hNoIndent).abs(), lessThan(0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'wrapper delegation keeps wrapping behavior consistent with direct HtmlText',
+    (WidgetTester tester) async {
+      // 覆盖：同样的文本与宽度下，“直接 HtmlText”与“透明 wrapper + HtmlText”应产生一致的行数/高度。
+      const String text = 'word word word word word word word word';
+
+      Future<double> heightFor({required bool wrapped}) async {
+        await tester.pumpWidget(
+          Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: SizedBox(
+                width: 220,
+                child: HtmlDiv(
+                  key: ValueKey(wrapped ? 'wrapped' : 'direct'),
+                  width: const FixedSize(220),
+                  height: const AutoSize(),
+                  textIndent: const HtmlLength.px(60),
+                  lineHeight: const HtmlLength.px(24),
+                  children: [
+                    if (wrapped)
+                      HtmlDiv(
+                        display: HtmlDisplay.inline,
+                        width: const AutoSize(),
+                        height: const AutoSize(),
+                        children: const [
+                          HtmlText(
+                            text,
+                            style: TextStyle(fontSize: 16, height: 1.7),
+                          ),
+                        ],
+                      )
+                    else
+                      const HtmlDiv(
+                        display: HtmlDisplay.inline,
+                        children: [
+                          HtmlText(
+                            text,
+                            style: TextStyle(fontSize: 16, height: 1.7),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await tester.pumpAndSettle();
+        return tester
+            .getSize(find.byKey(ValueKey(wrapped ? 'wrapped' : 'direct')))
+            .height;
+      }
+
+      final double hDirect = await heightFor(wrapped: false);
+      final double hWrapped = await heightFor(wrapped: true);
+
+      // 这两个高度应基本一致；并且应该大于 1 行高度（24），确保确实发生了折行。
+      expect(hDirect, greaterThan(24.5));
+      expect((hWrapped - hDirect).abs(), lessThan(0.5));
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('nested inline shrink-to-fit propagates widths', (
     WidgetTester tester,

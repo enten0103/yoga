@@ -31,6 +31,8 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final List<HtmlBoxShadow> boxShadow;
   final HtmlTransform? transform;
 
+  final List<Widget> _rawChildren;
+
   const HtmlDiv({
     super.key,
     this.width = const AutoSize(),
@@ -59,8 +61,56 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.background,
     this.boxShadow = const <HtmlBoxShadow>[],
     this.transform,
-    super.children = const [],
-  });
+    super.children = const <Widget>[],
+  }) : _rawChildren = children;
+
+  static bool _isTransparentInlineWrapper(HtmlDiv div) {
+    if (div.display != HtmlDisplay.inline) return false;
+    if (div.width is! AutoSize) return false;
+    if (div.height is! AutoSize) return false;
+    if (div.minWidth != null || div.maxWidth != null) return false;
+    if (div.minHeight != null || div.maxHeight != null) return false;
+    if (div.margin != null) return false;
+    if (div.padding != null) return false;
+    if (div.border != null) return false;
+    if (div.borderRadius != null) return false;
+    if (div.background != null) return false;
+    if (div.boxShadow.isNotEmpty) return false;
+    if (div.transform != null) return false;
+    if (div.textAlign != HtmlTextAlign.start) return false;
+    if (div.lineHeight != null) return false;
+    if (div.textIndent != const HtmlLength.px(0)) return false;
+    if (div.flexGrow != 0.0) return false;
+    if (div.flexShrink != 1.0) return false;
+    if (div.flexBasis != const HtmlLength.auto()) return false;
+    if (div.alignSelf != HtmlAlignSelf.auto) return false;
+    return true;
+  }
+
+  static List<Widget> _normalizeChildren(List<Widget> children) {
+    final List<Widget> out = <Widget>[];
+    for (final Widget child in children) {
+      if (child is Text) {
+        out.add(HtmlText.fromText(child));
+        continue;
+      }
+
+      // Flatten a visual/semantic no-op wrapper into the same inline run.
+      // We keep keyed wrappers intact so callers/tests can still find them.
+      if (child is HtmlDiv &&
+          child.key == null &&
+          _isTransparentInlineWrapper(child)) {
+        out.addAll(_normalizeChildren(child._rawChildren));
+        continue;
+      }
+
+      out.add(child);
+    }
+    return out;
+  }
+
+  @override
+  List<Widget> get children => _normalizeChildren(_rawChildren);
 
   @override
   RenderObject createRenderObject(BuildContext context) {
@@ -191,6 +241,21 @@ class HtmlImage extends LeafRenderObjectWidget {
   /// treated as the default: [AutoSize].
   final HtmlSize width;
   final HtmlSize height;
+
+  /// Natural size of the image in source pixels (encoded bitmap size).
+  ///
+  /// When provided, this is used as the preferred intrinsic size for
+  /// `width/height: auto` calculations, avoiding async header probing.
+  ///
+  /// The corresponding logical size is `naturalPixelSize / naturalPixelScale`.
+  final Size? naturalPixelSize;
+
+  /// Scale that maps [naturalPixelSize] to logical pixels.
+  ///
+  /// This matches Flutter's image scale semantics (e.g. an @2x asset typically
+  /// has scale=2.0). Defaults to 1.0.
+  final double naturalPixelScale;
+
   final Size placeholderSize;
   final String? debugLabel;
   final TextStyle debugLabelTextStyle;
@@ -205,6 +270,8 @@ class HtmlImage extends LeafRenderObjectWidget {
     this.filterQuality = FilterQuality.low,
     this.width = const AutoSize(),
     this.height = const AutoSize(),
+    this.naturalPixelSize,
+    this.naturalPixelScale = 1.0,
     this.placeholderSize = const Size(0, 0),
     this.debugLabel,
     this.debugLabelTextStyle = const TextStyle(
@@ -227,6 +294,8 @@ class HtmlImage extends LeafRenderObjectWidget {
       filterQuality: filterQuality,
       width: width,
       height: height,
+      naturalPixelSize: naturalPixelSize,
+      naturalPixelScale: naturalPixelScale,
       placeholderSize: placeholderSize,
       debugLabel: debugLabel,
       debugLabelTextStyle: debugLabelTextStyle,
@@ -245,6 +314,8 @@ class HtmlImage extends LeafRenderObjectWidget {
       ..filterQuality = filterQuality
       ..width = width
       ..height = height
+      ..naturalPixelSize = naturalPixelSize
+      ..naturalPixelScale = naturalPixelScale
       ..placeholderSize = placeholderSize
       ..debugLabel = debugLabel
       ..debugLabelTextStyle = debugLabelTextStyle
@@ -264,6 +335,10 @@ class HtmlImage extends LeafRenderObjectWidget {
 
     properties.add(DiagnosticsProperty<HtmlSize>('width', width));
     properties.add(DiagnosticsProperty<HtmlSize>('height', height));
+    properties.add(
+      DiagnosticsProperty<Size?>('naturalPixelSize', naturalPixelSize),
+    );
+    properties.add(DoubleProperty('naturalPixelScale', naturalPixelScale));
     properties.add(
       DiagnosticsProperty<Size>('placeholderSize', placeholderSize),
     );
