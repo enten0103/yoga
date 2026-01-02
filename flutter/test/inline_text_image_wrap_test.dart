@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -844,6 +845,267 @@ void main() {
       expect((spanTopLeft.dx - rootTopLeft.dx - 11).abs(), lessThan(0.01));
 
       // The image should be placed after span padding-left.
+      expect((imgTopLeft.dx - spanTopLeft.dx - 5).abs(), lessThan(0.01));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('textAlign positions a single-line mixed (text+image) run', (
+    WidgetTester tester,
+  ) async {
+    late Uint8List pngBytes;
+    await tester.runAsync(() async {
+      pngBytes = await _makeSolidPng(width: 2, height: 2, color: Colors.teal);
+    });
+
+    Future<void> pumpAndAssert({
+      required HtmlTextAlign textAlign,
+      required double expectedStartDx,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                key: const ValueKey('root'),
+                width: const FixedSize(160),
+                height: const AutoSize(),
+                textAlign: textAlign,
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    children: [
+                      const HtmlText(
+                        'xxxx',
+                        key: ValueKey('t1'),
+                        style: ahem10,
+                      ),
+                      HtmlImage(
+                        key: const ValueKey('img'),
+                        image: MemoryImage(pngBytes),
+                        width: const FixedSize(20),
+                        height: const FixedSize(10),
+                        placeholderSize: const Size(1, 1),
+                      ),
+                      const HtmlText('yy', key: ValueKey('t2'), style: ahem10),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // With Ahem10: 'xxxx' ~ 40px, image 20px, 'yy' ~ 20px => total ~ 80px.
+      // For width=160: start=0, center=(160-80)/2=40, end=(160-80)=80.
+      final Offset rootTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('root')),
+      );
+      final Offset t1TopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('t1')),
+      );
+      expect(
+        (t1TopLeft.dx - rootTopLeft.dx - expectedStartDx).abs(),
+        lessThan(0.01),
+      );
+      expect(tester.takeException(), isNull);
+    }
+
+    await pumpAndAssert(textAlign: HtmlTextAlign.start, expectedStartDx: 0);
+    await pumpAndAssert(textAlign: HtmlTextAlign.center, expectedStartDx: 40);
+    await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 80);
+  });
+
+  testWidgets(
+    'textAlign.center + textIndent: wrapped non-first line is centered (mixed text+image)',
+    (WidgetTester tester) async {
+      late Uint8List pngBytes;
+      await tester.runAsync(() async {
+        pngBytes = await _makeSolidPng(
+          width: 2,
+          height: 2,
+          color: Colors.orange,
+        );
+      });
+
+      // Width=160, indent=30 => first line maxWidth=130.
+      // First text is 13 chars => exactly fills first line.
+      // Second line: span(image 40) + 'xxxx'(40) => ~80px; centered => start ~40.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                key: const ValueKey('root'),
+                width: const FixedSize(160),
+                height: const AutoSize(),
+                textAlign: HtmlTextAlign.center,
+                textIndent: const HtmlLength.px(30),
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    children: [
+                      const HtmlText(
+                        'xxxxxxxxxxxxx',
+                        key: ValueKey('t1'),
+                        style: ahem10,
+                      ),
+                      HtmlDiv(
+                        key: const ValueKey('span'),
+                        display: HtmlDisplay.inline,
+                        padding: HtmlPadding.only(left: HtmlLength.px(5)),
+                        children: [
+                          const HtmlText(
+                            '',
+                            style: TextStyle(fontSize: 0, height: 0),
+                          ),
+                          HtmlImage(
+                            key: const ValueKey('img'),
+                            image: MemoryImage(pngBytes),
+                            width: const FixedSize(40),
+                            height: const FixedSize(10),
+                            placeholderSize: const Size(1, 1),
+                          ),
+                        ],
+                      ),
+                      const HtmlText(
+                        'xxxx',
+                        key: ValueKey('t2'),
+                        style: ahem10,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Rect rootRect = tester.getRect(find.byKey(const ValueKey('root')));
+      final Rect t1Rect = tester.getRect(find.byKey(const ValueKey('t1')));
+      final Rect spanRect = tester.getRect(find.byKey(const ValueKey('span')));
+      final Rect t2Rect = tester.getRect(find.byKey(const ValueKey('t2')));
+      final Offset spanTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('span')),
+      );
+      final Offset imgTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('img')),
+      );
+
+      // Ensure wrap happened: span is on a later line than the first text.
+      expect(spanRect.top, greaterThan(t1Rect.top));
+
+      // Center alignment check for the wrapped (non-first) line:
+      // use actual geometry bounds of the two widgets participating on that line.
+      final double lineLeft = math.min(spanRect.left, t2Rect.left);
+      final double lineRight = math.max(spanRect.right, t2Rect.right);
+      final double lineCenter = (lineLeft + lineRight) / 2.0;
+      final double rootCenter = (rootRect.left + rootRect.right) / 2.0;
+      expect((lineCenter - rootCenter).abs(), lessThan(0.01));
+
+      // The image should still be placed after span padding-left.
+      expect((imgTopLeft.dx - spanTopLeft.dx - 5).abs(), lessThan(0.01));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'textAlign.end + textIndent: wrapped non-first line is right-aligned (mixed text+image)',
+    (WidgetTester tester) async {
+      late Uint8List pngBytes;
+      await tester.runAsync(() async {
+        pngBytes = await _makeSolidPng(
+          width: 2,
+          height: 2,
+          color: Colors.indigo,
+        );
+      });
+
+      // Same structure as the center test, but we assert right edge alignment.
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                key: const ValueKey('root'),
+                width: const FixedSize(160),
+                height: const AutoSize(),
+                textAlign: HtmlTextAlign.end,
+                textIndent: const HtmlLength.px(30),
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    children: [
+                      const HtmlText(
+                        'xxxxxxxxxxxxx',
+                        key: ValueKey('t1'),
+                        style: ahem10,
+                      ),
+                      HtmlDiv(
+                        key: const ValueKey('span'),
+                        display: HtmlDisplay.inline,
+                        margin: HtmlMargin.only(left: HtmlLength.px(11)),
+                        padding: HtmlPadding.only(left: HtmlLength.px(5)),
+                        children: [
+                          const HtmlText(
+                            '',
+                            style: TextStyle(fontSize: 0, height: 0),
+                          ),
+                          HtmlImage(
+                            key: const ValueKey('img'),
+                            image: MemoryImage(pngBytes),
+                            width: const FixedSize(40),
+                            height: const FixedSize(10),
+                            placeholderSize: const Size(1, 1),
+                          ),
+                        ],
+                      ),
+                      const HtmlText(
+                        'xxxx',
+                        key: ValueKey('t2'),
+                        style: ahem10,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      final Rect rootRect = tester.getRect(find.byKey(const ValueKey('root')));
+      final Rect t1Rect = tester.getRect(find.byKey(const ValueKey('t1')));
+      final Rect spanRect = tester.getRect(find.byKey(const ValueKey('span')));
+      final Rect t2Rect = tester.getRect(find.byKey(const ValueKey('t2')));
+      final Offset spanTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('span')),
+      );
+      final Offset imgTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('img')),
+      );
+
+      expect(spanRect.top, greaterThan(t1Rect.top));
+
+      final double lineRight = math.max(spanRect.right, t2Rect.right);
+      expect((lineRight - rootRect.right).abs(), lessThan(0.01));
+
+      // No indent should leak onto the wrapped line; margin-left should remain.
+      // We don't assert an absolute dx for right alignment, but ensure the
+      // image-in-span internal padding is preserved.
       expect((imgTopLeft.dx - spanTopLeft.dx - 5).abs(), lessThan(0.01));
       expect(tester.takeException(), isNull);
     },
