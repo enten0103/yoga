@@ -1544,9 +1544,11 @@ class RenderHtmlDiv extends RenderBox
         strutStyle: strutStyle,
       );
       painter.setPlaceholderDimensions(placeholderDims);
-      painter.layout(
-        maxWidth: contentWidth.isFinite ? contentWidth : double.infinity,
-      );
+      final double maxWidth = contentWidth.isFinite
+          ? contentWidth
+          : double.infinity;
+      final double minWidth = contentWidth.isFinite ? contentWidth : 0.0;
+      painter.layout(minWidth: minWidth, maxWidth: maxWidth);
       _paragraphTextPainter = painter;
       _paragraphContentOffset = Offset(xOffset, yOffset);
 

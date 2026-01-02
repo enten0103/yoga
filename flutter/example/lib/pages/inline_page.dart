@@ -222,6 +222,20 @@ class InlinePage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           _section(
+            title: 'text-align：start/center/end（Text + Image inline 混排）',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _textAlignMixedExample(align: HtmlTextAlign.start),
+                const SizedBox(height: 12),
+                _textAlignMixedExample(align: HtmlTextAlign.center),
+                const SizedBox(height: 12),
+                _textAlignMixedExample(align: HtmlTextAlign.end),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          _section(
             title: 'inline 混排：Text + span + Image（auto 尺寸来自 naturalPixelSize）',
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,6 +593,60 @@ Widget _section({required String title, required Widget child}) {
       Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
       child,
+    ],
+  );
+}
+
+Widget _textAlignMixedExample({required HtmlTextAlign align}) {
+  final String label = switch (align) {
+    HtmlTextAlign.start => 'start',
+    HtmlTextAlign.center => 'center',
+    HtmlTextAlign.end => 'end',
+    HtmlTextAlign.justify => 'justify',
+  };
+
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        'textAlign: $label',
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      const SizedBox(height: 6),
+      HtmlDiv(
+        width: const FixedSize(320),
+        height: const AutoSize(),
+        textAlign: align,
+        border: HtmlBorder.all(
+          width: const FixedBorderWidth(1),
+          style: HtmlBorderStyle.solid,
+          color: const Color(0x33000000),
+        ),
+        background: const HtmlBackground(color: Color(0x0A000000)),
+        children: [
+          HtmlDiv(
+            display: HtmlDisplay.inline,
+            children: [
+              const HtmlText(
+                '这是一段较长的文字，用来观察 text-align 在换行后的对齐效果：',
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+              HtmlImage(
+                image: _kTest1Asset,
+                width: const FixedSize(72),
+                height: const FixedSize(24),
+                naturalPixelSize: _kTest1PixelSize,
+                placeholderSize: const Size(1, 1),
+                debugLabel: 'img',
+              ),
+              const HtmlText(
+                '图片后面继续追加一些文字，确保内容会换到下一行。',
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
+        ],
+      ),
     ],
   );
 }

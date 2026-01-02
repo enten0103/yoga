@@ -82,11 +82,13 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
         <PlaceholderDimensions>[];
     final List<RenderBox> placeholderChildren = <RenderBox>[];
     final List<EdgeInsets> placeholderMargins = <EdgeInsets>[];
+    final List<int> placeholderCharOffsets = <int>[];
     final List<(RenderHtmlText child, int start, int end)> textSegments =
         <(RenderHtmlText, int, int)>[];
 
     int paragraphOffset = 0;
 
+    final bool hasIndentPlaceholder = firstLineIndentPx > 0;
     if (firstLineIndentPx > 0) {
       spanChildren.add(
         const WidgetSpan(
@@ -154,6 +156,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
 
         placeholderChildren.add(child);
         placeholderMargins.add(m);
+        placeholderCharOffsets.add(paragraphOffset);
         spanChildren.add(
           const WidgetSpan(
             child: SizedBox.shrink(),
@@ -173,7 +176,8 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
           ),
         );
         paragraphOffset += 1;
-        // Placeholder children will be positioned by inlinePlaceholderBoxes.
+        // Placeholder children will be positioned by TextBoxes derived from
+        // getBoxesForSelection for the placeholder character.
       }
     }
 
@@ -189,9 +193,14 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
       strutStyle: strutStyle,
     );
     painter.setPlaceholderDimensions(placeholderDims);
-    painter.layout(
-      maxWidth: contentWidth.isFinite ? contentWidth : double.infinity,
-    );
+    final double maxWidth = contentWidth.isFinite
+        ? contentWidth
+        : double.infinity;
+    final double minWidth = contentWidth.isFinite ? contentWidth : 0.0;
+    // IMPORTANT: TextPainter may choose a width smaller than maxWidth unless
+    // minWidth is also provided. For CSS-like text-align, the line box width
+    // must be the available content width.
+    painter.layout(minWidth: minWidth, maxWidth: maxWidth);
 
     final List<LineMetrics> metrics = painter.computeLineMetrics();
 
@@ -237,10 +246,44 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
       lineMaxX[i] = math.max(lineMaxX[i], b.right);
     }
 
-    final List<TextBox>? placeholderBoxes = painter.inlinePlaceholderBoxes;
-    if (placeholderBoxes != null) {
-      for (final TextBox b in placeholderBoxes) {
-        recordLineBox(findLineIndexForBox(b), b);
+    // Collect placeholder boxes using selection so they are in the same
+    // coordinate space as text selection boxes.
+    if (hasIndentPlaceholder) {
+      final List<TextBox> b = painter.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 1),
+      );
+      if (b.isNotEmpty) {
+        recordLineBox(findLineIndexForBox(b.first), b.first);
+      }
+    }
+
+    final List<TextBox> placeholderChildBoxes = <TextBox>[];
+    for (final int off in placeholderCharOffsets) {
+      final List<TextBox> b = painter.getBoxesForSelection(
+        TextSelection(baseOffset: off, extentOffset: off + 1),
+      );
+      if (b.isEmpty) {
+        // Fallback: best-effort to keep layout working if selection boxes are
+        // unavailable for placeholders on a given engine.
+        //
+        // NOTE: This may reintroduce alignment inconsistencies on some
+        // platforms/versions; prefer the selection-based path.
+        final List<TextBox>? fallback = painter.inlinePlaceholderBoxes;
+        final int baseIndex = hasIndentPlaceholder ? 1 : 0;
+        final int i = placeholderChildBoxes.length;
+        if (fallback != null && baseIndex + i < fallback.length) {
+          placeholderChildBoxes.add(fallback[baseIndex + i]);
+          recordLineBox(
+            findLineIndexForBox(fallback[baseIndex + i]),
+            fallback[baseIndex + i],
+          );
+        }
+        continue;
+      }
+      // A placeholder occupies a single box in typical cases.
+      placeholderChildBoxes.add(b.first);
+      for (final TextBox tb in b) {
+        recordLineBox(findLineIndexForBox(tb), tb);
       }
     }
 
@@ -282,14 +325,24 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
       textSegments.first.$1.setParagraphDebugLineCount(metrics.length);
     }
 
+    // IMPORTANT:
+    // - In practice, TextPainter's text boxes for placeholders
+    //   (inlinePlaceholderBoxes) can already include the paragraph's alignment
+    //   offset, while text selection boxes do not.
+    // - To keep placeholders synced with painted text, we position placeholders
+    //   using their TextBox coordinates directly (no extra line-left shift),
+    //   but still compute per-line alignment offsets for mapping text selection
+    //   boxes back to per-child offsets/baselines.
+
     double lineStartOffsetX(int lineIndex) {
       if (metrics.isEmpty) return 0.0;
-      final double lineWidth = placeholderChildren.isEmpty
-          ? metrics[lineIndex.clamp(0, metrics.length - 1)].width
-          : computedLineWidth(lineIndex);
-      final double lineMin = placeholderChildren.isEmpty
-          ? 0.0
-          : computedLineMin(lineIndex);
+      // Do not rely on LineMetrics.width here. After forcing TextPainter to
+      // occupy the full content width (minWidth=maxWidth), some engines report
+      // LineMetrics.width equal to that full width, which would make
+      // center/end alignment appear as start. Instead, compute the per-line
+      // content bounds from selection boxes (text + placeholders).
+      final double lineWidth = computedLineWidth(lineIndex);
+      final double lineMin = computedLineMin(lineIndex);
       final bool isRtl = textDirection == TextDirection.rtl;
 
       double alignOffset;
@@ -351,16 +404,13 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
       }
     }
 
-    if (placeholderBoxes != null) {
-      int boxIndex = 0;
-      if (firstLineIndentPx > 0) {
-        boxIndex++;
-      }
+    if (placeholderChildBoxes.isNotEmpty) {
       for (int i = 0; i < placeholderChildren.length; i++) {
+        if (i >= placeholderChildBoxes.length) break;
         final RenderBox ph = placeholderChildren[i];
         final EdgeInsets m = placeholderMargins[i];
         final HtmlDivParentData pd = ph.parentData as HtmlDivParentData;
-        final TextBox b = placeholderBoxes[boxIndex++];
+        final TextBox b = placeholderChildBoxes[i];
         final int lineIndex = findLineIndexForBox(b);
         final double lineLeft = lineStartOffsetX(lineIndex);
         final double indentCorrection = positiveIndentCorrectionForLine(

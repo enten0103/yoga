@@ -920,6 +920,219 @@ void main() {
     await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 80);
   });
 
+  testWidgets('textAlign keeps image between text spans (single-line)', (
+    WidgetTester tester,
+  ) async {
+    late Uint8List pngBytes;
+    await tester.runAsync(() async {
+      pngBytes = await _makeSolidPng(width: 2, height: 2, color: Colors.cyan);
+    });
+
+    Future<void> pumpAndAssert({
+      required HtmlTextAlign textAlign,
+      required double expectedStartDx,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                key: const ValueKey('root'),
+                width: const FixedSize(160),
+                height: const AutoSize(),
+                textAlign: textAlign,
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  const HtmlText('xxxx', key: ValueKey('t1'), style: ahem10),
+                  HtmlImage(
+                    key: const ValueKey('img'),
+                    image: MemoryImage(pngBytes),
+                    width: const FixedSize(20),
+                    height: const FixedSize(10),
+                    placeholderSize: const Size(1, 1),
+                  ),
+                  const HtmlText('yy', key: ValueKey('t2'), style: ahem10),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final Offset rootTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('root')),
+      );
+      final Offset t1TopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('t1')),
+      );
+      final Offset imgTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('img')),
+      );
+      final Offset t2TopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('t2')),
+      );
+
+      // With Ahem10: 'xxxx' ~ 40px. The image should start right after it.
+      expect(
+        (imgTopLeft.dx - rootTopLeft.dx - (expectedStartDx + 40)).abs(),
+        lessThan(0.01),
+      );
+      // And 'yy' should start after image width (20px).
+      expect(
+        (t2TopLeft.dx - rootTopLeft.dx - (expectedStartDx + 40 + 20)).abs(),
+        lessThan(0.01),
+      );
+      // Sanity: order is preserved.
+      expect(t1TopLeft.dx, lessThan(imgTopLeft.dx));
+      expect(imgTopLeft.dx, lessThan(t2TopLeft.dx));
+      expect(tester.takeException(), isNull);
+    }
+
+    await pumpAndAssert(textAlign: HtmlTextAlign.center, expectedStartDx: 40);
+    await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 80);
+  });
+
+  testWidgets('textAlign centers/ends a single-line text-only run', (
+    WidgetTester tester,
+  ) async {
+    Future<void> pumpAndAssert({
+      required HtmlTextAlign textAlign,
+      required double expectedStartDx,
+    }) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                key: const ValueKey('root'),
+                width: const FixedSize(200),
+                height: const AutoSize(),
+                textAlign: textAlign,
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: const [
+                  HtmlText('Hello ', key: ValueKey('t1'), style: ahem10),
+                  HtmlText('world', key: ValueKey('t2'), style: ahem10),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // With Ahem10: 'Hello ' ~ 60px, 'world' ~ 50px => total ~ 110px.
+      // For width=200: start=0, center=(200-110)/2=45, end=(200-110)=90.
+      final Offset rootTopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('root')),
+      );
+      final Offset t1TopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('t1')),
+      );
+      final Offset t2TopLeft = tester.getTopLeft(
+        find.byKey(const ValueKey('t2')),
+      );
+
+      expect(
+        (t1TopLeft.dx - rootTopLeft.dx - expectedStartDx).abs(),
+        lessThan(0.01),
+      );
+      expect(t1TopLeft.dx, lessThan(t2TopLeft.dx));
+      expect(tester.takeException(), isNull);
+    }
+
+    await pumpAndAssert(textAlign: HtmlTextAlign.center, expectedStartDx: 45);
+    await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 90);
+  });
+
+  testWidgets(
+    'textAlign center/end keeps image between spans when first text ends with space',
+    (WidgetTester tester) async {
+      late Uint8List pngBytes;
+      await tester.runAsync(() async {
+        pngBytes = await _makeSolidPng(
+          width: 2,
+          height: 2,
+          color: Colors.lightBlue,
+        );
+      });
+
+      Future<void> pumpAndAssert({
+        required HtmlTextAlign textAlign,
+        required double expectedStartDx,
+      }) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.noScaling),
+              child: Center(
+                child: HtmlDiv(
+                  key: const ValueKey('root'),
+                  width: const FixedSize(200),
+                  height: const AutoSize(),
+                  textAlign: textAlign,
+                  border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                  children: [
+                    const HtmlText(
+                      'Hello ',
+                      key: ValueKey('t1'),
+                      style: ahem10,
+                    ),
+                    HtmlImage(
+                      key: const ValueKey('img'),
+                      image: MemoryImage(pngBytes),
+                      width: const FixedSize(20),
+                      height: const FixedSize(10),
+                      placeholderSize: const Size(1, 1),
+                    ),
+                    const HtmlText('world', key: ValueKey('t2'), style: ahem10),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final Offset rootTopLeft = tester.getTopLeft(
+          find.byKey(const ValueKey('root')),
+        );
+        final Offset t1TopLeft = tester.getTopLeft(
+          find.byKey(const ValueKey('t1')),
+        );
+        final Offset imgTopLeft = tester.getTopLeft(
+          find.byKey(const ValueKey('img')),
+        );
+        final Offset t2TopLeft = tester.getTopLeft(
+          find.byKey(const ValueKey('t2')),
+        );
+
+        // With Ahem10: each char ~10px. 'Hello ' => 60px, img 20px, 'world' => 50px.
+        // Total ~130px. For width=200: center start=(200-130)/2=35; end start=(200-130)=70.
+        expect(
+          (t1TopLeft.dx - rootTopLeft.dx - expectedStartDx).abs(),
+          lessThan(0.01),
+        );
+        expect(
+          (imgTopLeft.dx - rootTopLeft.dx - (expectedStartDx + 60)).abs(),
+          lessThan(0.01),
+        );
+        expect(
+          (t2TopLeft.dx - rootTopLeft.dx - (expectedStartDx + 60 + 20)).abs(),
+          lessThan(0.01),
+        );
+        expect(t1TopLeft.dx, lessThan(imgTopLeft.dx));
+        expect(imgTopLeft.dx, lessThan(t2TopLeft.dx));
+        expect(tester.takeException(), isNull);
+      }
+
+      await pumpAndAssert(textAlign: HtmlTextAlign.center, expectedStartDx: 35);
+      await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 70);
+    },
+  );
+
   testWidgets(
     'textAlign.center + textIndent: wrapped non-first line is centered (mixed text+image)',
     (WidgetTester tester) async {

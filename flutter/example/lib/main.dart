@@ -15,6 +15,7 @@ import 'pages/margin_page.dart';
 import 'pages/padding_page.dart';
 import 'pages/transform_page.dart';
 import 'pages/inline_page.dart';
+import 'pages/inline_text_align_page.dart';
 import 'pages/css_paint_order_page.dart';
 import 'pages/min_max_size_page.dart';
 import 'pages/flex_layout_page.dart';
@@ -177,6 +178,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const InlinePage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('Inline × TextAlign 实验页'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const InlineTextAlignPage()),
             ),
           ),
           ListTile(
