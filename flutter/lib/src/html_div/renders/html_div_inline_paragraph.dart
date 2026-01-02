@@ -1,6 +1,13 @@
 part of '../../../html_div.dart';
 
 final RegExp _breakAllWhitespaceRegExp = RegExp(r'\s');
+// CJK scripts typically have native per-character line break opportunities.
+// Avoid injecting \u200B for these ranges, because it can affect text
+// shaping/measurement on some engines (notably Windows) and introduce
+// unexpected wrapping.
+final RegExp _cjkLikeRegExp = RegExp(
+  r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]',
+);
 
 extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
   String _breakAllTextIfNeeded(String s) {
@@ -9,6 +16,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
     // can still consume remaining line space (CSS-like break-all).
     if (s.length <= 1) return s;
     if (s.contains(_breakAllWhitespaceRegExp)) return s;
+    if (s.contains(_cjkLikeRegExp)) return s;
     if (s.contains('\u200B')) return s;
     return s.characters.join('\u200B');
   }
@@ -21,6 +29,19 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
     required double? childContentMaxHeight,
     required double firstLineIndentPx,
   }) {
+    bool subtreeHasNonEmptyText(RenderBox root) {
+      if (root is RenderHtmlText) return root.data.isNotEmpty;
+      if (root is RenderHtmlDiv) {
+        RenderBox? c = root.firstChild;
+        while (c != null) {
+          if (subtreeHasNonEmptyText(c)) return true;
+          final HtmlDivParentData pd = c.parentData as HtmlDivParentData;
+          c = pd.nextSibling;
+        }
+      }
+      return false;
+    }
+
     RenderHtmlText? findFirstTextInSubtree(RenderBox root) {
       if (root is RenderHtmlText) return root;
       if (root is RenderHtmlDiv) {
@@ -146,13 +167,50 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
           contentWidth,
         );
         final double childMaxWidth = math.max(0.0, contentWidth - m.horizontal);
+        // See display:inline paragraph path in html_div.dart: placeholder
+        // children are atomic inline boxes, so prefer max-content measurement
+        // for inline RenderHtmlDiv placeholders with auto sizing.
+        final bool preferUnboundedWidth =
+            child is RenderHtmlDiv &&
+            child._display == HtmlDisplay.inline &&
+            // Only opt into max-content measurement for inline wrappers that
+            // explicitly set a line-height. This avoids breaking the
+            // transparent wrapper used for delegated text-indent, which must
+            // be forced to the full line width.
+            child._lineHeight != null &&
+            child._width is AutoSize &&
+            child._minWidth == null &&
+            child._maxWidth == null;
+
         final BoxConstraints childConstraints = childContentMaxHeight == null
-            ? BoxConstraints(maxWidth: childMaxWidth)
+            ? BoxConstraints(
+                maxWidth: preferUnboundedWidth
+                    ? double.infinity
+                    : childMaxWidth,
+              )
             : BoxConstraints(
-                maxWidth: childMaxWidth,
+                maxWidth: preferUnboundedWidth
+                    ? double.infinity
+                    : childMaxWidth,
                 maxHeight: childContentMaxHeight,
               );
         child.layout(childConstraints, parentUsesSize: true);
+
+        // CSS-like baseline behavior:
+        // - Inline span wrappers with in-flow text align by alphabetic baseline.
+        // - Otherwise align by bottom edge (replaced elements).
+        final bool useAlphabeticBaseline =
+            child is RenderHtmlDiv &&
+            child._display == HtmlDisplay.inline &&
+            subtreeHasNonEmptyText(child);
+        final double baselineFromTop = useAlphabeticBaseline
+            ? (child.getDistanceToBaseline(
+                    TextBaseline.alphabetic,
+                    onlyReal: true,
+                  ) ??
+                  child.getDistanceToBaseline(TextBaseline.alphabetic) ??
+                  child.size.height)
+            : child.size.height;
 
         placeholderChildren.add(child);
         placeholderMargins.add(m);
@@ -172,7 +230,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
             ),
             alignment: PlaceholderAlignment.baseline,
             baseline: TextBaseline.alphabetic,
-            baselineOffset: m.top + child.size.height,
+            baselineOffset: m.top + baselineFromTop,
           ),
         );
         paragraphOffset += 1;
@@ -464,6 +522,19 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
 
       final int firstLine = findLineIndexForBox(tBoxes.first);
       final int lastLine = findLineIndexForBox(tBoxes.last);
+      // Keep DevTools/tests in sync with actual unified paragraph wrapping.
+      // Derive the line count from the segment's own selection boxes to avoid
+      // off-by-one issues when the paragraph includes indent-only/placeholder lines.
+      int countLinesFromBoxes(List<TextBox> boxes) {
+        if (boxes.isEmpty) return 0;
+        final Set<int> lines = <int>{};
+        for (final TextBox b in boxes) {
+          lines.add(findLineIndexForBox(b));
+        }
+        return lines.length;
+      }
+
+      t.setParagraphDebugLineCount(countLinesFromBoxes(tBoxes));
       final double firstBaselineFromTop = metrics.isEmpty
           ? 0.0
           : metrics[firstLine].baseline - r.top;

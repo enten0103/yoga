@@ -81,15 +81,29 @@ Widget _label(HtmlTextAlign align) {
   );
 }
 
+String _alignKeySuffix(HtmlTextAlign align) {
+  return switch (align) {
+    HtmlTextAlign.start => 'start',
+    HtmlTextAlign.center => 'center',
+    HtmlTextAlign.end => 'end',
+    HtmlTextAlign.justify => 'justify',
+  };
+}
+
 Widget _frame({
+  Key? key,
+  Key? repaintBoundaryKey,
   required double width,
   required HtmlTextAlign align,
+  HtmlDisplay display = HtmlDisplay.block,
   required List<Widget> children,
 }) {
-  return HtmlDiv(
+  final Widget div = HtmlDiv(
+    key: key,
     width: FixedSize(width),
     height: const AutoSize(),
     textAlign: align,
+    display: display,
     border: HtmlBorder.all(
       width: const FixedBorderWidth(1),
       style: HtmlBorderStyle.solid,
@@ -98,21 +112,52 @@ Widget _frame({
     background: const HtmlBackground(color: Color(0x0A000000)),
     children: children,
   );
+
+  if (repaintBoundaryKey == null) return div;
+  return RepaintBoundary(key: repaintBoundaryKey, child: div);
 }
 
 Widget _mixedSingleLine({required HtmlTextAlign align}) {
+  final String s = _alignKeySuffix(align);
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       _label(align),
       const SizedBox(height: 6),
       _frame(
+        key: ValueKey('mixedSingleLine.$s.frame'),
+        repaintBoundaryKey: ValueKey('mixedSingleLine.$s.rb'),
         width: 320,
         align: align,
+        display: HtmlDisplay.inline,
         children: [
-          const HtmlText('Hello ', style: TextStyle(fontSize: 14, height: 1.4)),
-
-          const HtmlText(' world', style: TextStyle(fontSize: 14, height: 1.4)),
+          HtmlDiv(
+            lineHeight: HtmlLength.px(14),
+            display: HtmlDisplay.inline,
+            children: [
+              HtmlText(
+                '轻之国度录入组',
+                key: ValueKey('mixedSingleLine.$s.left'),
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
+          HtmlText(
+            'x',
+            key: ValueKey('mixedSingleLine.$s.x'),
+            style: const TextStyle(fontSize: 14, height: 1.4),
+          ),
+          HtmlDiv(
+            lineHeight: HtmlLength.px(22),
+            display: HtmlDisplay.inline,
+            children: [
+              HtmlText(
+                '虚空文学旅团',
+                key: ValueKey('mixedSingleLine.$s.right'),
+                style: TextStyle(fontSize: 14, height: 1.4),
+              ),
+            ],
+          ),
         ],
       ),
     ],

@@ -2,13 +2,11 @@ part of '../../html_div.dart';
 
 /// 【工具方法】计算给定文本在指定宽度/样式/缩进规则下占用的“排版行数”。
 ///
-/// 该方法刻意复用/对齐 [RenderHtmlText] 的 text-indent 逻辑：
-/// - 只对第一条排版行应用首行缩进（[firstLineIndentPx]）。
-/// - 先用 `firstLineMaxWidth = maxWidth - firstLineIndentPx` probe 一次，
-///   若 probe 不折行则不 split（避免“看起来单行但高度像两行”的回归）。
-/// - 若 probe 折行，则把文本拆成 `first/rest`：first 用 `firstLineMaxWidth` 排，
-///   rest 用 `maxWidth` 排；总行数 = 1 + rest 行数。
-/// - 对无空格 CJK 文本做“尾巴过短(widow)”与“，第”边界微调。
+/// 该方法用于测试：让“纯测量”结果尽量对齐实际渲染。
+///
+/// 当前 HtmlDiv 的 unified paragraph 会通过一个“首行缩进占位符”(WidgetSpan)
+/// 来实现 text-indent，因此这里也复用相同的 TextPainter + placeholder
+/// 方案来计算行数。
 ///
 /// 注意：行数是“在给定布局约束下”的结果；若 maxWidth/字体/平台不同，结果也可能不同。
 int measureTextLineCount({
@@ -26,18 +24,36 @@ int measureTextLineCount({
   int? maxLines,
   String? semanticsLabel,
 }) {
-  // 与 RenderHtmlText 一致：无界宽度时按无限宽处理。
+  // 与渲染路径一致：无界宽度时按无限宽处理。
   final double effectiveMaxWidth = maxWidth.isFinite
       ? maxWidth
       : double.infinity;
 
-  // Paragraph/placeholder semantics (WidgetSpan-like), to match the unified
-  // paragraph layout used by RenderHtmlDiv.
-  final List<InlineSpan> spans = <InlineSpan>[];
+  String breakAllIfNeeded(String s) {
+    if (s.length <= 1) return s;
+    if (s.contains(RegExp(r'\s'))) return s;
+    if (s.contains('\u200B')) return s;
+    return s.characters.join('\u200B');
+  }
+
+  final String paragraphText = breakAllIfNeeded(text);
+
+  // Mirror HtmlDiv's unified paragraph behavior:
+  // - optional first-line indent implemented via a placeholder span
+  // - the paragraph is laid out with minWidth=maxWidth=contentWidth
+  //   to match CSS-like line box semantics.
+  final List<InlineSpan> spanChildren = <InlineSpan>[];
   final List<PlaceholderDimensions> placeholderDims = <PlaceholderDimensions>[];
 
-  if (firstLineIndentPx > 0) {
-    spans.add(
+  // Extreme indent: match current rendering behavior by ignoring indent when
+  // it consumes the whole line width (indent >= maxWidth).
+  final bool applyIndentPlaceholder =
+      firstLineIndentPx > 0.0 &&
+      effectiveMaxWidth.isFinite &&
+      firstLineIndentPx < effectiveMaxWidth;
+
+  if (applyIndentPlaceholder) {
+    spanChildren.add(
       const WidgetSpan(
         child: SizedBox.shrink(),
         alignment: PlaceholderAlignment.baseline,
@@ -54,10 +70,12 @@ int measureTextLineCount({
     );
   }
 
-  spans.add(TextSpan(text: text, style: style, semanticsLabel: semanticsLabel));
+  spanChildren.add(
+    TextSpan(text: paragraphText, style: style, semanticsLabel: semanticsLabel),
+  );
 
   final TextPainter painter = TextPainter(
-    text: TextSpan(children: spans, style: style),
+    text: TextSpan(children: spanChildren),
     textAlign: textAlign,
     textDirection: textDirection,
     textScaler: textScaler,
@@ -68,10 +86,17 @@ int measureTextLineCount({
     textHeightBehavior: textHeightBehavior,
     ellipsis: null,
   );
+
   if (placeholderDims.isNotEmpty) {
     painter.setPlaceholderDimensions(placeholderDims);
   }
-  painter.layout(maxWidth: effectiveMaxWidth);
+
+  if (effectiveMaxWidth.isFinite) {
+    painter.layout(minWidth: effectiveMaxWidth, maxWidth: effectiveMaxWidth);
+  } else {
+    painter.layout(maxWidth: effectiveMaxWidth);
+  }
+
   return painter.computeLineMetrics().length;
 }
 

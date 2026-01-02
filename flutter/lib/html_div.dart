@@ -1295,7 +1295,14 @@ class RenderHtmlDiv extends RenderBox
         final double minI = computeMinIntrinsicWidth(double.infinity);
         final double maxI = computeMaxIntrinsicWidth(double.infinity);
         final double available = availableBorderBoxWidth;
-        intrinsicBorderBox = math.min(maxI, math.max(minI, available));
+        // Inline auto is shrink-to-fit. When line-height/strut is in play,
+        // text measurement can differ fractionally between intrinsic sizing
+        // and final paragraph layout, which may wrap the last glyph to a new
+        // line unexpectedly. Snap up to whole pixels to keep single-line
+        // content stable.
+        intrinsicBorderBox = math
+            .min(maxI, math.max(minI, available))
+            .ceilToDouble();
       } else if (_width is FitContent) {
         final double minI = computeMinIntrinsicWidth(double.infinity);
         final double maxI = computeMaxIntrinsicWidth(double.infinity);
@@ -1451,6 +1458,18 @@ class RenderHtmlDiv extends RenderBox
       }
 
       // Build spans and layout placeholder children.
+      bool subtreeHasNonEmptyText(RenderBox root) {
+        if (root is RenderHtmlText) return root.data.isNotEmpty;
+        if (root is RenderHtmlDiv) {
+          RenderBox? c = root.firstChild;
+          while (c != null) {
+            if (subtreeHasNonEmptyText(c)) return true;
+            c = (c.parentData as HtmlDivParentData).nextSibling;
+          }
+        }
+        return false;
+      }
+
       RenderBox? child = firstChild;
       while (child != null) {
         final HtmlDivParentData pd = child.parentData as HtmlDivParentData;
@@ -1491,15 +1510,58 @@ class RenderHtmlDiv extends RenderBox
             0.0,
             contentWidth - m.horizontal,
           );
-          child.layout(
-            childContentMaxHeight == null
-                ? BoxConstraints(maxWidth: childMaxWidth)
-                : BoxConstraints(
-                    maxWidth: childMaxWidth,
-                    maxHeight: childContentMaxHeight,
-                  ),
-            parentUsesSize: true,
-          );
+          // IMPORTANT:
+          // Placeholder children are treated as atomic inline boxes (WidgetSpan).
+          // If we constrain them to the remaining line width, they may wrap
+          // internally (creating multi-line content inside a single placeholder),
+          // which is surprising in mixed inline experiments.
+          //
+          // For inline RenderHtmlDiv placeholders with auto sizing, prefer a
+          // max-content measurement by using an unbounded maxWidth.
+          final bool preferUnboundedWidth =
+              child is RenderHtmlDiv &&
+              child._display == HtmlDisplay.inline &&
+              // Only opt into max-content measurement for inline wrappers that
+              // explicitly set a line-height. This avoids breaking the
+              // transparent wrapper used for delegated text-indent, which must
+              // be forced to the full line width.
+              child._lineHeight != null &&
+              child._width is AutoSize &&
+              child._minWidth == null &&
+              child._maxWidth == null;
+
+          final BoxConstraints placeholderConstraints =
+              childContentMaxHeight == null
+              ? BoxConstraints(
+                  maxWidth: preferUnboundedWidth
+                      ? double.infinity
+                      : childMaxWidth,
+                )
+              : BoxConstraints(
+                  maxWidth: preferUnboundedWidth
+                      ? double.infinity
+                      : childMaxWidth,
+                  maxHeight: childContentMaxHeight,
+                );
+
+          child.layout(placeholderConstraints, parentUsesSize: true);
+
+          // CSS-like baseline behavior:
+          // - If an inline span wrapper has in-flow text, align by its
+          //   alphabetic baseline (last line box).
+          // - Otherwise (e.g. replaced elements), align by its bottom edge.
+          final bool useAlphabeticBaseline =
+              child is RenderHtmlDiv &&
+              child._display == HtmlDisplay.inline &&
+              subtreeHasNonEmptyText(child);
+          final double baselineFromTop = useAlphabeticBaseline
+              ? (child.getDistanceToBaseline(
+                      TextBaseline.alphabetic,
+                      onlyReal: true,
+                    ) ??
+                    child.getDistanceToBaseline(TextBaseline.alphabetic) ??
+                    child.size.height)
+              : child.size.height;
 
           _paragraphPlaceholderChildren.add(child);
           placeholderMargins.add(m);
@@ -1518,8 +1580,7 @@ class RenderHtmlDiv extends RenderBox
               ),
               alignment: PlaceholderAlignment.baseline,
               baseline: TextBaseline.alphabetic,
-              // Baseline-at-bottom for non-text boxes.
-              baselineOffset: m.top + child.size.height,
+              baselineOffset: m.top + baselineFromTop,
             ),
           );
           // Placeholders occupy one character in the paragraph's plain text.
@@ -1600,6 +1661,7 @@ class RenderHtmlDiv extends RenderBox
         final HtmlDivParentData pd = t.parentData as HtmlDivParentData;
         // Clear any stale overrides first.
         t.clearParagraphBaselineOverrides();
+        t.setParagraphDebugLineCount(null);
 
         if (start == end) {
           pd.offset = Offset(xOffset, yOffset);
@@ -1628,6 +1690,19 @@ class RenderHtmlDiv extends RenderBox
         final TextBox lastBox = tBoxes.last;
         final int firstLine = findLineIndexForBox(firstBox);
         final int lastLine = findLineIndexForBox(lastBox);
+        // Keep DevTools/tests in sync with actual unified paragraph wrapping.
+        // Derive the line count from the segment's own selection boxes to avoid
+        // off-by-one issues when the paragraph includes indent-only/placeholder lines.
+        int countLinesFromBoxes(List<TextBox> boxes) {
+          if (boxes.isEmpty) return 0;
+          final Set<int> lines = <int>{};
+          for (final TextBox b in boxes) {
+            lines.add(findLineIndexForBox(b));
+          }
+          return lines.length;
+        }
+
+        t.setParagraphDebugLineCount(countLinesFromBoxes(tBoxes));
         final double firstBaselineFromTop = metrics[firstLine].baseline - r.top;
         final double lastBaselineFromTop = metrics[lastLine].baseline - r.top;
         t.setParagraphBaselineOverrides(

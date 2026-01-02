@@ -473,7 +473,9 @@ void main() {
           HtmlDiv(
             key: const ValueKey('span'),
             display: HtmlDisplay.inline,
-            children: const [HtmlText('x', style: ahem10)],
+            children: const [
+              HtmlText('x', key: ValueKey('spanText'), style: ahem10),
+            ],
           ),
           HtmlImage(
             key: const ValueKey('img'),
@@ -495,10 +497,13 @@ void main() {
       const ValueKey('t1'),
     );
     final double baselineYimg = _imageBaselineY(tester, const ValueKey('img'));
-    final double bottomYSpan = _boxBottomY(tester, const ValueKey('span'));
+    final double baselineYSpanText = _textFirstLineBaselineY(
+      tester,
+      const ValueKey('spanText'),
+    );
 
     expect((baselineYt1 - baselineYimg).abs(), lessThan(0.01));
-    expect((baselineYt1 - bottomYSpan).abs(), lessThan(0.01));
+    expect((baselineYt1 - baselineYSpanText).abs(), lessThan(0.01));
     expect(tester.takeException(), isNull);
   });
 
@@ -1046,6 +1051,125 @@ void main() {
     await pumpAndAssert(textAlign: HtmlTextAlign.center, expectedStartDx: 45);
     await pumpAndAssert(textAlign: HtmlTextAlign.end, expectedStartDx: 90);
   });
+
+  testWidgets('lineHeight on nested inline HtmlDiv does not force wrapping', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(textScaler: TextScaler.noScaling),
+          child: Center(
+            child: HtmlDiv(
+              width: FixedSize(320),
+              height: AutoSize(),
+              textAlign: HtmlTextAlign.start,
+              border: HtmlBorder.all(width: FixedBorderWidth(0)),
+              children: [
+                HtmlDiv(
+                  display: HtmlDisplay.inline,
+                  lineHeight: HtmlLength.px(14),
+                  children: [
+                    HtmlText(
+                      '轻之国度录入组',
+                      key: ValueKey('tLeft'),
+                      style: TextStyle(fontSize: 14, height: 1.4),
+                    ),
+                  ],
+                ),
+                HtmlText('x', style: TextStyle(fontSize: 14, height: 1.4)),
+                HtmlDiv(
+                  display: HtmlDisplay.inline,
+                  lineHeight: HtmlLength.px(22),
+                  children: [
+                    HtmlText(
+                      '虚空文学旅团',
+                      key: ValueKey('tRight'),
+                      style: TextStyle(fontSize: 14, height: 1.4),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final RenderHtmlText left = tester.renderObject(
+      find.byKey(const ValueKey('tLeft')),
+    );
+    final RenderHtmlText right = tester.renderObject(
+      find.byKey(const ValueKey('tRight')),
+    );
+
+    expect(left.debugLineCount, 1);
+    expect(right.debugLineCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'lineHeight does not force wrapping when parent HtmlDiv is inline',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.noScaling),
+            child: Center(
+              child: HtmlDiv(
+                display: HtmlDisplay.inline,
+                width: const FixedSize(320),
+                height: const AutoSize(),
+                textAlign: HtmlTextAlign.start,
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    lineHeight: HtmlLength.px(14),
+                    children: const [
+                      HtmlText(
+                        '轻之国度录入组',
+                        key: ValueKey('pInline.left'),
+                        style: TextStyle(fontSize: 14, height: 1.4),
+                      ),
+                    ],
+                  ),
+                  const HtmlText(
+                    'x',
+                    style: TextStyle(fontSize: 14, height: 1.4),
+                  ),
+                  HtmlDiv(
+                    display: HtmlDisplay.inline,
+                    lineHeight: HtmlLength.px(22),
+                    children: const [
+                      HtmlText(
+                        '虚空文学旅团',
+                        key: ValueKey('pInline.right'),
+                        style: TextStyle(fontSize: 14, height: 1.4),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final RenderHtmlText left = tester.renderObject(
+        find.byKey(const ValueKey('pInline.left')),
+      );
+      final RenderHtmlText right = tester.renderObject(
+        find.byKey(const ValueKey('pInline.right')),
+      );
+
+      expect(left.debugLineCount, 1);
+      expect(right.debugLineCount, 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'textAlign center/end keeps image between spans when first text ends with space',

@@ -203,19 +203,28 @@ class RenderHtmlText extends RenderBox {
   @visibleForTesting
   int get debugLineCount {
     final int? override = _paragraphOverrideDebugLineCount;
-    if (override != null) return override;
-
-    final TextPainter? full = _painterFull;
-    if (full != null) {
-      return full.computeLineMetrics().length;
+    int result;
+    if (override != null) {
+      result = override;
+    } else {
+      final TextPainter? full = _painterFull;
+      if (full != null) {
+        result = full.computeLineMetrics().length;
+      } else {
+        final TextPainter? first = _painterFirst;
+        if (first == null) {
+          result = 0;
+        } else {
+          final TextPainter? rest = _painterRest;
+          final int restLines = rest == null
+              ? 0
+              : rest.computeLineMetrics().length;
+          result = 1 + restLines;
+        }
+      }
     }
 
-    final TextPainter? first = _painterFirst;
-    if (first == null) return 0;
-
-    final TextPainter? rest = _painterRest;
-    final int restLines = rest == null ? 0 : rest.computeLineMetrics().length;
-    return 1 + restLines;
+    return result;
   }
 
   void setParagraphDebugLineCount(int? value) {
