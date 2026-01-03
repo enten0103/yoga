@@ -360,6 +360,66 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
       }
     }
 
+    // Some engines (notably with forced strut height) can position large
+    // baseline-aligned placeholders above y=0 in paragraph coordinates when a
+    // small line-height is combined with a tall replaced element.
+    //
+    // IMPORTANT:
+    // - For text-only runs, keep legacy behavior: run height ~= painter.height
+    //   (tests rely on this).
+    // - When baseline-aligned placeholders produce negative tops, painter.height
+    //   may be measured in a different implicit coordinate system (top-clamped
+    //   to 0), which can double-count height if combined with negative tops.
+    //   In that case, derive maxRunBottom from aligned bottoms instead.
+    double minRunTop = 0.0;
+    double maxRunBottom = painter.height;
+
+    double maxAlignedBottom = 0.0;
+    // NOTE: We intentionally don't use LineMetrics for bottom extents here,
+    // because different Flutter engines/versions can disagree on how the
+    // "leading" portion is represented. Selection boxes already reflect the
+    // painted extents for text, and placeholderTop+size reflects the intended
+    // extents for placeholders.
+
+    final int placeholderDimsBaseIndex = hasIndentPlaceholder ? 1 : 0;
+    for (int i = 0; i < placeholderChildBoxes.length; i++) {
+      final TextBox b = placeholderChildBoxes[i];
+      final int lineIndex = findLineIndexForBox(b);
+      if (metrics.isNotEmpty &&
+          lineIndex >= 0 &&
+          lineIndex < metrics.length &&
+          placeholderDimsBaseIndex + i < placeholderDims.length) {
+        final PlaceholderDimensions d =
+            placeholderDims[placeholderDimsBaseIndex + i];
+        final double phTop =
+            (metrics[lineIndex].baseline - (d.baselineOffset ?? 0.0))
+                .toDouble();
+        minRunTop = math.min(minRunTop, phTop);
+        maxAlignedBottom = math.max(maxAlignedBottom, phTop + d.size.height);
+      } else {
+        // Fallback to box-reported extents.
+        minRunTop = math.min(minRunTop, b.top);
+        maxAlignedBottom = math.max(maxAlignedBottom, b.bottom);
+      }
+    }
+    for (final List<TextBox> boxes in cachedTextBoxes) {
+      for (final TextBox b in boxes) {
+        minRunTop = math.min(minRunTop, b.top);
+        maxAlignedBottom = math.max(maxAlignedBottom, b.bottom);
+      }
+    }
+
+    // Always expand to include any aligned bottoms we observed.
+    maxRunBottom = math.max(maxRunBottom, maxAlignedBottom);
+
+    // If we detected negative tops, avoid mixing with painter.height. In this
+    // scenario, use aligned bottoms (line metrics + placeholders + text boxes)
+    // as the run's bottom extent.
+    if (minRunTop < 0) {
+      maxRunBottom = math.max(maxAlignedBottom, 0.0);
+    }
+    final double runShiftY = minRunTop < 0 ? -minRunTop : 0.0;
+
     double computedLineWidth(int lineIndex) {
       if (lineCount == 0) return 0.0;
       final int i = lineIndex.clamp(0, lineCount - 1);
@@ -474,9 +534,20 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
         final double indentCorrection = positiveIndentCorrectionForLine(
           lineIndex,
         );
+        double placeholderTop = b.top;
+        if (metrics.isNotEmpty &&
+            lineIndex >= 0 &&
+            lineIndex < metrics.length &&
+            placeholderDimsBaseIndex + i < placeholderDims.length) {
+          final PlaceholderDimensions d =
+              placeholderDims[placeholderDimsBaseIndex + i];
+          placeholderTop =
+              (metrics[lineIndex].baseline - (d.baselineOffset ?? 0.0))
+                  .toDouble();
+        }
         pd.offset = Offset(
           xOffset + lineLeft + b.left + indentCorrection + m.left,
-          yTop + b.top + m.top,
+          yTop + runShiftY + placeholderTop + m.top,
         );
       }
     }
@@ -485,7 +556,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
     for (final (RenderHtmlText t, int start, int end) in textSegments) {
       final HtmlDivParentData pd = t.parentData as HtmlDivParentData;
       if (start == end) {
-        pd.offset = Offset(xOffset, yTop);
+        pd.offset = Offset(xOffset, yTop + runShiftY);
         continue;
       }
 
@@ -495,7 +566,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
           TextPosition(offset: start),
           Rect.zero,
         );
-        pd.offset = Offset(xOffset + caret.dx, yTop + caret.dy);
+        pd.offset = Offset(xOffset + caret.dx, yTop + runShiftY + caret.dy);
         continue;
       }
 
@@ -545,21 +616,14 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
         firstLineBaselineFromTop: firstBaselineFromTop,
         lastLineBaselineFromTop: lastBaselineFromTop,
       );
-      pd.offset = Offset(xOffset + r.left, yTop + r.top);
+      pd.offset = Offset(xOffset + r.left, yTop + runShiftY + r.top);
     }
 
-    double runHeight = painter.height;
-    if (textSegments.isEmpty && placeholderDims.isNotEmpty) {
-      double maxPlaceholderHeight = 0.0;
-      for (final PlaceholderDimensions d in placeholderDims) {
-        maxPlaceholderHeight = math.max(maxPlaceholderHeight, d.size.height);
-      }
-      runHeight = math.max(runHeight, maxPlaceholderHeight);
-    }
+    final double runHeight = math.max(0.0, maxRunBottom - minRunTop);
 
     return _ParagraphRun(
       painter: painter,
-      offset: Offset(xOffset, yTop),
+      offset: Offset(xOffset, yTop + runShiftY),
       height: runHeight,
     );
   }

@@ -24,10 +24,21 @@
 ## 如何加/改一个 CSS-like 能力（按现有管线走）
 `models/*` → 在 `HtmlDiv/HtmlImage` 增参数 → `updateRenderObject` 传入 → `Render*` 增字段+setter → 放到对应 `renders/html_div_*.dart` 分区实现（按邻近 setter 选择 `markNeedsLayout()` vs `markNeedsPaint()`）。
 
+## CSS 对齐与测试原则（HtmlImage sizing）
+- 默认 natural size 一定会声明：测试里给 `HtmlImage.naturalPixelSize/naturalPixelScale`，避免异步 header probing 影响布局时序。
+- 预期对齐 CSS/MDN（replaced element sizing 的最小集合）：
+  - `width/height` 同时指定：允许拉伸（不强制保持比例）。
+  - 只指定一个轴、另一个轴为 `auto`：按 natural ratio 推导 `auto` 轴，且必须用“父约束夹紧后的 used 尺寸”推导（避免 clamp 后仍按原始 CSS 值推导）。
+  - `auto/auto`：使用 natural logical size（受父约束影响时保持比例收缩）。
+  - `%`：仅在对应轴 parent constraint bounded 时解析（否则按 `auto` 路径处理）。
+- 测试结构：优先用 `HtmlDiv/HtmlText/HtmlImage` 搭结构；若测试目标是复现 Flutter `BoxConstraints`（如 maxWidth/maxHeight 夹紧），允许最小 `SizedBox/ConstrainedBox` 作为“约束夹具”。
+
 ## 测试与示例（复现/回归优先看）
+- 测试结构约定：能用 `HtmlDiv/HtmlText/HtmlImage` 搭出来的布局结构，优先用它们；尽量少用 `SizedBox/Container/DecoratedBox/Center` 等 Flutter 原生布局组件（保留 `Directionality/MaterialApp` 这类测试外壳即可；若需要施加真实 Flutter `BoxConstraints` 来复现父约束夹紧，可用最小的 `SizedBox/ConstrainedBox` 作为“约束夹具”）。
 - 单测：`flutter/test/*.dart`（高密度覆盖 box model、border-image、inline 文本/图片换行、基线等）。
   - 行内排版/图片换行：`flutter/test/inline_text_image_wrap_test.dart`
   - text-indent/line-height/测量对齐：`flutter/test/display_inline_test.dart` + `flutter/lib/src/html_div/text_measure.dart` 的 `measureTextLineCount`
+  - HtmlImage 基线回归（inline wrapper + line-height）：`flutter/test/html_image_inline_baseline_test.dart`
 - Example Gallery：`flutter/example/lib/main.dart` + `flutter/example/lib/pages/*`（大部分页面都有对应 HTML 对照在 `flutter/example/html/pages/*`）。
 - 集成测试：`flutter/example/integration_test/inline_text_align_page_test.dart`（用 `RepaintBoundary` 像素扫描验证 text-align/inline 混排）。
 

@@ -35,21 +35,26 @@ void main() {
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
-          child: Center(
-            child: SizedBox(
-              width: 80, // tight width constraint
-              child: HtmlImage(
-                key: const ValueKey('img'),
-                image: MemoryImage(pngBytes),
-                width: const FixedSize(200),
-                height: const AutoSize(),
-                // Declare the natural size to avoid async probing.
-                naturalPixelSize: const Size(100, 50),
-                naturalPixelScale: 1.0,
-                // Keep placeholder non-zero to keep the layout path stable.
-                placeholderSize: const Size(1, 1),
+          child: HtmlDiv(
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: [
+              SizedBox(
+                // Clamp width via a direct parent RenderBox.
+                // RenderHtmlDiv may pre-measure children with loose constraints.
+                width: 80,
+                child: HtmlImage(
+                  key: const ValueKey('img'),
+                  image: MemoryImage(pngBytes),
+                  width: const FixedSize(200),
+                  height: const AutoSize(),
+                  // Declare the natural size to avoid async probing.
+                  naturalPixelSize: const Size(100, 50),
+                  naturalPixelScale: 1.0,
+                  // Keep placeholder non-zero to keep the layout path stable.
+                  placeholderSize: const Size(1, 1),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );
@@ -78,19 +83,23 @@ void main() {
       await tester.pumpWidget(
         Directionality(
           textDirection: TextDirection.ltr,
-          child: Center(
-            child: SizedBox(
-              height: 90, // tight height constraint
-              child: HtmlImage(
-                key: const ValueKey('img'),
-                image: MemoryImage(pngBytes),
-                width: const AutoSize(),
-                height: const FixedSize(200),
-                naturalPixelSize: const Size(100, 50),
-                naturalPixelScale: 1.0,
-                placeholderSize: const Size(1, 1),
+          child: HtmlDiv(
+            border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+            children: [
+              SizedBox(
+                // Clamp height via a direct parent RenderBox.
+                height: 90,
+                child: HtmlImage(
+                  key: const ValueKey('img'),
+                  image: MemoryImage(pngBytes),
+                  width: const AutoSize(),
+                  height: const FixedSize(200),
+                  naturalPixelSize: const Size(100, 50),
+                  naturalPixelScale: 1.0,
+                  placeholderSize: const Size(1, 1),
+                ),
               ),
-            ),
+            ],
           ),
         ),
       );

@@ -24,48 +24,65 @@ class HtmlImageNaturalSizeConstraintsPage extends StatelessWidget {
           const SizedBox(height: 12),
           const Text('Case A：width=300(auto height)，父约束 width=120'),
           const SizedBox(height: 8),
-          Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0x33000000)),
-              ),
-              child: SizedBox(
-                width: 120,
-                child: HtmlImage(
-                  key: const ValueKey('caseA'),
-                  image: _kWallhavenAsset,
-                  width: const FixedSize(300),
-                  height: const AutoSize(),
-                  naturalPixelSize: _kWallhavenPixelSize,
-                  naturalPixelScale: 1.0,
-                  placeholderSize: const Size(1, 1),
-                  debugLabel: 'A',
-                ),
-              ),
+          HtmlDiv(
+            border: HtmlBorder.all(
+              width: const FixedBorderWidth(1),
+              style: HtmlBorderStyle.solid,
+              color: const Color(0x33000000),
             ),
+            children: [
+              HtmlImage(
+                key: const ValueKey('caseA'),
+                image: _kWallhavenAsset,
+                width: const FixedSize(300),
+                naturalPixelSize: _kWallhavenPixelSize,
+                naturalPixelScale: 1.0,
+                placeholderSize: const Size(1, 1),
+                debugLabel: 'A',
+              ),
+              HtmlDiv(
+                border: HtmlBorder.all(width: const FixedBorderWidth(0)),
+                children: [
+                  HtmlImage(
+                    key: const ValueKey('caseA_inner'),
+                    image: _kWallhavenAsset,
+                    width: const FixedSize(300),
+                    naturalPixelSize: _kWallhavenPixelSize,
+                    naturalPixelScale: 1.0,
+                    placeholderSize: const Size(1, 1),
+                    debugLabel: 'A_inner',
+                  ),
+                ],
+              ),
+            ],
           ),
           const SizedBox(height: 24),
-          const Text('Case B：height=240(auto width)，父约束 height=90'),
           const SizedBox(height: 8),
-          Center(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                border: Border.all(color: const Color(0x33000000)),
-              ),
-              child: SizedBox(
-                height: 90,
-                child: HtmlImage(
-                  key: const ValueKey('caseB'),
-                  image: _kWallhavenAsset,
-                  width: const AutoSize(),
-                  height: const FixedSize(240),
-                  naturalPixelSize: _kWallhavenPixelSize,
-                  naturalPixelScale: 1.0,
-                  placeholderSize: const Size(1, 1),
-                  debugLabel: 'B',
-                ),
-              ),
+          HtmlDiv(
+            textAlign: HtmlTextAlign.center,
+            border: HtmlBorder.all(
+              width: const FixedBorderWidth(1),
+              style: HtmlBorderStyle.solid,
+              color: const Color(0x33000000),
             ),
+            children: [
+              HtmlDiv(
+                textAlign: HtmlTextAlign.center,
+                lineHeight: HtmlLength.px(16),
+                children: [
+                  HtmlImage(
+                    key: const ValueKey('caseB'),
+                    image: _kWallhavenAsset,
+                    width: const AutoSize(),
+                    height: const FixedSize(240),
+                    naturalPixelSize: _kWallhavenPixelSize,
+                    naturalPixelScale: 1.0,
+                    placeholderSize: const Size(1, 1),
+                    debugLabel: 'B',
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

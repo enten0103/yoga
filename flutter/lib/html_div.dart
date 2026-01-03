@@ -1611,10 +1611,39 @@ class RenderHtmlDiv extends RenderBox
       final double minWidth = contentWidth.isFinite ? contentWidth : 0.0;
       painter.layout(minWidth: minWidth, maxWidth: maxWidth);
       _paragraphTextPainter = painter;
-      _paragraphContentOffset = Offset(xOffset, yOffset);
+      // Some engines (especially with forced strut height) can place baseline-
+      // aligned placeholders (replaced elements) above y=0 in paragraph
+      // coordinates when line-height is smaller than the placeholder's height.
+      //
+      // If we don't account for negative tops, inline wrappers with a small
+      // line-height can paint children above their own box.
+      double minTop = 0.0;
+      double maxBottom = painter.height;
 
       // Position placeholder children.
       final List<TextBox>? boxes = painter.inlinePlaceholderBoxes;
+      if (boxes != null) {
+        for (final TextBox b in boxes) {
+          minTop = math.min(minTop, b.top);
+          maxBottom = math.max(maxBottom, b.bottom);
+        }
+      }
+
+      // Include text selection boxes in vertical extents too.
+      for (final (RenderHtmlText _, int start, int end) in textSegments) {
+        if (start == end) continue;
+        final List<TextBox> tBoxes = painter.getBoxesForSelection(
+          TextSelection(baseOffset: start, extentOffset: end),
+        );
+        for (final TextBox b in tBoxes) {
+          minTop = math.min(minTop, b.top);
+          maxBottom = math.max(maxBottom, b.bottom);
+        }
+      }
+
+      final double shiftY = minTop < 0 ? -minTop : 0.0;
+      _paragraphContentOffset = Offset(xOffset, yOffset + shiftY);
+
       if (boxes != null) {
         int boxIndex = 0;
         if (indentPx > 0) {
@@ -1628,7 +1657,7 @@ class RenderHtmlDiv extends RenderBox
           final TextBox b = boxes[boxIndex++];
           pd.offset = Offset(
             xOffset + b.left + m.left,
-            yOffset + b.top + m.top,
+            yOffset + shiftY + b.top + m.top,
           );
         }
       }
@@ -1664,7 +1693,7 @@ class RenderHtmlDiv extends RenderBox
         t.setParagraphDebugLineCount(null);
 
         if (start == end) {
-          pd.offset = Offset(xOffset, yOffset);
+          pd.offset = Offset(xOffset, yOffset + shiftY);
           continue;
         }
 
@@ -1677,7 +1706,7 @@ class RenderHtmlDiv extends RenderBox
             TextPosition(offset: start),
             Rect.zero,
           );
-          pd.offset = Offset(xOffset + caret.dx, yOffset + caret.dy);
+          pd.offset = Offset(xOffset + caret.dx, yOffset + shiftY + caret.dy);
           continue;
         }
 
@@ -1710,15 +1739,15 @@ class RenderHtmlDiv extends RenderBox
           lastLineBaselineFromTop: lastBaselineFromTop,
         );
 
-        pd.offset = Offset(xOffset + r.left, yOffset + r.top);
+        pd.offset = Offset(xOffset + r.left, yOffset + shiftY + r.top);
       }
 
       // Record last-line baseline for baseline queries.
       if (metrics.isNotEmpty) {
-        _lastLineBaselineFromTop = yOffset + metrics.last.baseline;
+        _lastLineBaselineFromTop = yOffset + shiftY + metrics.last.baseline;
       }
 
-      final double contentHeight = painter.height;
+      final double contentHeight = math.max(0.0, maxBottom - minTop);
 
       double? minH = resolveSizingLimit(_minHeight, isWidthAxis: false);
       double? maxH = resolveSizingLimit(_maxHeight, isWidthAxis: false);
