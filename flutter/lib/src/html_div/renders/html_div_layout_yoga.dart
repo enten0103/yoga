@@ -163,6 +163,23 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
 
       yoga.setWidth(root, contentWidth);
 
+      double? resolveRootContentLimit(HtmlSize? v) {
+        if (v == null) return null;
+        double? borderBox;
+        if (v is FixedSize) {
+          borderBox = v.value;
+        } else if (v is PercentSize && availableBorderBoxHeight.isFinite) {
+          borderBox = availableBorderBoxHeight * v.value / 100.0;
+        } else {
+          return null;
+        }
+
+        if (_boxSizing == HtmlBoxSizing.borderBox) {
+          borderBox = math.max(0.0, borderBox - borderVertical - paddingVertical);
+        }
+        return borderBox;
+      }
+
       if (_height is FixedSize) {
         final double h = (_height as FixedSize).value;
         final double contentH = _boxSizing == HtmlBoxSizing.borderBox
@@ -179,6 +196,14 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
       } else {
         yoga.setHeightAuto(root);
       }
+
+      double? rootMinH = resolveRootContentLimit(_minHeight);
+      double? rootMaxH = resolveRootContentLimit(_maxHeight);
+      if (rootMinH != null && rootMaxH != null && rootMaxH < rootMinH) {
+        rootMaxH = rootMinH;
+      }
+      if (rootMinH != null) yoga.setMinHeight(root, rootMinH);
+      if (rootMaxH != null) yoga.setMaxHeight(root, rootMaxH);
 
       final bool mainAxisIsRow =
           _flexDirection == HtmlFlexDirection.row ||
@@ -206,6 +231,42 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
         }
         return double.infinity;
       })();
+
+      double? resolveChildLimitContentPx(
+        RenderHtmlDiv child,
+        HtmlSize? v, {
+        required bool isWidthAxis,
+      }) {
+        if (v == null) return null;
+
+        double? borderBox;
+        if (v is FixedSize) {
+          borderBox = v.value;
+        } else if (v is PercentSize) {
+          final double ref = isWidthAxis ? contentWidth : preMeasureMaxHeight;
+          if (!ref.isFinite) return null;
+          borderBox = ref * v.value / 100.0;
+        } else {
+          return null;
+        }
+
+        if (child._boxSizing == HtmlBoxSizing.borderBox) {
+          final double containerBorderBoxWidth = child.size.width.isFinite
+              ? child.size.width
+              : contentWidth;
+          final EdgeInsets childBorder =
+              child._calculateBorderWidths(containerBorderBoxWidth);
+          final EdgeInsets childPadding =
+              child._padding?.resolve(referenceWidth: containerBorderBoxWidth) ??
+              EdgeInsets.zero;
+          final double sub = isWidthAxis
+              ? (childBorder.horizontal + childPadding.horizontal)
+              : (childBorder.vertical + childPadding.vertical);
+          borderBox = math.max(0.0, borderBox - sub);
+        }
+
+        return borderBox;
+      }
 
       for (final RenderBox c in children) {
         // Loose pre-layout for a measurable basis.
@@ -278,6 +339,41 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
           final HtmlSize w = c._width;
           final HtmlSize h = c._height;
           final HtmlLength basis = c._flexBasis;
+
+          // Apply min/max constraints to Yoga so that the final tight layout
+          // respects CSS-like size limits (otherwise the child render box can't
+          // shrink when given tight constraints).
+          double? childMinW = resolveChildLimitContentPx(
+            c,
+            c._minWidth,
+            isWidthAxis: true,
+          );
+          double? childMaxW = resolveChildLimitContentPx(
+            c,
+            c._maxWidth,
+            isWidthAxis: true,
+          );
+          if (childMinW != null && childMaxW != null && childMaxW < childMinW) {
+            childMaxW = childMinW;
+          }
+          if (childMinW != null) yoga.setMinWidth(node, childMinW);
+          if (childMaxW != null) yoga.setMaxWidth(node, childMaxW);
+
+          double? childMinH = resolveChildLimitContentPx(
+            c,
+            c._minHeight,
+            isWidthAxis: false,
+          );
+          double? childMaxH = resolveChildLimitContentPx(
+            c,
+            c._maxHeight,
+            isWidthAxis: false,
+          );
+          if (childMinH != null && childMaxH != null && childMaxH < childMinH) {
+            childMaxH = childMinH;
+          }
+          if (childMinH != null) yoga.setMinHeight(node, childMinH);
+          if (childMaxH != null) yoga.setMaxHeight(node, childMaxH);
 
           if (mainAxisIsRow) {
             if (w is FixedSize || w is PercentSize) {

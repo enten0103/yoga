@@ -144,6 +144,38 @@ class FlexLayoutPage extends StatelessWidget {
               ],
             ),
 
+            _sectionTitle('固定高度容器：column + justifyContent:center（垂直居中）'),
+            _frame(
+              direction: HtmlFlexDirection.column,
+              height: const FixedSize(220),
+              justifyContent: HtmlJustifyContent.center,
+              alignItems: HtmlAlignItems.center,
+              children: [
+                HtmlDiv(
+                  children: [
+                    HtmlDiv(
+                      background: HtmlBackground(color: Colors.teal),
+                      children: [
+                        Text(
+                          'Centered Box',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    HtmlDiv(
+                      background: HtmlBackground(color: Colors.teal),
+                      children: [
+                        Text(
+                          'Centered Box',
+                          style: TextStyle(color: Colors.white, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
             _sectionTitle('flexWrap：wrap（多行换行）'),
             _frame(
               wrap: HtmlFlexWrap.wrap,
