@@ -24,6 +24,9 @@ void main() {
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
 
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
+
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
@@ -43,6 +46,9 @@ void main() {
     final itemFinder = find.text('HtmlDiv Background 示例');
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
+
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
 
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();
@@ -64,6 +70,9 @@ void main() {
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
 
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
+
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
@@ -84,6 +93,9 @@ void main() {
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
 
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
+
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
@@ -101,6 +113,9 @@ void main() {
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
 
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
+
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();
 
@@ -117,6 +132,9 @@ void main() {
     final itemFinder = find.text('Flex × Image 交互示例');
     await tester.scrollUntilVisible(itemFinder, 200, scrollable: listFinder);
     expect(itemFinder, findsOneWidget);
+
+    await tester.ensureVisible(itemFinder);
+    await tester.pumpAndSettle();
 
     await tester.tap(itemFinder);
     await tester.pumpAndSettle();

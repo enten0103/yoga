@@ -20,6 +20,7 @@ import 'pages/css_paint_order_page.dart';
 import 'pages/min_max_size_page.dart';
 import 'pages/flex_layout_page.dart';
 import 'pages/flex_image_interaction_page.dart';
+import 'pages/html_image_natural_size_constraints_page.dart';
 import 'pages/jianjie_page.dart';
 import 'pages/strut_baseline_page.dart';
 
@@ -58,6 +59,15 @@ class HomePage extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (_) => const FlexImageInteractionPage(),
+              ),
+            ),
+          ),
+          ListTile(
+            title: const Text('HtmlImage natural size × constraints'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const HtmlImageNaturalSizeConstraintsPage(),
               ),
             ),
           ),

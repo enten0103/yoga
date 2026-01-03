@@ -493,9 +493,15 @@ class RenderHtmlImage extends RenderBox {
 
     if (hasW && !hasH) {
       if (natural.width > 0 && natural.height > 0) {
-        final double h = resolvedW * (natural.height / natural.width);
-        size = constraints.constrain(
-          Size(math.max(0.0, resolvedW), math.max(0.0, h)),
+        // IMPORTANT: the specified width may be clamped by parent constraints.
+        // Use the *used* width to compute the auto height, otherwise we can
+        // end up with a too-tall box after width is clamped.
+        final double usedW = constraints.constrainWidth(
+          math.max(0.0, resolvedW),
+        );
+        final double h = usedW * (natural.height / natural.width);
+        size = constraints.constrainSizeAndAttemptToPreserveAspectRatio(
+          Size(usedW, math.max(0.0, h)),
         );
         return;
       }
@@ -503,9 +509,14 @@ class RenderHtmlImage extends RenderBox {
 
     if (!hasW && hasH) {
       if (natural.width > 0 && natural.height > 0) {
-        final double w = resolvedH * (natural.width / natural.height);
-        size = constraints.constrain(
-          Size(math.max(0.0, w), math.max(0.0, resolvedH)),
+        // Symmetric to the width-only case: compute auto width from the used
+        // (possibly clamped) height.
+        final double usedH = constraints.constrainHeight(
+          math.max(0.0, resolvedH),
+        );
+        final double w = usedH * (natural.width / natural.height);
+        size = constraints.constrainSizeAndAttemptToPreserveAspectRatio(
+          Size(math.max(0.0, w), usedH),
         );
         return;
       }
