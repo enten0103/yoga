@@ -175,26 +175,12 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
         }
 
         if (_boxSizing == HtmlBoxSizing.borderBox) {
-          borderBox = math.max(0.0, borderBox - borderVertical - paddingVertical);
+          borderBox = math.max(
+            0.0,
+            borderBox - borderVertical - paddingVertical,
+          );
         }
         return borderBox;
-      }
-
-      if (_height is FixedSize) {
-        final double h = (_height as FixedSize).value;
-        final double contentH = _boxSizing == HtmlBoxSizing.borderBox
-            ? math.max(0.0, h - borderVertical - paddingVertical)
-            : h;
-        yoga.setHeight(root, contentH);
-      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
-        final double h =
-            constraints.maxHeight * (_height as PercentSize).value / 100.0;
-        final double contentH = _boxSizing == HtmlBoxSizing.borderBox
-            ? math.max(0.0, h - borderVertical - paddingVertical)
-            : h;
-        yoga.setHeight(root, contentH);
-      } else {
-        yoga.setHeightAuto(root);
       }
 
       double? rootMinH = resolveRootContentLimit(_minHeight);
@@ -202,6 +188,37 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
       if (rootMinH != null && rootMaxH != null && rootMaxH < rootMinH) {
         rootMaxH = rootMinH;
       }
+
+      double? explicitRootContentHeight;
+      if (_height is FixedSize) {
+        final double h = (_height as FixedSize).value;
+        explicitRootContentHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? math.max(0.0, h - borderVertical - paddingVertical)
+            : h;
+      } else if (_height is PercentSize && constraints.hasBoundedHeight) {
+        final double h =
+            constraints.maxHeight * (_height as PercentSize).value / 100.0;
+        explicitRootContentHeight = _boxSizing == HtmlBoxSizing.borderBox
+            ? math.max(0.0, h - borderVertical - paddingVertical)
+            : h;
+      }
+
+      // Yoga may not clamp an explicit height against maxHeight when the root
+      // has unbounded availableHeight (e.g. inside ListView). Clamp eagerly to
+      // match CSS used values.
+      double? usedRootContentHeight = explicitRootContentHeight;
+      if (usedRootContentHeight != null) {
+        if (rootMinH != null) {
+          usedRootContentHeight = math.max(usedRootContentHeight, rootMinH);
+        }
+        if (rootMaxH != null) {
+          usedRootContentHeight = math.min(usedRootContentHeight, rootMaxH);
+        }
+        yoga.setHeight(root, usedRootContentHeight);
+      } else {
+        yoga.setHeightAuto(root);
+      }
+
       if (rootMinH != null) yoga.setMinHeight(root, rootMinH);
       if (rootMaxH != null) yoga.setMaxHeight(root, rootMaxH);
 
@@ -209,7 +226,7 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
           _flexDirection == HtmlFlexDirection.row ||
           _flexDirection == HtmlFlexDirection.rowReverse;
 
-      final double preMeasureMaxHeight = (() {
+      double preMeasureMaxHeight = (() {
         if (_height is FixedSize) {
           final double h = (_height as FixedSize).value;
           return _boxSizing == HtmlBoxSizing.borderBox
@@ -232,6 +249,16 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
         return double.infinity;
       })();
 
+      if (usedRootContentHeight != null && usedRootContentHeight.isFinite) {
+        preMeasureMaxHeight = math.min(
+          preMeasureMaxHeight,
+          usedRootContentHeight,
+        );
+      }
+      if (rootMaxH != null && rootMaxH.isFinite) {
+        preMeasureMaxHeight = math.min(preMeasureMaxHeight, rootMaxH);
+      }
+
       double? resolveChildLimitContentPx(
         RenderHtmlDiv child,
         HtmlSize? v, {
@@ -251,13 +278,14 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
         }
 
         if (child._boxSizing == HtmlBoxSizing.borderBox) {
-          final double containerBorderBoxWidth = child.size.width.isFinite
-              ? child.size.width
-              : contentWidth;
-          final EdgeInsets childBorder =
-              child._calculateBorderWidths(containerBorderBoxWidth);
+          // CSS: percentage padding/margin is resolved against the containing
+          // block's width (here: parent contentWidth), not the child's own size.
+          final double containingBlockWidth = contentWidth;
+          final EdgeInsets childBorder = child._calculateBorderWidths(
+            containingBlockWidth,
+          );
           final EdgeInsets childPadding =
-              child._padding?.resolve(referenceWidth: containerBorderBoxWidth) ??
+              child._padding?.resolve(referenceWidth: containingBlockWidth) ??
               EdgeInsets.zero;
           final double sub = isWidthAxis
               ? (childBorder.horizontal + childPadding.horizontal)
@@ -425,7 +453,9 @@ extension _RenderHtmlDivLayoutYogaExt on RenderHtmlDiv {
               0.0,
               availableBorderBoxHeight - borderVertical - paddingVertical,
             )
-          : double.nan;
+          : ((usedRootContentHeight != null && usedRootContentHeight.isFinite)
+                ? usedRootContentHeight
+                : double.nan);
 
       yoga.calculateLayout(
         root,

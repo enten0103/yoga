@@ -271,6 +271,36 @@ class FlexLayoutPage extends StatelessWidget {
                 ),
               ],
             ),
+            _sectionTitle('max-height / height'),
+            HtmlDiv(
+              display: HtmlDisplay.flex,
+              justifyContent: HtmlJustifyContent.center,
+              alignItems: HtmlAlignItems.center,
+              height: const FixedSize(800),
+              maxHeight: const FixedSize(120),
+              border: HtmlBorder.all(
+                width: const FixedBorderWidth(1),
+                style: HtmlBorderStyle.solid,
+                color: const Color(0x1A000000),
+              ),
+              children: [
+                HtmlDiv(
+                  background: HtmlBackground(color: Colors.teal),
+                  children: [
+                    HtmlDiv(
+                      children: [
+                        HtmlDiv(
+                          key: const ValueKey('child'),
+                          width: const FixedSize(100),
+                          height: const FixedSize(300),
+                          background: HtmlBackground(color: Colors.amber),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ],
         ),
       ),
