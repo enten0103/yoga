@@ -20,6 +20,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
   final HtmlLength flexBasis;
   final HtmlAlignSelf alignSelf;
   final HtmlTextAlign textAlign;
+  final HtmlOverflowWrap overflowWrap;
   final HtmlLength? lineHeight;
   final HtmlLength textIndent;
   final HtmlMargin? margin;
@@ -51,6 +52,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     this.flexBasis = const HtmlLength.auto(),
     this.alignSelf = HtmlAlignSelf.auto,
     this.textAlign = HtmlTextAlign.start,
+    this.overflowWrap = HtmlOverflowWrap.normal,
     this.lineHeight,
     this.textIndent = const HtmlLength.px(0),
     this.margin,
@@ -78,6 +80,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     if (div.boxShadow.isNotEmpty) return false;
     if (div.transform != null) return false;
     if (div.textAlign != HtmlTextAlign.start) return false;
+    if (div.overflowWrap != HtmlOverflowWrap.normal) return false;
     if (div.lineHeight != null) return false;
     if (div.textIndent != const HtmlLength.px(0)) return false;
     if (div.flexGrow != 0.0) return false;
@@ -131,6 +134,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       flexBasis: flexBasis,
       alignSelf: alignSelf,
       textAlign: textAlign,
+      overflowWrap: overflowWrap,
       lineHeight: lineHeight,
       textIndent: textIndent,
       margin: margin,
@@ -164,6 +168,7 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
       ..flexBasis = flexBasis
       ..alignSelf = alignSelf
       ..textAlign = textAlign
+      ..overflowWrap = overflowWrap
       ..lineHeight = lineHeight
       ..textIndent = textIndent
       ..margin = margin
@@ -204,6 +209,9 @@ class HtmlDiv extends MultiChildRenderObjectWidget {
     properties.add(EnumProperty<HtmlAlignSelf>('alignSelf', alignSelf));
 
     properties.add(EnumProperty<HtmlTextAlign>('textAlign', textAlign));
+    properties.add(
+      EnumProperty<HtmlOverflowWrap>('overflowWrap', overflowWrap),
+    );
     properties.add(DiagnosticsProperty<HtmlLength?>('lineHeight', lineHeight));
     properties.add(DiagnosticsProperty<HtmlLength>('textIndent', textIndent));
 

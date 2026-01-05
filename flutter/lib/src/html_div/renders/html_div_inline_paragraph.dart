@@ -10,7 +10,17 @@ final RegExp _cjkLikeRegExp = RegExp(
 );
 
 extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
-  String _breakAllTextIfNeeded(String s) {
+  String _breakAllTextIfNeeded(
+    String s, {
+    required TextStyle style,
+    required double maxLineWidth,
+    required TextDirection textDirection,
+    required TextScaler textScaler,
+    required Locale? locale,
+    required TextWidthBasis textWidthBasis,
+    required TextHeightBehavior? textHeightBehavior,
+  }) {
+    if (_overflowWrap == HtmlOverflowWrap.normal) return s;
     // Prefer normal whitespace wrapping when there are break opportunities.
     // For long unbroken runs, add zero-width break points so trailing text
     // can still consume remaining line space (CSS-like break-all).
@@ -18,6 +28,23 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
     if (s.contains(_breakAllWhitespaceRegExp)) return s;
     if (s.contains(_cjkLikeRegExp)) return s;
     if (s.contains('\u200B')) return s;
+
+    // Only inject break opportunities when the unbroken run cannot fit within
+    // a single line by itself. This avoids splitting short words like "NESTED"
+    // when the paragraph wraps for other reasons (e.g. surrounding whitespace).
+    if (!maxLineWidth.isFinite || maxLineWidth <= 0) return s;
+    final TextPainter probe = TextPainter(
+      text: TextSpan(text: s, style: style),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      locale: locale,
+      textWidthBasis: textWidthBasis,
+      textHeightBehavior: textHeightBehavior,
+      maxLines: 1,
+      ellipsis: null,
+    )..layout(maxWidth: double.infinity);
+    if (probe.width <= maxLineWidth) return s;
+
     return s.characters.join('\u200B');
   }
 
@@ -146,7 +173,16 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
 
         child.layout(baseConstraints, parentUsesSize: true);
 
-        final String paragraphText = _breakAllTextIfNeeded(child.data);
+        final String paragraphText = _breakAllTextIfNeeded(
+          child.data,
+          style: child.style ?? defaultStyle,
+          maxLineWidth: contentWidth,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          locale: locale,
+          textWidthBasis: textWidthBasis,
+          textHeightBehavior: textHeightBehavior,
+        );
         final int start = paragraphOffset;
         final int end = start + paragraphText.length;
         textSegments.add((child, start, end));
@@ -174,7 +210,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
             child is RenderHtmlDiv &&
             child._display == HtmlDisplay.inline &&
             // Prefer max-content measurement for inline wrappers when the
-            // caller explicitly opts into intrinsic sizing (Min/Max/FitContent)
+            // caller explicitly opts into intrinsic sizing (Min/MaxContent)
             // or when line-height is explicitly set.
             //
             // Keep the default behavior for the transparent wrapper used for
@@ -182,8 +218,7 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
             // forced to the full line width.
             (child._lineHeight != null ||
                 child._width is MinContent ||
-                child._width is MaxContent ||
-                child._width is FitContent) &&
+                child._width is MaxContent) &&
             child._minWidth == null &&
             child._maxWidth == null;
 

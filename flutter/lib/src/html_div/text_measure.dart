@@ -23,16 +23,38 @@ int measureTextLineCount({
   TextHeightBehavior? textHeightBehavior,
   int? maxLines,
   String? semanticsLabel,
+  HtmlOverflowWrap overflowWrap = HtmlOverflowWrap.normal,
 }) {
   // 与渲染路径一致：无界宽度时按无限宽处理。
   final double effectiveMaxWidth = maxWidth.isFinite
       ? maxWidth
       : double.infinity;
 
+  final RegExp cjkLike = RegExp(
+    r'[\u3040-\u30FF\u3400-\u4DBF\u4E00-\u9FFF\uAC00-\uD7AF]',
+  );
+
   String breakAllIfNeeded(String s) {
+    if (overflowWrap == HtmlOverflowWrap.normal) return s;
     if (s.length <= 1) return s;
     if (s.contains(RegExp(r'\s'))) return s;
+    if (s.contains(cjkLike)) return s;
     if (s.contains('\u200B')) return s;
+    if (!effectiveMaxWidth.isFinite || effectiveMaxWidth <= 0) return s;
+
+    final TextPainter probe = TextPainter(
+      text: TextSpan(text: s, style: style),
+      textDirection: textDirection,
+      textScaler: textScaler,
+      locale: locale,
+      textWidthBasis: textWidthBasis,
+      textHeightBehavior: textHeightBehavior,
+      strutStyle: strutStyle,
+      maxLines: 1,
+      ellipsis: null,
+    )..layout(maxWidth: double.infinity);
+    if (probe.width <= effectiveMaxWidth) return s;
+
     return s.characters.join('\u200B');
   }
 

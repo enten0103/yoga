@@ -79,6 +79,7 @@ class RenderHtmlDiv extends RenderBox
   HtmlLength _flexBasis;
   HtmlAlignSelf _alignSelf;
   HtmlTextAlign _textAlign;
+  HtmlOverflowWrap _overflowWrap;
   HtmlLength? _lineHeight;
   HtmlLength _textIndent;
 
@@ -144,6 +145,7 @@ class RenderHtmlDiv extends RenderBox
     HtmlLength flexBasis = const HtmlLength.auto(),
     HtmlAlignSelf alignSelf = HtmlAlignSelf.auto,
     HtmlTextAlign textAlign = HtmlTextAlign.start,
+    HtmlOverflowWrap overflowWrap = HtmlOverflowWrap.normal,
     HtmlLength? lineHeight,
     HtmlLength textIndent = const HtmlLength.px(0),
     HtmlMargin? margin,
@@ -171,6 +173,7 @@ class RenderHtmlDiv extends RenderBox
        _flexBasis = flexBasis,
        _alignSelf = alignSelf,
        _textAlign = textAlign,
+       _overflowWrap = overflowWrap,
        _lineHeight = lineHeight,
        _textIndent = textIndent,
        _margin = margin,
@@ -213,6 +216,9 @@ class RenderHtmlDiv extends RenderBox
     properties.add(EnumProperty<HtmlAlignSelf>('alignSelf', _alignSelf));
 
     properties.add(EnumProperty<HtmlTextAlign>('textAlign', _textAlign));
+    properties.add(
+      EnumProperty<HtmlOverflowWrap>('overflowWrap', _overflowWrap),
+    );
     properties.add(DiagnosticsProperty<HtmlLength?>('lineHeight', _lineHeight));
     properties.add(DiagnosticsProperty<HtmlLength>('textIndent', _textIndent));
 
@@ -407,6 +413,14 @@ class RenderHtmlDiv extends RenderBox
   set textAlign(HtmlTextAlign value) {
     if (_textAlign != value) {
       _textAlign = value;
+      markNeedsLayout();
+    }
+  }
+
+  HtmlOverflowWrap get overflowWrap => _overflowWrap;
+  set overflowWrap(HtmlOverflowWrap value) {
+    if (_overflowWrap != value) {
+      _overflowWrap = value;
       markNeedsLayout();
     }
   }
@@ -714,23 +728,26 @@ class RenderHtmlDiv extends RenderBox
   ) {
     if (!contentWidth.isFinite || contentWidth <= 0) return 0;
 
-    final TextDirection textDirection = (() {
+    final RenderHtmlText? firstText = (() {
       RenderBox? c = firstChild;
       while (c != null) {
-        if (c is RenderHtmlText) return c.textDirection;
+        if (c is RenderHtmlText) return c;
         c = (c.parentData as HtmlDivParentData).nextSibling;
       }
-      return TextDirection.ltr;
+      return null;
     })();
 
-    final TextStyle defaultStyle = (() {
-      RenderBox? c = firstChild;
-      while (c != null) {
-        if (c is RenderHtmlText) return c.style ?? const TextStyle();
-        c = (c.parentData as HtmlDivParentData).nextSibling;
-      }
-      return const TextStyle();
-    })();
+    final TextDirection textDirection =
+        firstText?.textDirection ?? TextDirection.ltr;
+
+    final TextStyle defaultStyle = firstText?.style ?? const TextStyle();
+
+    final TextScaler textScaler = firstText?.textScaler ?? TextScaler.noScaling;
+    final Locale? locale = firstText?.locale;
+    final TextWidthBasis textWidthBasis =
+        firstText?.textWidthBasis ?? TextWidthBasis.parent;
+    final TextHeightBehavior? textHeightBehavior =
+        firstText?.textHeightBehavior;
 
     final double indentPx = _textIndent.isPercent
         ? _textIndent.resolvePx(reference: borderBoxWidth)
@@ -795,7 +812,16 @@ class RenderHtmlDiv extends RenderBox
 
       if (child is RenderHtmlText) {
         hasText = true;
-        final String paragraphText = _breakAllTextIfNeeded(child.data);
+        final String paragraphText = _breakAllTextIfNeeded(
+          child.data,
+          style: child.style ?? defaultStyle,
+          maxLineWidth: contentWidth,
+          textDirection: textDirection,
+          textScaler: textScaler,
+          locale: locale,
+          textWidthBasis: textWidthBasis,
+          textHeightBehavior: textHeightBehavior,
+        );
         spanChildren.add(
           TextSpan(
             text: paragraphText,
@@ -1240,6 +1266,15 @@ class RenderHtmlDiv extends RenderBox
       _usingParagraphInlineLayout = true;
       _paragraphPlaceholderChildren.clear();
 
+      final RenderHtmlText? firstText = (() {
+        RenderBox? c = firstChild;
+        while (c != null) {
+          if (c is RenderHtmlText) return c;
+          c = (c.parentData as HtmlDivParentData).nextSibling;
+        }
+        return null;
+      })();
+
       final TextDirection textDirection = (() {
         // Prefer the first HtmlText child's direction if available.
         RenderBox? c = firstChild;
@@ -1304,6 +1339,14 @@ class RenderHtmlDiv extends RenderBox
         return const TextStyle();
       })();
 
+      final TextScaler textScaler =
+          firstText?.textScaler ?? TextScaler.noScaling;
+      final Locale? locale = firstText?.locale;
+      final TextWidthBasis textWidthBasis =
+          firstText?.textWidthBasis ?? TextWidthBasis.parent;
+      final TextHeightBehavior? textHeightBehavior =
+          firstText?.textHeightBehavior;
+
       StrutStyle? strutStyle;
       if (_lineHeight != null) {
         final double baseFontSize = defaultStyle.fontSize ?? 14.0;
@@ -1349,7 +1392,16 @@ class RenderHtmlDiv extends RenderBox
           // We'll position this child based on its glyph boxes after the
           // unified paragraph is laid out.
 
-          final String paragraphText = _breakAllTextIfNeeded(child.data);
+          final String paragraphText = _breakAllTextIfNeeded(
+            child.data,
+            style: child.style ?? defaultStyle,
+            maxLineWidth: contentWidth,
+            textDirection: textDirection,
+            textScaler: textScaler,
+            locale: locale,
+            textWidthBasis: textWidthBasis,
+            textHeightBehavior: textHeightBehavior,
+          );
 
           final int start = paragraphOffset;
           final int end = start + paragraphText.length;

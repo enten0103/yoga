@@ -577,6 +577,23 @@ class InlinePage extends StatelessWidget {
                   height: FixedSize(22),
                   background: HtmlBackground(color: Color(0xFFB2DFDB)),
                 ),
+                HtmlDiv(
+                  children: [
+                    HtmlDiv(
+                      display: HtmlDisplay.inline,
+                      children: [
+                        HtmlDiv(
+                          children: [
+                            HtmlDiv(
+                              display: HtmlDisplay.inline,
+                              children: [HtmlText("Intriduction 1")],
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
