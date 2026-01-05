@@ -739,9 +739,14 @@ class RenderHtmlText extends RenderBox {
 
   @override
   double computeMaxIntrinsicWidth(double height) {
+    // CSS max-content width: format on a single line with infinite available
+    // width (i.e. do not use soft wrap opportunities). Flutter's
+    // `maxIntrinsicWidth` can behave closer to "longest word" for some
+    // texts with wrap opportunities, which makes `fit-content` under-measure
+    // and causes unexpected wrapping.
     final TextPainter painter = _newPainter(_buildSpan(_data))
       ..layout(maxWidth: double.infinity);
-    final double w = painter.maxIntrinsicWidth;
+    final double w = painter.width;
     if (_firstLineIndentPx > 0) {
       return w + _firstLineIndentPx;
     }

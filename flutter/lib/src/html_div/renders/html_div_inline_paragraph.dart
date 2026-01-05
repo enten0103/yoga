@@ -173,12 +173,17 @@ extension _RenderHtmlDivInlineParagraphExt on RenderHtmlDiv {
         final bool preferUnboundedWidth =
             child is RenderHtmlDiv &&
             child._display == HtmlDisplay.inline &&
-            // Only opt into max-content measurement for inline wrappers that
-            // explicitly set a line-height. This avoids breaking the
-            // transparent wrapper used for delegated text-indent, which must
-            // be forced to the full line width.
-            child._lineHeight != null &&
-            child._width is AutoSize &&
+            // Prefer max-content measurement for inline wrappers when the
+            // caller explicitly opts into intrinsic sizing (Min/Max/FitContent)
+            // or when line-height is explicitly set.
+            //
+            // Keep the default behavior for the transparent wrapper used for
+            // delegated text-indent (width:auto, no lineHeight), which must be
+            // forced to the full line width.
+            (child._lineHeight != null ||
+                child._width is MinContent ||
+                child._width is MaxContent ||
+                child._width is FitContent) &&
             child._minWidth == null &&
             child._maxWidth == null;
 

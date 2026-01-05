@@ -38,6 +38,7 @@ part 'src/html_div/renders/html_div_transform_hit_test.dart';
 part 'src/html_div/renders/html_div_background_paint.dart';
 part 'src/html_div/renders/html_div_box_shadow_paint.dart';
 part 'src/html_div/renders/html_div_image_streams.dart';
+part 'src/html_div/renders/html_div_intrinsics.dart';
 part 'src/html_div/renders/html_div_layout_yoga.dart';
 part 'src/html_div/renders/html_div_inline_paragraph.dart';
 
@@ -384,6 +385,8 @@ class RenderHtmlDiv extends RenderBox
     }
   }
 
+  // NOTE: intrinsic sizing helpers live in
+  // `src/html_div/renders/html_div_intrinsics.dart`.
   HtmlLength get flexBasis => _flexBasis;
   set flexBasis(HtmlLength value) {
     if (_flexBasis != value) {
@@ -705,181 +708,6 @@ class RenderHtmlDiv extends RenderBox
     );
   }
 
-  static double _inlineMinContentWidth(RenderBox? firstChild, double height) {
-    double maxBoxWidth = 0;
-    RenderBox? child = firstChild;
-    while (child != null) {
-      final EdgeInsets m = _resolveChildMargin(child, 0);
-      final double childWidth = child.getMinIntrinsicWidth(height);
-      maxBoxWidth = math.max(maxBoxWidth, childWidth + m.horizontal);
-      child = (child.parentData as HtmlDivParentData).nextSibling;
-    }
-    return maxBoxWidth;
-  }
-
-  static double _inlineMaxContentWidth(RenderBox? firstChild, double height) {
-    double maxLineWidth = 0;
-    double currentLineWidth = 0;
-
-    RenderBox? child = firstChild;
-    while (child != null) {
-      final EdgeInsets m = _resolveChildMargin(child, 0);
-      final HtmlDisplay d = _readChildHtmlDisplay(child);
-
-      if (d == HtmlDisplay.inline) {
-        final double childWidth = child.getMaxIntrinsicWidth(height);
-        currentLineWidth += childWidth + m.horizontal;
-      } else {
-        maxLineWidth = math.max(maxLineWidth, currentLineWidth);
-        final double childWidth = child.getMaxIntrinsicWidth(height);
-        maxLineWidth = math.max(maxLineWidth, childWidth + m.horizontal);
-        currentLineWidth = 0;
-      }
-
-      child = (child.parentData as HtmlDivParentData).nextSibling;
-    }
-
-    maxLineWidth = math.max(maxLineWidth, currentLineWidth);
-    return maxLineWidth;
-  }
-
-  static double _inlineIntrinsicHeight(
-    RenderBox? firstChild,
-    double width,
-    HtmlLength? lineHeight,
-    HtmlLength textIndent,
-    double indentReferenceWidth,
-  ) {
-    if (!width.isFinite || width <= 0) return 0;
-
-    final double indentPx = textIndent.isPercent
-        ? textIndent.resolvePx(reference: indentReferenceWidth)
-        : textIndent.resolvePx(reference: width);
-    bool indentApplied = false;
-    double currentLineIndent = 0;
-
-    double currentY = 0;
-    double inlineX = 0;
-    double lineAscent = 0;
-    double lineDescent = 0;
-
-    final (double strutAscent, double strutDescent) = _computeLineHeightStrut(
-      firstChild,
-      lineHeight,
-    );
-
-    double flushLine() {
-      if (lineAscent + lineDescent <= 0) return 0;
-      final double finalAscent = math.max(lineAscent, strutAscent);
-      final double finalDescent = math.max(lineDescent, strutDescent);
-      return finalAscent + finalDescent;
-    }
-
-    RenderBox? child = firstChild;
-    while (child != null) {
-      final HtmlDisplay d = _readChildHtmlDisplay(child);
-      final EdgeInsets m = _resolveChildMargin(child, width);
-
-      if (d == HtmlDisplay.inline) {
-        if (inlineX == 0) {
-          currentLineIndent = indentApplied ? 0.0 : indentPx;
-        }
-        final double available = math.max(0.0, width - currentLineIndent);
-        final double childMaxWidth = math.max(0.0, available - m.horizontal);
-        (double w, double h, double baseline) measure(
-          RenderBox box,
-          double maxWidth,
-        ) {
-          if (box is RenderParagraph) {
-            final RenderParagraph p = box;
-            final TextPainter painter = TextPainter(
-              text: p.text,
-              textAlign: p.textAlign,
-              textDirection: p.textDirection,
-              textScaler: p.textScaler,
-              maxLines: p.maxLines,
-              locale: p.locale,
-              strutStyle: p.strutStyle,
-              textWidthBasis: p.textWidthBasis,
-              textHeightBehavior: p.textHeightBehavior,
-            )..layout(maxWidth: maxWidth);
-
-            final double h = painter.height;
-            final double baseline = painter.computeDistanceToActualBaseline(
-              TextBaseline.alphabetic,
-            );
-            return (painter.width, h, baseline.clamp(0.0, h));
-          }
-
-          final double w = math.min(
-            box.getMaxIntrinsicWidth(double.infinity),
-            maxWidth,
-          );
-          final double h = box.getMaxIntrinsicHeight(maxWidth);
-          // Baseline-at-bottom for non-text.
-          return (w, h, h);
-        }
-
-        final RenderBox childBox = child;
-        var (double childWidth, double childHeight, double baselineDistance) =
-            measure(childBox, childMaxWidth);
-
-        double inlineBoxWidth = childWidth + m.horizontal;
-        if (inlineX > 0 && inlineX + inlineBoxWidth > available) {
-          currentY += flushLine();
-          inlineX = 0;
-          lineAscent = 0;
-          lineDescent = 0;
-          indentApplied = true;
-          currentLineIndent = 0;
-
-          // Recompute with the new line's available width. This mirrors the
-          // real layout path, where a child may wrap internally depending on
-          // the maxWidth constraint.
-          final double newAvailable = math.max(0.0, width - currentLineIndent);
-          final double newChildMaxWidth = math.max(
-            0.0,
-            newAvailable - m.horizontal,
-          );
-          final measured = measure(childBox, newChildMaxWidth);
-          childWidth = measured.$1;
-          childHeight = measured.$2;
-          baselineDistance = measured.$3;
-          inlineBoxWidth = childWidth + m.horizontal;
-        }
-
-        inlineX += inlineBoxWidth;
-        final double ascent = m.top + baselineDistance;
-        final double descent =
-            m.bottom + math.max(0.0, childHeight - baselineDistance);
-        lineAscent = math.max(lineAscent, ascent);
-        lineDescent = math.max(lineDescent, descent);
-
-        if (!indentApplied) {
-          // After we've placed content on the first inline line, subsequent lines are not indented.
-          indentApplied = true;
-        }
-      } else {
-        if (inlineX > 0) {
-          currentY += flushLine();
-          inlineX = 0;
-          lineAscent = 0;
-          lineDescent = 0;
-          indentApplied = true;
-          currentLineIndent = 0;
-        }
-        final double childMaxWidth = math.max(0.0, width - m.horizontal);
-        final double childHeight = child.getMaxIntrinsicHeight(childMaxWidth);
-        currentY += m.top + childHeight + m.bottom;
-      }
-
-      child = (child.parentData as HtmlDivParentData).nextSibling;
-    }
-
-    if (inlineX > 0) currentY += flushLine();
-    return currentY;
-  }
-
   double _inlineParagraphIntrinsicHeight(
     double contentWidth,
     double borderBoxWidth,
@@ -1040,15 +868,26 @@ class RenderHtmlDiv extends RenderBox
     } else {
       if (_display == HtmlDisplay.inline) {
         contentW = _inlineMinContentWidth(firstChild, height);
+      } else if (_display == HtmlDisplay.block) {
+        // Block formatting context: consecutive inline-level children share
+        // line boxes. Measure using the inline-run aware algorithm so blocks
+        // like <p>Text<span>..</span>Text</p> are sized CSS-like.
+        contentW = _inlineMinContentWidth(firstChild, height);
       } else {
         RenderBox? child = firstChild;
+        final bool sumChildren =
+            _display == HtmlDisplay.flex &&
+            (_flexDirection == HtmlFlexDirection.row ||
+                _flexDirection == HtmlFlexDirection.rowReverse) &&
+            _flexWrap == HtmlFlexWrap.noWrap;
         while (child != null) {
           // Percentage margins depend on containing block width; ignore in width intrinsics.
           final EdgeInsets m = _resolveChildMargin(child, 0);
-          contentW = math.max(
-            contentW,
-            child.getMinIntrinsicWidth(height) + m.horizontal,
-          );
+          final double childW =
+              child.getMinIntrinsicWidth(height) + m.horizontal;
+          contentW = sumChildren
+              ? (contentW + childW)
+              : math.max(contentW, childW);
           child = (child.parentData as HtmlDivParentData).nextSibling;
         }
       }
@@ -1073,16 +912,29 @@ class RenderHtmlDiv extends RenderBox
       contentW = (_width as FixedSize).value;
     } else {
       if (_display == HtmlDisplay.inline) {
-        contentW = _inlineMaxContentWidth(firstChild, height);
+        // Use paragraph-style measurement to match actual shaping/wrapping
+        // behavior (spans + placeholders), otherwise width can be subtly
+        // under-estimated and cause unexpected wraps in shrink-to-fit.
+        contentW = _paragraphLikeMaxContentWidth(firstChild, height);
+      } else if (_display == HtmlDisplay.block) {
+        // Block formatting context: max-content equals the widest line
+        // produced by consecutive inline runs separated by block children.
+        contentW = _paragraphLikeMaxContentWidth(firstChild, height);
       } else {
         RenderBox? child = firstChild;
+        final bool sumChildren =
+            _display == HtmlDisplay.flex &&
+            (_flexDirection == HtmlFlexDirection.row ||
+                _flexDirection == HtmlFlexDirection.rowReverse) &&
+            _flexWrap == HtmlFlexWrap.noWrap;
         while (child != null) {
           // Percentage margins depend on containing block width; ignore in width intrinsics.
           final EdgeInsets m = _resolveChildMargin(child, 0);
-          contentW = math.max(
-            contentW,
-            child.getMaxIntrinsicWidth(height) + m.horizontal,
-          );
+          final double childW =
+              child.getMaxIntrinsicWidth(height) + m.horizontal;
+          contentW = sumChildren
+              ? (contentW + childW)
+              : math.max(contentW, childW);
           child = (child.parentData as HtmlDivParentData).nextSibling;
         }
       }
@@ -1286,7 +1138,7 @@ class RenderHtmlDiv extends RenderBox
       sizingWidth = availableSizingWidth;
     } else {
       // Intrinsic / shrink-to-fit cases.
-      final double intrinsicBorderBox;
+      double intrinsicBorderBox;
       if (_width is MinContent) {
         intrinsicBorderBox = computeMinIntrinsicWidth(double.infinity);
       } else if (_width is MaxContent) {
@@ -1312,6 +1164,14 @@ class RenderHtmlDiv extends RenderBox
         intrinsicBorderBox = computeMaxIntrinsicWidth(double.infinity);
       } else {
         intrinsicBorderBox = 0.0;
+      }
+
+      // Text shaping and paragraph layout can differ fractionally between
+      // intrinsic sizing and the final tight layout (especially during Yoga
+      // pre-measure with maxWidth: infinity). Snap up to whole pixels to avoid
+      // borderline wraps where adding a character changes the chosen width.
+      if (intrinsicBorderBox.isFinite && intrinsicBorderBox > 0) {
+        intrinsicBorderBox = intrinsicBorderBox.ceilToDouble();
       }
 
       sizingWidth = _boxSizing == HtmlBoxSizing.borderBox

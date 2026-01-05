@@ -23,6 +23,7 @@ import 'pages/flex_image_interaction_page.dart';
 import 'pages/html_image_natural_size_constraints_page.dart';
 import 'pages/jianjie_page.dart';
 import 'pages/strut_baseline_page.dart';
+import 'pages/p_toc_001_copy_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -51,6 +52,13 @@ class HomePage extends StatelessWidget {
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const FlexLayoutPage()),
+            ),
+          ),
+          ListTile(
+            title: const Text('p-toc-001 复刻（HtmlDiv）'),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PToc001CopyPage()),
             ),
           ),
           ListTile(
