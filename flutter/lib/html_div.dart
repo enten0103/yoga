@@ -890,7 +890,10 @@ class RenderHtmlDiv extends RenderBox
         borderW.horizontal + paddingW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
-      contentW = (_width as FixedSize).value;
+      final double w = (_width as FixedSize).value;
+      return _boxSizing == HtmlBoxSizing.borderBox
+          ? w
+          : (w + nonContentHorizontal);
     } else {
       if (_display == HtmlDisplay.inline) {
         contentW = _inlineMinContentWidth(firstChild, height);
@@ -922,7 +925,7 @@ class RenderHtmlDiv extends RenderBox
     if (_boxSizing == HtmlBoxSizing.contentBox) {
       return contentW + nonContentHorizontal;
     } else {
-      return math.max(contentW, nonContentHorizontal);
+      return contentW + nonContentHorizontal;
     }
   }
 
@@ -935,7 +938,10 @@ class RenderHtmlDiv extends RenderBox
         borderW.horizontal + paddingW.horizontal;
     double contentW = 0;
     if (_width is FixedSize) {
-      contentW = (_width as FixedSize).value;
+      final double w = (_width as FixedSize).value;
+      return _boxSizing == HtmlBoxSizing.borderBox
+          ? w
+          : (w + nonContentHorizontal);
     } else {
       if (_display == HtmlDisplay.inline) {
         // Use paragraph-style measurement to match actual shaping/wrapping
@@ -969,7 +975,7 @@ class RenderHtmlDiv extends RenderBox
     if (_boxSizing == HtmlBoxSizing.contentBox) {
       return contentW + nonContentHorizontal;
     } else {
-      return math.max(contentW, nonContentHorizontal);
+      return contentW + nonContentHorizontal;
     }
   }
 
@@ -982,7 +988,10 @@ class RenderHtmlDiv extends RenderBox
     final double nonContentVertical = borderW.vertical + paddingW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
-      contentH = (_height as FixedSize).value;
+      final double h = (_height as FixedSize).value;
+      return _boxSizing == HtmlBoxSizing.borderBox
+          ? h
+          : (h + nonContentVertical);
     } else {
       final double referenceWidth = width.isFinite
           ? math.max(0.0, width - borderW.horizontal - paddingW.horizontal)
@@ -1010,7 +1019,7 @@ class RenderHtmlDiv extends RenderBox
     if (_boxSizing == HtmlBoxSizing.contentBox) {
       return contentH + nonContentVertical;
     } else {
-      return math.max(contentH, nonContentVertical);
+      return contentH + nonContentVertical;
     }
   }
 
@@ -1023,7 +1032,10 @@ class RenderHtmlDiv extends RenderBox
     final double nonContentVertical = borderW.vertical + paddingW.vertical;
     double contentH = 0;
     if (_height is FixedSize) {
-      contentH = (_height as FixedSize).value;
+      final double h = (_height as FixedSize).value;
+      return _boxSizing == HtmlBoxSizing.borderBox
+          ? h
+          : (h + nonContentVertical);
     } else {
       final double referenceWidth = width.isFinite
           ? math.max(0.0, width - borderW.horizontal - paddingW.horizontal)
@@ -1051,7 +1063,7 @@ class RenderHtmlDiv extends RenderBox
     if (_boxSizing == HtmlBoxSizing.contentBox) {
       return contentH + nonContentVertical;
     } else {
-      return math.max(contentH, nonContentVertical);
+      return contentH + nonContentVertical;
     }
   }
 

@@ -51,6 +51,7 @@ class _ExampleBlock extends StatelessWidget {
         const SizedBox(height: 8),
         HtmlDiv(
           width: const PercentSize(100),
+          display: HtmlDisplay.inline,
           height: const AutoSize(),
           border: HtmlBorder.all(width: const FixedBorderWidth(1)),
           padding: const HtmlPadding.all(HtmlLength.px(12)),
